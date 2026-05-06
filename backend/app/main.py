@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.db import get_session
+from app.routers import contacts
 
 # FastAPI() creates the ASGI app. title/version show up in auto-generated docs at /docs.
 app = FastAPI(title="tinyCRM", version="0.1.0")
@@ -19,6 +20,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(contacts.router)
 
 
 @app.get(

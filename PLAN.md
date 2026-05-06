@@ -58,7 +58,7 @@ A small CRM for self-employment, built as a learning project for FastAPI and Flu
 
 ## Development Phases
 
-### Phase 0 — Setup (½ day)
+### Phase 0 — Setup (½ day) [DONE]
 Prove the stack works end-to-end before writing any real feature.
 
 - FastAPI project scaffold with `uvicorn` and a `/ping` endpoint
