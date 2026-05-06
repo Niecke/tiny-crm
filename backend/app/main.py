@@ -1,11 +1,22 @@
 from fastapi import Depends, FastAPI, Response
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.db import get_session
 
 # FastAPI() creates the ASGI app. title/version show up in auto-generated docs at /docs.
 app = FastAPI(title="tinyCRM", version="0.1.0")
+
+# CORS lets the browser-hosted Flutter app call this API.
+# allow_origins=["*"] during local dev; set CORS_ORIGINS env var in prod.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get(

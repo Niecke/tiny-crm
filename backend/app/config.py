@@ -5,6 +5,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     database_url: str = "postgresql+asyncpg://crm:crm@localhost:5432/crm"
+    # Locked down to the real domain in prod via env var
+    cors_origins: list[str] = ["*"]
 
 
 settings = Settings()
