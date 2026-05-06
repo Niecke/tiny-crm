@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'pages/contacts_page.dart';
 import 'pages/health_page.dart';
 
 void main() {
-  runApp(const MyApp());
+  // ProviderScope must wrap the whole app — it owns all provider state.
+  // Without it, any ref.watch() call throws at runtime.
+  runApp(const ProviderScope(child: MyApp()));
 }
 
 class MyApp extends StatelessWidget {

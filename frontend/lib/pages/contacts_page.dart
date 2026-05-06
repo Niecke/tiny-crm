@@ -1,67 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../api.dart';
 import '../models/contact.dart';
+import '../providers/contacts_provider.dart';
 import 'contact_detail_page.dart';
 import 'contact_form_page.dart';
 
-class ContactsPage extends StatefulWidget {
+// ConsumerWidget = StatelessWidget with access to `ref` (the Riverpod handle).
+// ref.watch(provider) → reactive: widget rebuilds when provider value changes.
+// ref.read(provider)  → one-shot: use inside callbacks, not in build().
+class ContactsPage extends ConsumerWidget {
   const ContactsPage({super.key});
 
   @override
-  State<ContactsPage> createState() => _ContactsPageState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    // watch rebuilds this widget whenever contactsProvider emits a new value
+    final contactsAsync = ref.watch(contactsProvider);
 
-class _ContactsPageState extends State<ContactsPage> {
-  late Future<List<Contact>> _contactsFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _contactsFuture = _fetchContacts();
-  }
-
-  Future<List<Contact>> _fetchContacts() async {
-    final res = await dio.get<List<dynamic>>('/contacts/');
-    return res.data!.map((e) => Contact.fromJson(e as Map<String, dynamic>)).toList();
-  }
-
-  void _refresh() => setState(() { _contactsFuture = _fetchContacts(); });
-
-  // Navigator.push returns a Future that resolves when the pushed page pops.
-  // Passing true back signals that something changed → refresh the list.
-  Future<void> _openCreate() async {
-    final created = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(builder: (_) => const ContactFormPage()),
-    );
-    if (created == true && mounted) _refresh();
-  }
-
-  Future<void> _openDetail(Contact contact) async {
-    final changed = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(builder: (_) => ContactDetailPage(contact: contact)),
-    );
-    if (changed == true && mounted) _refresh();
-  }
-
-  Future<void> _openEdit(Contact contact) async {
-    final saved = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(builder: (_) => ContactFormPage(contact: contact)),
-    );
-    if (saved == true && mounted) _refresh();
-  }
-
-  @override
-  Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Contacts card — fixed width, scrolls independently
           SizedBox(
             width: 360,
             child: Card(
@@ -74,7 +34,10 @@ class _ContactsPageState extends State<ContactsPage> {
                       children: [
                         Text('Contacts', style: Theme.of(context).textTheme.titleMedium),
                         IconButton(
-                          onPressed: _openCreate,
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const ContactFormPage()),
+                          ),
                           icon: const Icon(Icons.add),
                           tooltip: 'New Contact',
                         ),
@@ -83,9 +46,37 @@ class _ContactsPageState extends State<ContactsPage> {
                   ),
                   const Divider(height: 1),
                   Expanded(
-                    child: FutureBuilder<List<Contact>>(
-                      future: _contactsFuture,
-                      builder: (context, snapshot) => _buildBody(snapshot),
+                    // .when() is Riverpod's replacement for FutureBuilder — handles
+                    // loading / error / data in one clean expression
+                    child: contactsAsync.when(
+                      loading: () => const Center(child: CircularProgressIndicator()),
+                      error: (e, _) => Center(
+                        child: SelectableText(
+                          'Error: $e',
+                          style: TextStyle(color: Theme.of(context).colorScheme.error),
+                        ),
+                      ),
+                      data: (contacts) => contacts.isEmpty
+                          ? const Center(child: Text('No contacts yet.'))
+                          : ListView.builder(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              itemCount: contacts.length,
+                              itemBuilder: (context, index) => _ContactTile(
+                                contact: contacts[index],
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => ContactDetailPage(contact: contacts[index]),
+                                  ),
+                                ),
+                                onEdit: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => ContactFormPage(contact: contacts[index]),
+                                  ),
+                                ),
+                              ),
+                            ),
                     ),
                   ),
                 ],
@@ -93,47 +84,15 @@ class _ContactsPageState extends State<ContactsPage> {
             ),
           ),
           const SizedBox(width: 16),
-          // Right panel — future content goes here
           const Expanded(child: SizedBox()),
         ],
       ),
     );
   }
-
-  Widget _buildBody(AsyncSnapshot<List<Contact>> snapshot) {
-    if (snapshot.connectionState == ConnectionState.waiting) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (snapshot.hasError) {
-      return Center(
-        child: SelectableText(
-          'Error: ${snapshot.error}',
-          style: TextStyle(color: Theme.of(context).colorScheme.error),
-        ),
-      );
-    }
-    final contacts = snapshot.data!;
-    if (contacts.isEmpty) {
-      return const Center(child: Text('No contacts yet. Create one!'));
-    }
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      itemCount: contacts.length,
-      itemBuilder: (context, index) => _ContactCard(
-        contact: contacts[index],
-        onTap: () => _openDetail(contacts[index]),
-        onEdit: () => _openEdit(contacts[index]),
-      ),
-    );
-  }
 }
 
-class _ContactCard extends StatelessWidget {
-  const _ContactCard({
-    required this.contact,
-    required this.onTap,
-    required this.onEdit,
-  });
+class _ContactTile extends StatelessWidget {
+  const _ContactTile({required this.contact, required this.onTap, required this.onEdit});
 
   final Contact contact;
   final VoidCallback onTap;

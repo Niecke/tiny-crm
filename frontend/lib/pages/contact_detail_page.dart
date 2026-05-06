@@ -1,22 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../api.dart';
 import '../models/contact.dart';
+import '../providers/contacts_provider.dart';
 import 'contact_form_page.dart';
 
-class ContactDetailPage extends StatelessWidget {
+class ContactDetailPage extends ConsumerWidget {
   const ContactDetailPage({super.key, required this.contact});
 
   final Contact contact;
 
-  Future<void> _delete(BuildContext context) async {
+  Future<void> _delete(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete contact'),
         content: Text('Delete "${contact.name}"? This cannot be undone.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
@@ -26,22 +30,23 @@ class ContactDetailPage extends StatelessWidget {
       ),
     );
     if (confirmed != true || !context.mounted) return;
-    await dio.delete('/contacts/${contact.id}');
-    // Pop with true so the contacts list knows to refresh
-    if (context.mounted) Navigator.pop(context, true);
+    await ref.read(contactsRepositoryProvider).delete(contact.id);
+    // Invalidate → contactsProvider refetches → ContactsPage list updates automatically
+    ref.invalidate(contactsProvider);
+    if (context.mounted) Navigator.pop(context);
   }
 
-  Future<void> _edit(BuildContext context) async {
-    final saved = await Navigator.push<bool>(
+  Future<void> _edit(BuildContext context, WidgetRef ref) async {
+    await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => ContactFormPage(contact: contact)),
     );
-    // Pop with true so the contacts list refreshes
-    if (saved == true && context.mounted) Navigator.pop(context, true);
+    // Form already invalidated the provider — pop detail so user lands on fresh list
+    if (context.mounted) Navigator.pop(context);
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       appBar: AppBar(
         title: Text(contact.name),
@@ -49,7 +54,7 @@ class ContactDetailPage extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.delete_outline),
             tooltip: 'Delete',
-            onPressed: () => _delete(context),
+            onPressed: () => _delete(context, ref),
           ),
         ],
       ),
@@ -57,11 +62,16 @@ class ContactDetailPage extends StatelessWidget {
         padding: const EdgeInsets.all(24),
         children: [
           _Field(label: 'Name', value: contact.name),
-          if (contact.company != null) _Field(label: 'Company', value: contact.company!),
-          if (contact.email != null) _Field(label: 'Email', value: contact.email!),
-          if (contact.phone != null) _Field(label: 'Phone', value: contact.phone!),
-          if (contact.address != null) _Field(label: 'Address', value: contact.address!),
-          if (contact.notes != null) _Field(label: 'Notes', value: contact.notes!),
+          if (contact.company != null)
+            _Field(label: 'Company', value: contact.company!),
+          if (contact.email != null)
+            _Field(label: 'Email', value: contact.email!),
+          if (contact.phone != null)
+            _Field(label: 'Phone', value: contact.phone!),
+          if (contact.address != null)
+            _Field(label: 'Address', value: contact.address!),
+          if (contact.notes != null)
+            _Field(label: 'Notes', value: contact.notes!),
           if (contact.tags.isNotEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
@@ -72,7 +82,9 @@ class ContactDetailPage extends StatelessWidget {
                   const SizedBox(height: 4),
                   Wrap(
                     spacing: 6,
-                    children: contact.tags.map((t) => Chip(label: Text(t))).toList(),
+                    children: contact.tags
+                        .map((t) => Chip(label: Text(t)))
+                        .toList(),
                   ),
                 ],
               ),
@@ -80,7 +92,7 @@ class ContactDetailPage extends StatelessWidget {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _edit(context),
+        onPressed: () => _edit(context, ref),
         icon: const Icon(Icons.edit),
         label: const Text('Edit'),
       ),

@@ -1,23 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../api.dart';
 import '../models/contact.dart';
+import '../providers/contacts_provider.dart';
 
-class ContactFormPage extends StatefulWidget {
-  // contact == null → create mode, contact != null → edit mode
+// ConsumerStatefulWidget = StatefulWidget with ref.
+// Use when you need both local mutable state (form controllers) and providers.
+class ContactFormPage extends ConsumerStatefulWidget {
   const ContactFormPage({super.key, this.contact});
 
   final Contact? contact;
 
   @override
-  State<ContactFormPage> createState() => _ContactFormPageState();
+  ConsumerState<ContactFormPage> createState() => _ContactFormPageState();
 }
 
-class _ContactFormPageState extends State<ContactFormPage> {
+class _ContactFormPageState extends ConsumerState<ContactFormPage> {
   final _formKey = GlobalKey<FormState>();
   bool _saving = false;
 
-  // One controller per field — each holds the current text value
   late final TextEditingController _name;
   late final TextEditingController _company;
   late final TextEditingController _email;
@@ -43,7 +44,6 @@ class _ContactFormPageState extends State<ContactFormPage> {
 
   @override
   void dispose() {
-    // Always dispose controllers to free resources
     for (final ctrl in [_name, _company, _email, _phone, _address, _tags, _notes]) {
       ctrl.dispose();
     }
@@ -68,21 +68,23 @@ class _ContactFormPageState extends State<ContactFormPage> {
       if (_notes.text.isNotEmpty) 'notes': _notes.text,
     };
 
+    final repo = ref.read(contactsRepositoryProvider);
     if (_isEdit) {
-      await dio.patch('/contacts/${widget.contact!.id}', data: body);
+      await repo.update(widget.contact!.id, body);
     } else {
-      await dio.post('/contacts/', data: body);
+      await repo.create(body);
     }
 
-    if (mounted) Navigator.pop(context, true);
+    // Invalidate here — every watcher of contactsProvider refetches automatically
+    ref.invalidate(contactsProvider);
+
+    if (mounted) Navigator.pop(context);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_isEdit ? 'Edit Contact' : 'New Contact'),
-      ),
+      appBar: AppBar(title: Text(_isEdit ? 'Edit Contact' : 'New Contact')),
       body: Form(
         key: _formKey,
         child: ListView(
