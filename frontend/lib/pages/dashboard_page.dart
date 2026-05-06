@@ -30,7 +30,7 @@ class _DashboardPageState extends State<DashboardPage> {
         future: _pingFuture,
         builder: (context, snapshot) => switch (snapshot.connectionState) {
           ConnectionState.waiting => const CircularProgressIndicator(),
-          _ when snapshot.hasError => Text(
+          _ when snapshot.hasError => SelectableText(
               'Error: ${snapshot.error}',
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),

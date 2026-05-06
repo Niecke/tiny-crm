@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import Depends, FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
@@ -22,8 +24,28 @@ app.add_middleware(
 @app.get(
     "/health",
     responses={
-        200: {"content": {"application/json": {"example": {"status": "ok", "db": "ok"}}}},
-        503: {"content": {"application/json": {"example": {"status": "degraded", "db": "error"}}}},
+        200: {
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "ok",
+                        "db": "ok",
+                        "timestamp": "2026-05-06 15:17:50.366912",
+                    }
+                }
+            }
+        },
+        503: {
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "degraded",
+                        "db": "error",
+                        "timestamp": "2026-05-06 15:17:50.366912",
+                    }
+                }
+            }
+        },
     },
 )
 async def health(
@@ -37,6 +59,7 @@ async def health(
     Returns 503 when the database is unreachable.
     Suitable for load balancer health checks.
     """
+    ts = str(datetime.now())
     try:
         await session.execute(text("SELECT 1"))
         db_ok = True
@@ -47,7 +70,11 @@ async def health(
         # Response parameter lets us set the status code without abandoning normal return flow
         response.status_code = 503
 
-    return {"status": "ok" if db_ok else "degraded", "db": "ok" if db_ok else "error"}
+    return {
+        "status": "ok" if db_ok else "degraded",
+        "db": "ok" if db_ok else "error",
+        "timestamp": ts,
+    }
 
 
 @app.get("/ping")

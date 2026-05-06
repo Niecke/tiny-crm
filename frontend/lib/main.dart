@@ -29,9 +29,11 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int _currentIndex = 0;
+  int _refreshCounter = 0;
 
-  static const _pages = [DashboardPage(), HealthPage()];
   static const _labels = ['Dashboard', 'Health'];
+
+  void _refresh() => setState(() => _refreshCounter++);
 
   @override
   Widget build(BuildContext context) {
@@ -53,11 +55,22 @@ class _AppShellState extends State<AppShell> {
                 style: TextStyle(fontWeight: _currentIndex == i ? FontWeight.bold : FontWeight.normal),
               ),
             ),
+          IconButton(
+            onPressed: _refresh,
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh',
+          ),
           const SizedBox(width: 8),
         ],
       ),
-      // IndexedStack keeps all pages alive — no refetch when switching tabs
-      body: IndexedStack(index: _currentIndex, children: _pages),
+      // New ValueKey on each refresh → Flutter recreates the page → initState reruns → data refetched
+      body: IndexedStack(
+        index: _currentIndex,
+        children: [
+          DashboardPage(key: ValueKey('dash_$_refreshCounter')),
+          HealthPage(key: ValueKey('health_$_refreshCounter')),
+        ],
+      ),
     );
   }
 }

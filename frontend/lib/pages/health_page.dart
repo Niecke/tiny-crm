@@ -23,8 +23,6 @@ class _HealthPageState extends State<HealthPage> {
     return res.data!;
   }
 
-  void _refresh() => setState(() { _healthFuture = _fetchHealth(); });
-
   @override
   Widget build(BuildContext context) {
     return Center(
@@ -32,7 +30,7 @@ class _HealthPageState extends State<HealthPage> {
         future: _healthFuture,
         builder: (context, snapshot) => switch (snapshot.connectionState) {
           ConnectionState.waiting => const CircularProgressIndicator(),
-          _ when snapshot.hasError => Text(
+          _ when snapshot.hasError => SelectableText(
               'Error: ${snapshot.error}',
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
@@ -40,13 +38,11 @@ class _HealthPageState extends State<HealthPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 ...snapshot.data!.entries.map(
-                  (e) => _StatusRow(label: e.key, value: e.value as String),
-                ),
-                const SizedBox(height: 24),
-                FilledButton.icon(
-                  onPressed: _refresh,
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Refresh'),
+                  (e) => _StatusRow(
+                    label: e.key,
+                    value: e.value as String,
+                    showIcon: e.key != 'timestamp',
+                  ),
                 ),
               ],
             ),
@@ -57,10 +53,11 @@ class _HealthPageState extends State<HealthPage> {
 }
 
 class _StatusRow extends StatelessWidget {
-  const _StatusRow({required this.label, required this.value});
+  const _StatusRow({required this.label, required this.value, this.showIcon = true});
 
   final String label;
   final String value;
+  final bool showIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -70,11 +67,13 @@ class _StatusRow extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            ok ? Icons.check_circle : Icons.error,
-            color: ok ? Colors.green : Colors.red,
-          ),
-          const SizedBox(width: 12),
+          if (showIcon) ...[
+            Icon(
+              ok ? Icons.check_circle : Icons.error,
+              color: ok ? Colors.green : Colors.red,
+            ),
+            const SizedBox(width: 12),
+          ],
           Text(
             '$label: $value',
             style: Theme.of(context).textTheme.titleMedium,
