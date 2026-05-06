@@ -78,11 +78,3 @@ async def health(
         "db": "ok" if db_ok else "error",
         "timestamp": ts,
     }
-
-
-@app.get("/ping")
-async def ping() -> dict[str, str]:
-    """
-    Just a test endpoint for the flutter frontend.
-    """
-    return {"result": "pong"}

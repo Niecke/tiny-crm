@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'pages/dashboard_page.dart';
+import 'pages/contacts_page.dart';
 import 'pages/health_page.dart';
 
 void main() {
@@ -67,7 +67,7 @@ class _AppShellState extends State<AppShell> {
       body: IndexedStack(
         index: _currentIndex,
         children: [
-          DashboardPage(key: ValueKey('dash_$_refreshCounter')),
+          ContactsPage(key: ValueKey('dash_$_refreshCounter')),
           HealthPage(key: ValueKey('health_$_refreshCounter')),
         ],
       ),
