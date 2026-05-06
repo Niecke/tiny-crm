@@ -30,3 +30,19 @@ sudo dnf install chromium
 echo 'export CHROME_EXECUTABLE=chromium-browser' >> ~/.bashrc
 source ~/.bashrc
 flutter doctor
+
+## Git Stuff
+
+```
+#!/usr/bin/env bash
+set -e
+
+echo ">>> ruff (backend)"
+cd backend
+.venv/bin/ruff check .
+.venv/bin/ruff format --check .
+cd ..
+
+echo ">>> flutter analyze (frontend)"
+"$HOME/development/flutter/bin/flutter" analyze frontend
+```
