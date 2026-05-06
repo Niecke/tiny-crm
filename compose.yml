@@ -15,10 +15,5 @@ services:
       timeout: 5s
       retries: 10
 
-  frontend:
-    build: ./frontend
-    ports:
-      - "8080:8080"
-
 volumes:
   postgres_data:

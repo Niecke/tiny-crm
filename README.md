@@ -3,10 +3,24 @@ cd backend
 # --reload watches files and restarts on save — essential for development
 
 
+## Dev — just postgres
+podman-compose up -d
 
-podman-compose up -d      # start postgres
-podman-compose down       # stop (data persists in volume)
-podman-compose down -v    # stop + wipe all data
+cd backend
+.venv/bin/uvicorn app.main:app --reload
+# --reload watches files and restarts on save — essential for development
+
+cd frontend
+flutter run
+
+## Full stack (test)
+podman-compose -f compose.full.yml up -d
+
+podman-compose -f compose.full.yml build frontend && \
+  podman-compose -f compose.full.yml build backend && \
+  podman-compose -f compose.full.yml up -d --force-recreate frontend backend
+
+podman-compose -f compose.full.yml logs -f backend   # watch startup + migrations
 
 
 ## Flutter Setup
