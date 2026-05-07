@@ -2,11 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import current_active_user
 from app.db import get_session
 from app.models.contact import Contact
 from app.schemas.contact import ContactCreate, ContactRead, ContactUpdate
 
-router = APIRouter(prefix="/contacts", tags=["contacts"])
+router = APIRouter(
+    prefix="/contacts", tags=["contacts"], dependencies=[Depends(current_active_user)]
+)
 
 
 @router.get("/", response_model=list[ContactRead])

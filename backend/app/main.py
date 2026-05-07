@@ -5,9 +5,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import auth_backend, fastapi_users
 from app.config import settings
 from app.db import get_session
 from app.routers import contacts
+from app.schemas.user import UserRead, UserUpdate
 
 # FastAPI() creates the ASGI app. title/version show up in auto-generated docs at /docs.
 app = FastAPI(title="tinyCRM", version="0.1.0")
@@ -22,6 +24,17 @@ app.add_middleware(
 )
 
 app.include_router(contacts.router)
+app.include_router(
+    fastapi_users.get_auth_router(auth_backend),
+    prefix="/auth/jwt",
+    tags=["auth"],
+)
+# /users/me for profile; no register router — admin created via CLI
+app.include_router(
+    fastapi_users.get_users_router(UserRead, UserUpdate),
+    prefix="/users",
+    tags=["users"],
+)
 
 
 @app.get(

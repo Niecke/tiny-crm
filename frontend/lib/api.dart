@@ -1,9 +1,23 @@
 import 'package:dio/dio.dart';
 
+import 'core/auth_storage.dart';
+
 // Single Dio instance shared across all pages.
-// One instance = one connection pool = better performance.
 final dio = Dio(BaseOptions(
   baseUrl: 'http://localhost:8000',
-  // Don't throw on non-2xx — let each call inspect the status itself.
   validateStatus: (status) => status != null,
-));
+))..interceptors.add(_AuthInterceptor());
+
+class _AuthInterceptor extends Interceptor {
+  @override
+  Future<void> onRequest(
+    RequestOptions options,
+    RequestInterceptorHandler handler,
+  ) async {
+    final token = await AuthStorage.readToken();
+    if (token != null) {
+      options.headers['Authorization'] = 'Bearer $token';
+    }
+    handler.next(options);
+  }
+}
