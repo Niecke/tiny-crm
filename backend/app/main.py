@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import auth_backend, fastapi_users
 from app.config import settings
 from app.db import get_session
-from app.routers import contacts
+from app.routers import contacts, users
 from app.schemas.user import UserRead, UserUpdate
 
 # FastAPI() creates the ASGI app. title/version show up in auto-generated docs at /docs.
@@ -29,6 +29,9 @@ app.include_router(
     prefix="/auth/jwt",
     tags=["auth"],
 )
+# Custom password-change endpoint (must register before fastapi-users users router
+# so the more specific /users/me/password route resolves first).
+app.include_router(users.router)
 # /users/me for profile; no register router — admin created via CLI
 app.include_router(
     fastapi_users.get_users_router(UserRead, UserUpdate),

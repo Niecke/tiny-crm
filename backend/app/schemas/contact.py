@@ -1,4 +1,5 @@
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel
 
@@ -26,7 +27,7 @@ class ContactUpdate(BaseModel):
 
 # ContactRead is what the API returns — includes server-generated fields
 class ContactRead(ContactCreate):
-    id: int
+    id: UUID
     created_at: datetime
     updated_at: datetime
 

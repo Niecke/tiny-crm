@@ -19,12 +19,12 @@ class ContactsRepository {
     return Contact.fromJson(res.data!);
   }
 
-  Future<Contact> update(int id, Map<String, dynamic> data) async {
+  Future<Contact> update(String id, Map<String, dynamic> data) async {
     final res = await _dio.patch<Map<String, dynamic>>('/contacts/$id', data: data);
     return Contact.fromJson(res.data!);
   }
 
-  Future<void> delete(int id) async {
+  Future<void> delete(String id) async {
     await _dio.delete('/contacts/$id');
   }
 }

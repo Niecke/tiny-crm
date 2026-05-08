@@ -10,7 +10,7 @@ class Contact {
     this.notes,
   });
 
-  final int id;
+  final String id;
   final String name;
   final String? company;
   final String? email;
@@ -20,7 +20,7 @@ class Contact {
   final String? notes;
 
   factory Contact.fromJson(Map<String, dynamic> json) => Contact(
-        id: json['id'] as int,
+        id: json['id'] as String,
         name: json['name'] as String,
         company: json['company'] as String?,
         email: json['email'] as String?,
