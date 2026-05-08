@@ -1,10 +1,25 @@
+import 'dart:async';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'api.dart';
+import 'config.dart';
 import 'router.dart';
 
 void main() {
-  runApp(const ProviderScope(child: App()));
+  runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    final config = await AppConfig.load();
+    dio = Dio(BaseOptions(
+      baseUrl: config.apiUrl,
+      validateStatus: (status) => status != null,
+    ))..interceptors.add(AuthInterceptor());
+    runApp(const ProviderScope(child: App()));
+  }, (error, stack) {
+    debugPrint('UNCAUGHT: $error\n$stack');
+  });
 }
 
 class App extends ConsumerWidget {

@@ -3,12 +3,9 @@ import 'package:dio/dio.dart';
 import 'core/auth_storage.dart';
 
 // Single Dio instance shared across all pages.
-final dio = Dio(BaseOptions(
-  baseUrl: 'http://localhost:8000',
-  validateStatus: (status) => status != null,
-))..interceptors.add(_AuthInterceptor());
+late final Dio dio;
 
-class _AuthInterceptor extends Interceptor {
+class AuthInterceptor extends Interceptor {
   @override
   Future<void> onRequest(
     RequestOptions options,

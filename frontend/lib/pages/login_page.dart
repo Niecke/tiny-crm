@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../api.dart';
 import '../features/auth/auth_provider.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
@@ -33,7 +34,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     });
 
     try {
-      final dio = Dio(BaseOptions(baseUrl: 'http://localhost:8000'));
       // fastapi-users JWT login expects form data, not JSON
       final resp = await dio.post(
         '/auth/jwt/login',
@@ -42,13 +42,16 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           'password': _passwordCtrl.text,
         }),
       );
-      final token = resp.data['access_token'] as String;
-      await ref.read(authProvider.notifier).setToken(token);
+      if (resp.statusCode == 200) {
+        final token = resp.data['access_token'] as String;
+        await ref.read(authProvider.notifier).setToken(token);
+      } else if (resp.statusCode == 400) {
+        setState(() => _error = 'Invalid credentials.');
+      } else {
+        setState(() => _error = 'Login failed (${resp.statusCode}).');
+      }
     } on DioException catch (e) {
-      final status = e.response?.statusCode;
-      setState(() {
-        _error = status == 400 ? 'Invalid credentials.' : 'Login failed ($status).';
-      });
+      setState(() => _error = 'Login failed (${e.response?.statusCode}).');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -64,6 +67,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             padding: const EdgeInsets.all(24),
             child: Form(
               key: _formKey,
+              child: AutofillGroup(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -74,6 +78,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     controller: _emailCtrl,
                     decoration: const InputDecoration(labelText: 'Email'),
                     keyboardType: TextInputType.emailAddress,
+                    autofillHints: const [AutofillHints.email],
                     validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
                   ),
                   const SizedBox(height: 16),
@@ -81,6 +86,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     controller: _passwordCtrl,
                     decoration: const InputDecoration(labelText: 'Password'),
                     obscureText: true,
+                    autofillHints: const [AutofillHints.password],
                     validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
                     onFieldSubmitted: (_) => _submit(),
                   ),
@@ -96,6 +102,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         : const Text('Sign in'),
                   ),
                 ],
+              ),
               ),
             ),
           ),
