@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'features/auth/auth_provider.dart';
 import 'providers/contacts_provider.dart';
 import 'pages/change_password_page.dart';
-import 'pages/contacts_page.dart';
+import 'pages/dashboard_page.dart';
 import 'pages/health_page.dart';
 import 'pages/login_page.dart';
 
@@ -41,7 +41,10 @@ GoRouter _buildRouter(Ref ref) {
       ShellRoute(
         builder: (context, state, child) => AppShell(child: child),
         routes: [
-          GoRoute(path: '/', builder: (context, state) => const ContactsPage()),
+          GoRoute(
+            path: '/',
+            builder: (context, state) => const DashboardPage(),
+          ),
           GoRoute(
             path: '/health',
             builder: (context, state) => const HealthPage(),
@@ -73,7 +76,7 @@ class AppShell extends ConsumerWidget {
         title: const Text('tinyCRM'),
         actions: [
           for (final (label, path) in [
-            ('Contacts', '/'),
+            ('Dashboard', '/'),
             ('Health', '/health'),
           ])
             TextButton(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/task.dart';
@@ -13,12 +14,14 @@ class TaskFormPage extends ConsumerStatefulWidget {
   ConsumerState<TaskFormPage> createState() => _TaskFormPageState();
 }
 
-class _TaskFormPageState extends ConsumerState<TaskFormPage> {
+class _TaskFormPageState extends ConsumerState<TaskFormPage>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   bool _saving = false;
 
   late final TextEditingController _title;
   late final TextEditingController _description;
+  late final TabController _descTabController;
   DateTime? _dueDate;
   int _priority = 0;
 
@@ -30,6 +33,7 @@ class _TaskFormPageState extends ConsumerState<TaskFormPage> {
     final t = widget.task;
     _title = TextEditingController(text: t?.title);
     _description = TextEditingController(text: t?.description);
+    _descTabController = TabController(length: 2, vsync: this);
     _dueDate = t?.dueDate;
     _priority = t?.priority ?? 0;
   }
@@ -38,6 +42,7 @@ class _TaskFormPageState extends ConsumerState<TaskFormPage> {
   void dispose() {
     _title.dispose();
     _description.dispose();
+    _descTabController.dispose();
     super.dispose();
   }
 
@@ -110,12 +115,55 @@ class _TaskFormPageState extends ConsumerState<TaskFormPage> {
             ),
             Padding(
               padding: const EdgeInsets.only(bottom: 16),
-              child: TextFormField(
-                controller: _description,
-                maxLines: 6,
+              child: InputDecorator(
                 decoration: const InputDecoration(
-                  labelText: 'Description (Markdown)',
                   border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.zero,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TabBar(
+                      controller: _descTabController,
+                      tabs: const [Tab(text: 'Edit'), Tab(text: 'Preview')],
+                      dividerColor: Colors.transparent,
+                    ),
+                    const Divider(height: 1),
+                    SizedBox(
+                      height: 180,
+                      child: TabBarView(
+                        controller: _descTabController,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: TextField(
+                              controller: _description,
+                              maxLines: null,
+                              expands: true,
+                              decoration: const InputDecoration.collapsed(
+                                hintText: 'Description (Markdown supported)',
+                              ),
+                            ),
+                          ),
+                          SingleChildScrollView(
+                            padding: const EdgeInsets.all(12),
+                            child: ListenableBuilder(
+                              listenable: _description,
+                              builder: (context, _) {
+                                final text = _description.text;
+                                return text.isEmpty
+                                    ? const Text(
+                                        'Nothing to preview.',
+                                        style: TextStyle(color: Colors.grey),
+                                      )
+                                    : MarkdownBody(data: text);
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
