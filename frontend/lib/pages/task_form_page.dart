@@ -21,6 +21,7 @@ class _TaskFormPageState extends ConsumerState<TaskFormPage>
 
   late final TextEditingController _title;
   late final TextEditingController _description;
+  late final TextEditingController _tags;
   late final TabController _descTabController;
   DateTime? _dueDate;
   int _priority = 0;
@@ -33,6 +34,7 @@ class _TaskFormPageState extends ConsumerState<TaskFormPage>
     final t = widget.task;
     _title = TextEditingController(text: t?.title);
     _description = TextEditingController(text: t?.description);
+    _tags = TextEditingController(text: t?.tags.join(', '));
     _descTabController = TabController(length: 2, vsync: this);
     _dueDate = t?.dueDate;
     _priority = t?.priority ?? 0;
@@ -42,6 +44,7 @@ class _TaskFormPageState extends ConsumerState<TaskFormPage>
   void dispose() {
     _title.dispose();
     _description.dispose();
+    _tags.dispose();
     _descTabController.dispose();
     super.dispose();
   }
@@ -74,11 +77,16 @@ class _TaskFormPageState extends ConsumerState<TaskFormPage>
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
 
+    final tags = _tags.text.isEmpty
+        ? <String>[]
+        : _tags.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+
     final body = {
       'title': _title.text,
       if (_description.text.isNotEmpty) 'description': _description.text,
       'due_date': _dueDate?.toUtc().toIso8601String(),
       'priority': _priority,
+      'tags': tags,
     };
 
     final repo = ref.read(tasksRepositoryProvider);
@@ -208,6 +216,17 @@ class _TaskFormPageState extends ConsumerState<TaskFormPage>
                   DropdownMenuItem(value: 2, child: Text('High')),
                 ],
                 onChanged: (v) => setState(() => _priority = v ?? 0),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: TextFormField(
+                controller: _tags,
+                decoration: const InputDecoration(
+                  labelText: 'Tags',
+                  hintText: 'bug, urgent, feature',
+                  border: OutlineInputBorder(),
+                ),
               ),
             ),
             FilledButton(

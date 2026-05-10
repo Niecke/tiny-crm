@@ -5,6 +5,7 @@ class Task {
     this.description,
     this.dueDate,
     required this.priority,
+    this.tags = const [],
   });
 
   final String id;
@@ -12,6 +13,7 @@ class Task {
   final String? description;
   final DateTime? dueDate;
   final int priority;
+  final List<String> tags;
 
   bool get isOverdue =>
       dueDate != null && dueDate!.isBefore(DateTime.now());
@@ -24,5 +26,6 @@ class Task {
             ? null
             : DateTime.parse(json['due_date'] as String),
         priority: json['priority'] as int,
+        tags: (json['tags'] as List<dynamic>?)?.cast<String>() ?? [],
       );
 }

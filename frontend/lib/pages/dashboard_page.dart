@@ -185,6 +185,13 @@ class _TaskTile extends ConsumerWidget {
               'Priority: ${_priorityLabels[task.priority.clamp(0, 2)]}',
               style: const TextStyle(color: Colors.grey),
             ),
+            if (task.tags.isNotEmpty)
+              Wrap(
+                spacing: 4,
+                children: task.tags
+                    .map((t) => Chip(label: Text(t), visualDensity: VisualDensity.compact))
+                    .toList(),
+              ),
           ],
         ),
         trailing: IconButton(
