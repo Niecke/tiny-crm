@@ -7,8 +7,11 @@ class TasksRepository {
 
   final Dio _dio;
 
-  Future<List<Task>> list() async {
-    final res = await _dio.get<List<dynamic>>('/tasks/');
+  Future<List<Task>> list({String? search}) async {
+    final res = await _dio.get<List<dynamic>>(
+      '/tasks/',
+      queryParameters: search != null && search.isNotEmpty ? {'search': search} : null,
+    );
     return res.data!.map((e) => Task.fromJson(e as Map<String, dynamic>)).toList();
   }
 

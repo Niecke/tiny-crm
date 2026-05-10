@@ -8,6 +8,6 @@ final tasksRepositoryProvider = Provider<TasksRepository>((ref) {
   return TasksRepository(dio);
 });
 
-final tasksProvider = FutureProvider<List<Task>>((ref) {
-  return ref.read(tasksRepositoryProvider).list();
+final tasksProvider = FutureProvider.family<List<Task>, String>((ref, search) {
+  return ref.read(tasksRepositoryProvider).list(search: search.isEmpty ? null : search);
 });

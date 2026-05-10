@@ -10,93 +10,139 @@ import 'contact_detail_page.dart';
 import 'contact_form_page.dart';
 import 'task_form_page.dart';
 
-class DashboardPage extends ConsumerWidget {
+class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= 700) {
+          return const Padding(
+            padding: EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(width: 360, child: _ContactsPanel()),
+                SizedBox(width: 16),
+                Expanded(child: _TasksPanel()),
+              ],
+            ),
+          );
+        }
+        return DefaultTabController(
+          length: 2,
+          child: Column(
+            children: [
+              Expanded(
+                child: TabBarView(
+                  children: const [_ContactsPanel(), _TasksPanel()],
+                ),
+              ),
+              const TabBar(
+                tabs: [
+                  Tab(icon: Icon(Icons.people_outline), text: 'Contacts'),
+                  Tab(icon: Icon(Icons.task_outlined), text: 'Tasks'),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ContactsPanel extends ConsumerWidget {
+  const _ContactsPanel();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final contactsAsync = ref.watch(contactsProvider);
 
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Column(
         children: [
-          SizedBox(
-            width: 360,
-            child: Card(
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Contacts', style: Theme.of(context).textTheme.titleMedium),
-                        IconButton(
-                          onPressed: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const ContactFormPage()),
-                          ),
-                          icon: const Icon(Icons.add),
-                          tooltip: 'New Contact',
-                        ),
-                      ],
-                    ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Contacts', style: Theme.of(context).textTheme.titleMedium),
+                IconButton(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ContactFormPage()),
                   ),
-                  const Divider(height: 1),
-                  Expanded(
-                    child: contactsAsync.when(
-                      loading: () => const Center(child: CircularProgressIndicator()),
-                      error: (e, _) => Center(
-                        child: SelectableText(
-                          'Error: $e',
-                          style: TextStyle(color: Theme.of(context).colorScheme.error),
-                        ),
-                      ),
-                      data: (contacts) => contacts.isEmpty
-                          ? const Center(child: Text('No contacts yet.'))
-                          : ListView.builder(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              itemCount: contacts.length,
-                              itemBuilder: (context, index) => _ContactTile(
-                                contact: contacts[index],
-                                onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => ContactDetailPage(contact: contacts[index]),
-                                  ),
-                                ),
-                                onEdit: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => ContactFormPage(contact: contacts[index]),
-                                  ),
-                                ),
-                              ),
-                            ),
-                    ),
-                  ),
-                ],
-              ),
+                  icon: const Icon(Icons.add),
+                  tooltip: 'New Contact',
+                ),
+              ],
             ),
           ),
-          const SizedBox(width: 16),
-          const Expanded(child: _TasksPanel()),
+          const Divider(height: 1),
+          Expanded(
+            child: contactsAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(
+                child: SelectableText(
+                  'Error: $e',
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ),
+              data: (contacts) => contacts.isEmpty
+                  ? const Center(child: Text('No contacts yet.'))
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      itemCount: contacts.length,
+                      itemBuilder: (context, index) => _ContactTile(
+                        contact: contacts[index],
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ContactDetailPage(contact: contacts[index]),
+                          ),
+                        ),
+                        onEdit: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ContactFormPage(contact: contacts[index]),
+                          ),
+                        ),
+                      ),
+                    ),
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _TasksPanel extends ConsumerWidget {
+class _TasksPanel extends ConsumerStatefulWidget {
   const _TasksPanel();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final tasksAsync = ref.watch(tasksProvider);
+  ConsumerState<_TasksPanel> createState() => _TasksPanelState();
+}
+
+class _TasksPanelState extends ConsumerState<_TasksPanel> {
+  final _searchController = TextEditingController();
+  String _search = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tasksAsync = ref.watch(tasksProvider(_search));
 
     return Card(
+      margin: EdgeInsets.zero,
       child: Column(
         children: [
           Padding(
@@ -114,6 +160,28 @@ class _TasksPanel extends ConsumerWidget {
                   tooltip: 'New Task',
                 ),
               ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search tasks…',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _search.isEmpty
+                    ? null
+                    : IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _search = '');
+                        },
+                      ),
+                isDense: true,
+                border: const OutlineInputBorder(),
+              ),
+              onChanged: (v) => setState(() => _search = v.trim()),
             ),
           ),
           const Divider(height: 1),
