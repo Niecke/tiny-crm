@@ -96,7 +96,10 @@ class AppShell extends ConsumerWidget {
               ),
             ),
           IconButton(
-            onPressed: () => ref.invalidate(contactsProvider),
+            onPressed: () => {
+              ref.invalidate(contactsProvider),
+              ref.invalidate(tasksProvider),
+            },
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh',
           ),
