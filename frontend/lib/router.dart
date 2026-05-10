@@ -30,7 +30,7 @@ GoRouter _buildRouter(Ref ref) {
       final authState = ref.read(authProvider);
       if (authState.isLoading) return null;
 
-      final isLoggedIn = authState.valueOrNull != null;
+      final isLoggedIn = authState.asData?.value != null;
       final onLogin = state.matchedLocation == '/login';
 
       if (!isLoggedIn && !onLogin) return '/login';
