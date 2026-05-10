@@ -130,6 +130,7 @@ class _TasksPanel extends ConsumerStatefulWidget {
 class _TasksPanelState extends ConsumerState<_TasksPanel> {
   final _searchController = TextEditingController();
   String _search = '';
+  bool _includeDone = false;
 
   @override
   void dispose() {
@@ -139,7 +140,8 @@ class _TasksPanelState extends ConsumerState<_TasksPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final tasksAsync = ref.watch(tasksProvider(_search));
+    final filter = (search: _search, includeDone: _includeDone);
+    final tasksAsync = ref.watch(tasksProvider(filter));
 
     return Card(
       margin: EdgeInsets.zero,
@@ -151,13 +153,25 @@ class _TasksPanelState extends ConsumerState<_TasksPanel> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('Tasks', style: Theme.of(context).textTheme.titleMedium),
-                IconButton(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const TaskFormPage()),
-                  ),
-                  icon: const Icon(Icons.add),
-                  tooltip: 'New Task',
+                Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => setState(() => _includeDone = !_includeDone),
+                      icon: Icon(
+                        _includeDone ? Icons.check_circle : Icons.check_circle_outline,
+                        color: _includeDone ? Theme.of(context).colorScheme.primary : null,
+                      ),
+                      tooltip: _includeDone ? 'Hide done tasks' : 'Show done tasks',
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const TaskFormPage()),
+                      ),
+                      icon: const Icon(Icons.add),
+                      tooltip: 'New Task',
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -228,9 +242,24 @@ class _TaskTile extends ConsumerWidget {
           context,
           MaterialPageRoute(builder: (_) => TaskFormPage(task: task)),
         ),
+        leading: IconButton(
+          icon: Icon(
+            task.done ? Icons.check_circle : Icons.radio_button_unchecked,
+            color: task.done ? Theme.of(context).colorScheme.primary : null,
+          ),
+          tooltip: task.done ? 'Mark undone' : 'Mark done',
+          onPressed: () async {
+            await ref.read(tasksRepositoryProvider).update(task.id, {'done': !task.done});
+            ref.invalidate(tasksProvider);
+          },
+        ),
         title: Text(
           task.title,
-          style: TextStyle(color: titleColor, fontWeight: FontWeight.w500),
+          style: TextStyle(
+            color: task.done ? Colors.grey : titleColor,
+            fontWeight: FontWeight.w500,
+            decoration: task.done ? TextDecoration.lineThrough : null,
+          ),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

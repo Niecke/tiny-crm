@@ -18,6 +18,7 @@ class Task(Base):
     due_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     priority: Mapped[int] = mapped_column(default=0)
     tags: Mapped[list[str]] = mapped_column(ARRAY(String), server_default="{}")
+    done: Mapped[bool] = mapped_column(default=False, server_default="false")
     created: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

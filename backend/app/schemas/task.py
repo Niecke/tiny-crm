@@ -10,6 +10,7 @@ class TaskCreate(BaseModel):
     due_date: datetime | None = None
     priority: int = 0
     tags: list[str] = []
+    done: bool = False
 
 
 class TaskUpdate(BaseModel):
@@ -18,6 +19,7 @@ class TaskUpdate(BaseModel):
     due_date: datetime | None = None
     priority: int | None = None
     tags: list[str] | None = None
+    done: bool | None = None
 
 
 class TaskRead(TaskCreate):

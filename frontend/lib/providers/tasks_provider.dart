@@ -8,6 +8,11 @@ final tasksRepositoryProvider = Provider<TasksRepository>((ref) {
   return TasksRepository(dio);
 });
 
-final tasksProvider = FutureProvider.family<List<Task>, String>((ref, search) {
-  return ref.read(tasksRepositoryProvider).list(search: search.isEmpty ? null : search);
+typedef TasksFilter = ({String search, bool includeDone});
+
+final tasksProvider = FutureProvider.family<List<Task>, TasksFilter>((ref, filter) {
+  return ref.read(tasksRepositoryProvider).list(
+        search: filter.search.isEmpty ? null : filter.search,
+        includeDone: filter.includeDone,
+      );
 });

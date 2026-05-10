@@ -18,12 +18,15 @@ async def list_tasks(
     skip: int = 0,
     limit: int = 200,
     search: str | None = None,
+    include_done: bool = False,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> list[Task]:
     # NULLS LAST so tasks without a due date sink to the bottom; client renders
     # overdue (due_date < now) red, and ascending order naturally floats them up.
     query = select(Task).where(Task.user_id == user.id)
+    if not include_done:
+        query = query.where(Task.done.is_(False))
     if search:
         query = query.where(Task.title.ilike(f"%{search}%"))
     result = await session.execute(
