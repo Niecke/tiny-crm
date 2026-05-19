@@ -4,7 +4,9 @@ RUN flutter precache --web
 COPY pubspec.* ./
 RUN flutter pub get
 COPY . .
-RUN flutter build web --release
+RUN export APP_VERSION=$(date -u +%Y%m%d%H%M%S) && \
+    echo "{\"version\":\"$APP_VERSION\"}" > web/version.json && \
+    flutter build web --release --dart-define=APP_VERSION=$APP_VERSION
 
 FROM caddy:alpine
 COPY --from=builder /app/build/web /srv

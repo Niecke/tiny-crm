@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'api.dart';
 import 'config.dart';
+import 'core/version_check.dart';
 import 'router.dart';
 
 void main() {
@@ -17,6 +18,7 @@ void main() {
       validateStatus: (status) => status != null,
     ))..interceptors.add(AuthInterceptor());
     runApp(const ProviderScope(child: App()));
+    VersionCheckService.start();
   }, (error, stack) {
     debugPrint('UNCAUGHT: $error\n$stack');
   });
