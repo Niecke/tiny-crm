@@ -1,15 +1,16 @@
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import current_active_user
+from app.auth.users import User
 from app.db import get_session
 from app.models.contact import Contact
 from app.schemas.contact import ContactCreate, ContactRead, ContactUpdate
 
-router = APIRouter(
-    prefix="/contacts", tags=["contacts"], dependencies=[Depends(current_active_user)]
-)
+router = APIRouter(prefix="/contacts", tags=["contacts"])
 
 
 @router.get("/", response_model=list[ContactRead])
@@ -17,18 +18,22 @@ async def list_contacts(
     skip: int = 0,
     limit: int = 50,
     session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_active_user),
 ) -> list[Contact]:
-    result = await session.execute(select(Contact).offset(skip).limit(limit))
+    result = await session.execute(
+        select(Contact).where(Contact.user_id == user.id).offset(skip).limit(limit)
+    )
     return list(result.scalars().all())
 
 
 @router.get("/{contact_id}", response_model=ContactRead)
 async def get_contact(
-    contact_id: int,
+    contact_id: UUID,
     session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_active_user),
 ) -> Contact:
     contact = await session.get(Contact, contact_id)
-    if contact is None:
+    if contact is None or contact.user_id != user.id:
         raise HTTPException(status_code=404, detail="Contact not found")
     return contact
 
@@ -37,8 +42,9 @@ async def get_contact(
 async def create_contact(
     body: ContactCreate,
     session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_active_user),
 ) -> Contact:
-    contact = Contact(**body.model_dump())
+    contact = Contact(**body.model_dump(), user_id=user.id)
     session.add(contact)
     await session.commit()
     await session.refresh(contact)
@@ -47,12 +53,13 @@ async def create_contact(
 
 @router.patch("/{contact_id}", response_model=ContactRead)
 async def update_contact(
-    contact_id: int,
+    contact_id: UUID,
     body: ContactUpdate,
     session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_active_user),
 ) -> Contact:
     contact = await session.get(Contact, contact_id)
-    if contact is None:
+    if contact is None or contact.user_id != user.id:
         raise HTTPException(status_code=404, detail="Contact not found")
     # exclude_unset=True — only update fields the caller actually sent
     for field, value in body.model_dump(exclude_unset=True).items():
@@ -64,11 +71,12 @@ async def update_contact(
 
 @router.delete("/{contact_id}", status_code=204)
 async def delete_contact(
-    contact_id: int,
+    contact_id: UUID,
     session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_active_user),
 ) -> None:
     contact = await session.get(Contact, contact_id)
-    if contact is None:
+    if contact is None or contact.user_id != user.id:
         raise HTTPException(status_code=404, detail="Contact not found")
     await session.delete(contact)
     await session.commit()

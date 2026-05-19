@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/providers/tasks_provider.dart';
 import 'package:go_router/go_router.dart';
 
 import 'features/auth/auth_provider.dart';
 import 'providers/contacts_provider.dart';
-import 'pages/contacts_page.dart';
+import 'pages/change_password_page.dart';
+import 'pages/dashboard_page.dart';
 import 'pages/health_page.dart';
 import 'pages/login_page.dart';
+import 'pages/profile_page.dart';
 
 final routerProvider = Provider<GoRouter>((ref) => _buildRouter(ref));
 
@@ -29,7 +32,7 @@ GoRouter _buildRouter(Ref ref) {
       final authState = ref.read(authProvider);
       if (authState.isLoading) return null;
 
-      final isLoggedIn = authState.valueOrNull != null;
+      final isLoggedIn = authState.asData?.value != null;
       final onLogin = state.matchedLocation == '/login';
 
       if (!isLoggedIn && !onLogin) return '/login';
@@ -40,10 +43,21 @@ GoRouter _buildRouter(Ref ref) {
       ShellRoute(
         builder: (context, state, child) => AppShell(child: child),
         routes: [
-          GoRoute(path: '/', builder: (context, state) => const ContactsPage()),
+          GoRoute(
+            path: '/',
+            builder: (context, state) => const DashboardPage(),
+          ),
           GoRoute(
             path: '/health',
             builder: (context, state) => const HealthPage(),
+          ),
+          GoRoute(
+            path: '/account',
+            builder: (context, state) => const ProfilePage(),
+          ),
+          GoRoute(
+            path: '/account/password',
+            builder: (context, state) => const ChangePasswordPage(),
           ),
         ],
       ),
@@ -68,7 +82,7 @@ class AppShell extends ConsumerWidget {
         title: const Text('tinyCRM'),
         actions: [
           for (final (label, path) in [
-            ('Contacts', '/'),
+            ('Dashboard', '/'),
             ('Health', '/health'),
           ])
             TextButton(
@@ -88,9 +102,17 @@ class AppShell extends ConsumerWidget {
               ),
             ),
           IconButton(
-            onPressed: () => ref.invalidate(contactsProvider),
+            onPressed: () => {
+              ref.invalidate(contactsProvider),
+              ref.invalidate(tasksProvider),
+            },
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh',
+          ),
+          IconButton(
+            onPressed: () => context.push('/account'),
+            icon: const Icon(Icons.account_circle_outlined),
+            tooltip: 'My account',
           ),
           IconButton(
             onPressed: () => ref.read(authProvider.notifier).logout(),

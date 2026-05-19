@@ -12,6 +12,7 @@ from alembic import context
 from app.db import Base
 from app.config import settings  # noqa: F401
 from app.models import contact as _  # noqa: F401
+from app.models import task as _task  # noqa: F401
 from app.auth import users as _auth  # noqa: F401
 
 config = context.config

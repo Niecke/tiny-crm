@@ -30,7 +30,7 @@ class App extends ConsumerWidget {
     final router = ref.watch(routerProvider);
     return MaterialApp.router(
       title: 'tinyCRM',
-      theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo)),
+      theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF48BB78))),
       routerConfig: router,
     );
   }
