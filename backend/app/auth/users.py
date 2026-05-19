@@ -1,18 +1,24 @@
 from collections.abc import AsyncGenerator
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import Depends
 from fastapi_users import BaseUserManager, FastAPIUsers, UUIDIDMixin
 from fastapi_users.authentication import AuthenticationBackend, BearerTransport, JWTStrategy
 from fastapi_users.db import SQLAlchemyBaseUserTableUUID, SQLAlchemyUserDatabase
+from sqlalchemy import DateTime, String
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.config import settings
 from app.db import Base, get_session
 
 
 class User(SQLAlchemyBaseUserTableUUID, Base):
-    pass
+    name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    password_changed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
 
 async def get_user_db(

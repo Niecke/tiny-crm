@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../api.dart';
+import '../providers/user_provider.dart';
 
 class ChangePasswordPage extends ConsumerStatefulWidget {
   const ChangePasswordPage({super.key});
@@ -36,13 +36,11 @@ class _ChangePasswordPageState extends ConsumerState<ChangePasswordPage> {
     });
 
     try {
-      await dio.post(
-        '/users/me/password',
-        data: {
-          'old_password': _oldCtrl.text,
-          'new_password': _newCtrl.text,
-        },
-      );
+      await ref.read(userRepositoryProvider).changePassword(
+            oldPassword: _oldCtrl.text,
+            newPassword: _newCtrl.text,
+          );
+      ref.invalidate(userProfileProvider);
       if (!mounted) return;
       final messenger = ScaffoldMessenger.of(context);
       if (context.canPop()) {

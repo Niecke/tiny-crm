@@ -1,3 +1,4 @@
+from datetime import datetime
 from uuid import UUID
 
 from fastapi_users import schemas as fu_schemas
@@ -5,11 +6,12 @@ from pydantic import BaseModel, Field
 
 
 class UserRead(fu_schemas.BaseUser[UUID]):
-    pass
+    name: str | None = None
+    password_changed_at: datetime | None = None
 
 
 class UserUpdate(fu_schemas.BaseUserUpdate):
-    pass
+    name: str | None = None
 
 
 class PasswordChange(BaseModel):

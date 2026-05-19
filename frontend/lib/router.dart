@@ -9,6 +9,7 @@ import 'pages/change_password_page.dart';
 import 'pages/dashboard_page.dart';
 import 'pages/health_page.dart';
 import 'pages/login_page.dart';
+import 'pages/profile_page.dart';
 
 final routerProvider = Provider<GoRouter>((ref) => _buildRouter(ref));
 
@@ -49,6 +50,10 @@ GoRouter _buildRouter(Ref ref) {
           GoRoute(
             path: '/health',
             builder: (context, state) => const HealthPage(),
+          ),
+          GoRoute(
+            path: '/account',
+            builder: (context, state) => const ProfilePage(),
           ),
           GoRoute(
             path: '/account/password',
@@ -105,9 +110,9 @@ class AppShell extends ConsumerWidget {
             tooltip: 'Refresh',
           ),
           IconButton(
-            onPressed: () => context.push('/account/password'),
-            icon: const Icon(Icons.password),
-            tooltip: 'Change password',
+            onPressed: () => context.push('/account'),
+            icon: const Icon(Icons.account_circle_outlined),
+            tooltip: 'My account',
           ),
           IconButton(
             onPressed: () => ref.read(authProvider.notifier).logout(),
