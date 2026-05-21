@@ -6,7 +6,7 @@ RUN flutter pub get
 COPY . .
 RUN export APP_VERSION=$(date -u +%Y%m%d%H%M%S) && \
     echo "{\"version\":\"$APP_VERSION\"}" > web/version.json && \
-    flutter build web --release --dart-define=APP_VERSION=$APP_VERSION
+    flutter build web --release --dart-define=APP_VERSION=$APP_VERSION --wasm
 
 FROM caddy:alpine
 COPY --from=builder /app/build/web /srv

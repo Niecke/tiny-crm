@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -53,12 +55,28 @@ class DashboardPage extends StatelessWidget {
   }
 }
 
-class _ContactsPanel extends ConsumerWidget {
+class _ContactsPanel extends ConsumerStatefulWidget {
   const _ContactsPanel();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final contactsAsync = ref.watch(contactsProvider);
+  ConsumerState<_ContactsPanel> createState() => _ContactsPanelState();
+}
+
+class _ContactsPanelState extends ConsumerState<_ContactsPanel> {
+  final _searchController = TextEditingController();
+  String _search = '';
+  Timer? _debounce;
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final contactsAsync = ref.watch(contactsProvider(_search));
 
     return Card(
       margin: EdgeInsets.zero,
@@ -69,7 +87,10 @@ class _ContactsPanel extends ConsumerWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Contacts', style: Theme.of(context).textTheme.titleMedium),
+                Text(
+                  'Contacts',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
                 IconButton(
                   onPressed: () => Navigator.push(
                     context,
@@ -79,6 +100,34 @@ class _ContactsPanel extends ConsumerWidget {
                   tooltip: 'New Contact',
                 ),
               ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search contacts…',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _search.isEmpty
+                    ? null
+                    : IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _debounce?.cancel();
+                          _searchController.clear();
+                          setState(() => _search = '');
+                        },
+                      ),
+                isDense: true,
+                border: const OutlineInputBorder(),
+              ),
+              onChanged: (v) {
+                _debounce?.cancel();
+                _debounce = Timer(const Duration(seconds: 1), () {
+                  setState(() => _search = v.trim());
+                });
+              },
             ),
           ),
           const Divider(height: 1),
@@ -94,20 +143,25 @@ class _ContactsPanel extends ConsumerWidget {
               data: (contacts) => contacts.isEmpty
                   ? const Center(child: Text('No contacts yet.'))
                   : ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       itemCount: contacts.length,
                       itemBuilder: (context, index) => _ContactTile(
                         contact: contacts[index],
                         onTap: () => Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => ContactDetailPage(contact: contacts[index]),
+                            builder: (_) =>
+                                ContactDetailPage(contact: contacts[index]),
                           ),
                         ),
                         onEdit: () => Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => ContactFormPage(contact: contacts[index]),
+                            builder: (_) =>
+                                ContactFormPage(contact: contacts[index]),
                           ),
                         ),
                       ),
@@ -131,9 +185,11 @@ class _TasksPanelState extends ConsumerState<_TasksPanel> {
   final _searchController = TextEditingController();
   String _search = '';
   bool _includeDone = false;
+  Timer? _debounce;
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -156,12 +212,19 @@ class _TasksPanelState extends ConsumerState<_TasksPanel> {
                 Row(
                   children: [
                     IconButton(
-                      onPressed: () => setState(() => _includeDone = !_includeDone),
+                      onPressed: () =>
+                          setState(() => _includeDone = !_includeDone),
                       icon: Icon(
-                        _includeDone ? Icons.check_circle : Icons.check_circle_outline,
-                        color: _includeDone ? Theme.of(context).colorScheme.primary : null,
+                        _includeDone
+                            ? Icons.check_circle
+                            : Icons.check_circle_outline,
+                        color: _includeDone
+                            ? Theme.of(context).colorScheme.primary
+                            : null,
                       ),
-                      tooltip: _includeDone ? 'Hide done tasks' : 'Show done tasks',
+                      tooltip: _includeDone
+                          ? 'Hide done tasks'
+                          : 'Show done tasks',
                     ),
                     IconButton(
                       onPressed: () => Navigator.push(
@@ -188,6 +251,7 @@ class _TasksPanelState extends ConsumerState<_TasksPanel> {
                     : IconButton(
                         icon: const Icon(Icons.clear),
                         onPressed: () {
+                          _debounce?.cancel();
                           _searchController.clear();
                           setState(() => _search = '');
                         },
@@ -195,7 +259,12 @@ class _TasksPanelState extends ConsumerState<_TasksPanel> {
                 isDense: true,
                 border: const OutlineInputBorder(),
               ),
-              onChanged: (v) => setState(() => _search = v.trim()),
+              onChanged: (v) {
+                _debounce?.cancel();
+                _debounce = Timer(const Duration(seconds: 1), () {
+                  setState(() => _search = v.trim());
+                });
+              },
             ),
           ),
           const Divider(height: 1),
@@ -211,9 +280,13 @@ class _TasksPanelState extends ConsumerState<_TasksPanel> {
               data: (tasks) => tasks.isEmpty
                   ? const Center(child: Text('No tasks yet.'))
                   : ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       itemCount: tasks.length,
-                      itemBuilder: (context, index) => _TaskTile(task: tasks[index]),
+                      itemBuilder: (context, index) =>
+                          _TaskTile(task: tasks[index]),
                     ),
             ),
           ),
@@ -249,7 +322,9 @@ class _TaskTile extends ConsumerWidget {
           ),
           tooltip: task.done ? 'Mark undone' : 'Mark done',
           onPressed: () async {
-            await ref.read(tasksRepositoryProvider).update(task.id, {'done': !task.done});
+            await ref.read(tasksRepositoryProvider).update(task.id, {
+              'done': !task.done,
+            });
             ref.invalidate(tasksProvider);
           },
         ),
@@ -268,8 +343,9 @@ class _TaskTile extends ConsumerWidget {
               MarkdownBody(
                 data: task.description!,
                 shrinkWrap: true,
-                styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context))
-                    .copyWith(p: Theme.of(context).textTheme.bodySmall),
+                styleSheet: MarkdownStyleSheet.fromTheme(
+                  Theme.of(context),
+                ).copyWith(p: Theme.of(context).textTheme.bodySmall),
               ),
               const Divider(height: 12),
             ],
@@ -286,7 +362,12 @@ class _TaskTile extends ConsumerWidget {
               Wrap(
                 spacing: 4,
                 children: task.tags
-                    .map((t) => Chip(label: Text(t), visualDensity: VisualDensity.compact))
+                    .map(
+                      (t) => Chip(
+                        label: Text(t),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    )
                     .toList(),
               ),
           ],
@@ -313,7 +394,11 @@ class _TaskTile extends ConsumerWidget {
 }
 
 class _ContactTile extends StatelessWidget {
-  const _ContactTile({required this.contact, required this.onTap, required this.onEdit});
+  const _ContactTile({
+    required this.contact,
+    required this.onTap,
+    required this.onEdit,
+  });
 
   final Contact contact;
   final VoidCallback onTap;
@@ -336,7 +421,12 @@ class _ContactTile extends StatelessWidget {
               Wrap(
                 spacing: 4,
                 children: contact.tags
-                    .map((t) => Chip(label: Text(t), visualDensity: VisualDensity.compact))
+                    .map(
+                      (t) => Chip(
+                        label: Text(t),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    )
                     .toList(),
               ),
           ],
