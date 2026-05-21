@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,12 +17,14 @@ router = APIRouter(prefix="/contacts", tags=["contacts"])
 async def list_contacts(
     skip: int = 0,
     limit: int = 50,
+    search: str | None = Query(default=None),
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> list[Contact]:
-    result = await session.execute(
-        select(Contact).where(Contact.user_id == user.id).offset(skip).limit(limit)
-    )
+    q = select(Contact).where(Contact.user_id == user.id)
+    if search:
+        q = q.where(Contact.name.ilike(f"%{search}%"))
+    result = await session.execute(q.offset(skip).limit(limit))
     return list(result.scalars().all())
 
 

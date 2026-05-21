@@ -9,9 +9,17 @@ class ContactsRepository {
 
   final Dio _dio;
 
-  Future<List<Contact>> list() async {
-    final res = await _dio.get<List<dynamic>>('/contacts/');
-    return res.data!.map((e) => Contact.fromJson(e as Map<String, dynamic>)).toList();
+  Future<List<Contact>> list({String? search}) async {
+    final params = <String, dynamic>{
+      if (search != null && search.isNotEmpty) 'search': search,
+    };
+    final res = await _dio.get<List<dynamic>>(
+      '/contacts/',
+      queryParameters: params.isEmpty ? null : params,
+    );
+    return res.data!
+        .map((e) => Contact.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<Contact> create(Map<String, dynamic> data) async {
@@ -20,7 +28,10 @@ class ContactsRepository {
   }
 
   Future<Contact> update(String id, Map<String, dynamic> data) async {
-    final res = await _dio.patch<Map<String, dynamic>>('/contacts/$id', data: data);
+    final res = await _dio.patch<Map<String, dynamic>>(
+      '/contacts/$id',
+      data: data,
+    );
     return Contact.fromJson(res.data!);
   }
 

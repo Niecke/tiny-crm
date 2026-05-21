@@ -10,9 +10,14 @@ final contactsRepositoryProvider = Provider<ContactsRepository>((ref) {
   return ContactsRepository(dio);
 });
 
-// FutureProvider for the contacts list.
-// Any widget that calls ref.watch(contactsProvider) rebuilds automatically
-// when ref.invalidate(contactsProvider) is called from anywhere in the app.
-final contactsProvider = FutureProvider<List<Contact>>((ref) {
-  return ref.read(contactsRepositoryProvider).list();
+// FutureProvider.family for the contacts list — keyed by search string.
+// Pass empty string to load all. Any widget calling ref.watch(contactsProvider(''))
+// rebuilds automatically when ref.invalidate(contactsProvider) is called.
+final contactsProvider = FutureProvider.family<List<Contact>, String>((
+  ref,
+  search,
+) {
+  return ref
+      .read(contactsRepositoryProvider)
+      .list(search: search.isEmpty ? null : search);
 });
