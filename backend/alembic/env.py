@@ -11,7 +11,8 @@ from alembic import context
 # Adding a new model file? Import it here too.
 from app.db import Base
 from app.config import settings  # noqa: F401
-from app.models import contact as _  # noqa: F401
+from app.models import contact as _contact  # noqa: F401
+from app.models import document as _doc  # noqa: F401
 from app.models import task as _task  # noqa: F401
 from app.auth import users as _auth  # noqa: F401
 

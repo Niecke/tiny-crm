@@ -10,5 +10,12 @@ class Settings(BaseSettings):
     # Must be overridden in prod with a long random secret
     jwt_secret: str = "CHANGE_ME_IN_PROD"
 
+    # S3-compatible storage — set S3_ENDPOINT_URL for MinIO/Hetzner; leave unset for AWS
+    s3_endpoint_url: str | None = None
+    s3_access_key: str = "minioadmin"
+    s3_secret_key: str = "minioadmin"
+    s3_bucket: str = "tinycrm-documents"
+    s3_region: str = "us-east-1"
+
 
 settings = Settings()
