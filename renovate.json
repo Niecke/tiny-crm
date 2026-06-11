@@ -3,5 +3,9 @@
   "extends": [
     "config:recommended"
   ],
-  "baseBranches": ["dev"]
+  "baseBranches": [
+    "dev"
+  ],
+  "minimumReleaseAge": "7 days",
+  "internalChecksFilter": "strict"
 }
