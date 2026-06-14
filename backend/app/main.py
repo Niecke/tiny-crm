@@ -10,9 +10,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import auth_backend, fastapi_users
 from app.config import settings
 from app.db import get_session
+from app.logging_config import configure_logging
 from app.routers import contacts, documents, tasks, users
 from app.schemas.user import UserRead, UserUpdate
 from app.storage import check_storage
+
+# Configure JSON logging before anything emits records (and after uvicorn applies
+# its own defaults, since uvicorn imports this module on startup).
+configure_logging()
 
 
 @asynccontextmanager
