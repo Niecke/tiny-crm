@@ -1,3 +1,5 @@
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from datetime import datetime
 
 from fastapi import Depends, FastAPI, Response
@@ -8,11 +10,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import auth_backend, fastapi_users
 from app.config import settings
 from app.db import get_session
-from app.routers import contacts, tasks, users
+from app.routers import contacts, documents, tasks, users
 from app.schemas.user import UserRead, UserUpdate
+from app.storage import check_storage
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Runs some checks when booting the application"""
+    await check_storage()
+    yield
+
 
 # FastAPI() creates the ASGI app. title/version show up in auto-generated docs at /docs.
-app = FastAPI(title="tinyCRM", version="0.1.0")
+app = FastAPI(title="tinyCRM", version="0.1.0", lifespan=lifespan)
 
 # CORS lets the browser-hosted Flutter app call this API.
 # allow_origins=["*"] during local dev; set CORS_ORIGINS env var in prod.
@@ -25,6 +36,7 @@ app.add_middleware(
 
 app.include_router(contacts.router)
 app.include_router(tasks.router)
+app.include_router(documents.router)
 app.include_router(
     fastapi_users.get_auth_router(auth_backend),
     prefix="/auth/jwt",
