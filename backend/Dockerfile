@@ -9,9 +9,10 @@ COPY app/ app/
 COPY alembic/ alembic/
 COPY alembic.ini .
 COPY scripts/ scripts/
+COPY log_config.json .
 
 EXPOSE 8000
 
 # Run migrations then start the server.
 # alembic upgrade head is idempotent — safe to run on every startup.
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-config log_config.json"]

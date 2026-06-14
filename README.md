@@ -7,7 +7,7 @@
 Run the backend locally
 ```bash
 cd backend
-.venv/bin/uvicorn app.main:app --reload
+.venv/bin/uvicorn app.main:app --reload --log-config log_config.json
 ```
 
 Apply schema migrations via alembic locall
