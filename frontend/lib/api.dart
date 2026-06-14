@@ -6,6 +6,10 @@ import 'core/auth_storage.dart';
 late final Dio dio;
 
 class AuthInterceptor extends Interceptor {
+  AuthInterceptor({this.onUnauthorized});
+
+  final Future<void> Function()? onUnauthorized;
+
   @override
   Future<void> onRequest(
     RequestOptions options,
@@ -16,5 +20,27 @@ class AuthInterceptor extends Interceptor {
       options.headers['Authorization'] = 'Bearer $token';
     }
     handler.next(options);
+  }
+
+  @override
+  Future<void> onResponse(
+    Response response,
+    ResponseInterceptorHandler handler,
+  ) async {
+    if (response.statusCode == 401) {
+      await onUnauthorized?.call();
+    }
+    handler.next(response);
+  }
+
+  @override
+  Future<void> onError(
+    DioException err,
+    ErrorInterceptorHandler handler,
+  ) async {
+    if (err.response?.statusCode == 401) {
+      await onUnauthorized?.call();
+    }
+    handler.next(err);
   }
 }

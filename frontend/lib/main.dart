@@ -7,17 +7,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'api.dart';
 import 'config.dart';
 import 'core/version_check.dart';
+import 'features/auth/auth_provider.dart';
 import 'router.dart';
 
 void main() {
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
     final config = await AppConfig.load();
+    final container = ProviderContainer();
     dio = Dio(BaseOptions(
       baseUrl: config.apiUrl,
       validateStatus: (status) => status != null,
-    ))..interceptors.add(AuthInterceptor());
-    runApp(const ProviderScope(child: App()));
+    ))..interceptors.add(AuthInterceptor(
+        onUnauthorized: () => container.read(authProvider.notifier).logout(),
+      ));
+    runApp(UncontrolledProviderScope(container: container, child: const App()));
     VersionCheckService.start();
   }, (error, stack) {
     debugPrint('UNCAUGHT: $error\n$stack');
