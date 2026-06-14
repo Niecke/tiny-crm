@@ -5,8 +5,10 @@ import 'package:go_router/go_router.dart';
 
 import 'features/auth/auth_provider.dart';
 import 'providers/contacts_provider.dart';
+import 'providers/documents_provider.dart';
 import 'pages/change_password_page.dart';
 import 'pages/dashboard_page.dart';
+import 'pages/documents_page.dart';
 import 'pages/health_page.dart';
 import 'pages/login_page.dart';
 import 'pages/profile_page.dart';
@@ -48,6 +50,10 @@ GoRouter _buildRouter(Ref ref) {
             builder: (context, state) => const DashboardPage(),
           ),
           GoRoute(
+            path: '/documents',
+            builder: (context, state) => const DocumentsPage(),
+          ),
+          GoRoute(
             path: '/health',
             builder: (context, state) => const HealthPage(),
           ),
@@ -83,6 +89,7 @@ class AppShell extends ConsumerWidget {
         actions: [
           for (final (label, path) in [
             ('Dashboard', '/'),
+            ('Documents', '/documents'),
             ('Health', '/health'),
           ])
             TextButton(
@@ -105,6 +112,7 @@ class AppShell extends ConsumerWidget {
             onPressed: () => {
               ref.invalidate(contactsProvider),
               ref.invalidate(tasksProvider),
+              ref.invalidate(documentsProvider),
             },
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh',
