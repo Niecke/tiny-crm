@@ -4,6 +4,7 @@ import logging
 from collections.abc import AsyncIterator
 
 import aioboto3
+from botocore.config import Config
 from botocore.exceptions import ClientError
 
 from app.config import settings
@@ -16,9 +17,17 @@ _session = aioboto3.Session(
     region_name=settings.s3_region,
 )
 
+# botocore >=1.36 sends a CRC32 checksum with aws-chunked trailers on every
+# request by default. Non-AWS S3 (Hetzner/MinIO/Ceph) reject the new headers
+# and return SignatureDoesNotMatch, so only send checksums when required.
+_config = Config(
+    request_checksum_calculation="when_required",
+    response_checksum_validation="when_required",
+)
+
 
 def _client_kwargs() -> dict[str, object]:
-    kwargs: dict[str, object] = {}
+    kwargs: dict[str, object] = {"config": _config}
     if settings.s3_endpoint_url:
         kwargs["endpoint_url"] = settings.s3_endpoint_url
     return kwargs
