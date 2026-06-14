@@ -15,7 +15,7 @@ class Task(Base):
     user_id: Mapped[UUID] = mapped_column(ForeignKey("user.id", ondelete="CASCADE"), index=True)
     title: Mapped[str]
     description: Mapped[str | None]
-    due_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    due_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     priority: Mapped[int] = mapped_column(default=0)
     tags: Mapped[list[str]] = mapped_column(ARRAY(String), server_default="{}")
     done: Mapped[bool] = mapped_column(default=False, server_default="false")
