@@ -1,5 +1,4 @@
 import asyncio
-from logging.config import fileConfig
 
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
@@ -11,16 +10,19 @@ from alembic import context
 # Adding a new model file? Import it here too.
 from app.db import Base
 from app.config import settings  # noqa: F401
+from app.logging_config import configure_logging
 from app.models import contact as _contact  # noqa: F401
 from app.models import document as _doc  # noqa: F401
 from app.models import task as _task  # noqa: F401
+from app.models import project as _project  # noqa: F401
 from app.auth import users as _auth  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)
 
-if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+# Route Alembic's logging through the shared JSON formatter instead of the
+# plain `generic` formatter defined in alembic.ini's [formatters] section.
+configure_logging()
 
 target_metadata = Base.metadata
 
