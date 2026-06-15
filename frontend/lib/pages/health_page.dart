@@ -25,8 +25,13 @@ class _HealthPageState extends State<HealthPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: FutureBuilder<Map<String, dynamic>>(
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('System health'),
+        leading: BackButton(onPressed: () => Navigator.pop(context)),
+      ),
+      body: Center(
+        child: FutureBuilder<Map<String, dynamic>>(
         future: _healthFuture,
         builder: (context, snapshot) => switch (snapshot.connectionState) {
           ConnectionState.waiting => const CircularProgressIndicator(),
@@ -48,7 +53,8 @@ class _HealthPageState extends State<HealthPage> {
             ),
         },
       ),
-    );
+    ),
+  );
   }
 }
 

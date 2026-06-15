@@ -97,7 +97,6 @@ class AppShell extends ConsumerWidget {
             ('Dashboard', '/'),
             ('Projects', '/projects'),
             ('Documents', '/documents'),
-            ('Health', '/health'),
           ])
             TextButton(
               onPressed: () => context.go(path),

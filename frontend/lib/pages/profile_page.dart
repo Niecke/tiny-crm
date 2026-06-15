@@ -64,6 +64,12 @@ class _ProfileContent extends StatelessWidget {
           icon: const Icon(Icons.lock_outline),
           label: const Text('Change password'),
         ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: () => context.push('/health'),
+          icon: const Icon(Icons.monitor_heart_outlined),
+          label: const Text('System health'),
+        ),
       ],
     );
   }
