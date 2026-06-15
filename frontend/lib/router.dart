@@ -87,32 +87,63 @@ class AppShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
     final location = GoRouterState.of(context).matchedLocation;
+    final isWide = MediaQuery.of(context).size.width >= 700;
 
     return Scaffold(
       appBar: AppBar(
         backgroundColor: scheme.inversePrimary,
-        title: const Text('tinyCRM'),
-        actions: [
-          for (final (label, path) in [
-            ('Dashboard', '/'),
-            ('Projects', '/projects'),
-            ('Documents', '/documents'),
-          ])
-            TextButton(
-              onPressed: () => context.go(path),
-              style: TextButton.styleFrom(
-                foregroundColor: location == path
-                    ? scheme.primary
-                    : scheme.onSurface,
-              ),
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontWeight: location == path
-                      ? FontWeight.bold
-                      : FontWeight.normal,
+        leading: isWide
+            ? null
+            : InkWell(
+                onTap: () => context.go('/'),
+                borderRadius: BorderRadius.circular(9),
+                child: Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: scheme.outlineVariant,
+                        width: 1.5,
+                      ),
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                    child: Image.asset('web/favicon.png'),
+                  ),
                 ),
               ),
+        title: isWide ? const Text('tinyCRM') : null,
+        actions: [
+          if (isWide)
+            for (final (label, path) in [
+              ('Dashboard', '/'),
+              ('Projects', '/projects'),
+              ('Documents', '/documents'),
+            ])
+              TextButton(
+                onPressed: () => context.go(path),
+                style: TextButton.styleFrom(
+                  foregroundColor: location == path
+                      ? scheme.primary
+                      : scheme.onSurface,
+                ),
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontWeight: location == path
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                  ),
+                ),
+              )
+          else
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.menu),
+              tooltip: 'Navigate',
+              onSelected: context.go,
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: '/projects', child: Text('Projects')),
+                PopupMenuItem(value: '/documents', child: Text('Documents')),
+              ],
             ),
           IconButton(
             onPressed: () => {
