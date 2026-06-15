@@ -11,7 +11,7 @@ from app.auth import auth_backend, fastapi_users
 from app.config import settings
 from app.db import get_session
 from app.logging_config import configure_logging
-from app.routers import contacts, documents, tasks, users
+from app.routers import contacts, documents, projects, tasks, users
 from app.schemas.user import UserRead, UserUpdate
 from app.storage import check_storage
 
@@ -42,6 +42,7 @@ app.add_middleware(
 app.include_router(contacts.router)
 app.include_router(tasks.router)
 app.include_router(documents.router)
+app.include_router(projects.router)
 app.include_router(
     fastapi_users.get_auth_router(auth_backend),
     prefix="/auth/jwt",

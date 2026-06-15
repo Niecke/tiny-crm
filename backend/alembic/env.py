@@ -14,6 +14,7 @@ from app.logging_config import configure_logging
 from app.models import contact as _contact  # noqa: F401
 from app.models import document as _doc  # noqa: F401
 from app.models import task as _task  # noqa: F401
+from app.models import project as _project  # noqa: F401
 from app.auth import users as _auth  # noqa: F401
 
 config = context.config
