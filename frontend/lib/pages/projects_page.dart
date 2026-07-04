@@ -610,8 +610,11 @@ class _DocumentInfoDialogState extends ConsumerState<_DocumentInfoDialog> {
   }
 
   void _triggerBrowserDownload(List<int> bytes, String filename, String mimeType) {
-    final jsBytes = bytes.map((b) => b.toJS).toList().toJS;
-    final blob = web.Blob(jsBytes, web.BlobPropertyBag(type: mimeType));
+    // Pass the bytes as a typed array (BufferSource). If we hand Blob a JS
+    // array of plain numbers instead, each byte is coerced to its decimal
+    // string, producing a file that contains only the digits 0-9.
+    final data = Uint8List.fromList(bytes);
+    final blob = web.Blob([data.toJS].toJS, web.BlobPropertyBag(type: mimeType));
     final url = web.URL.createObjectURL(blob);
     final anchor = web.document.createElement('a') as web.HTMLAnchorElement;
     anchor.href = url;

@@ -4,6 +4,11 @@
 
 ### Backend
 
+Run the database server and MinIO
+```bash
+podman-compose up -d
+```
+
 Run the backend locally
 ```bash
 cd backend
@@ -14,11 +19,6 @@ Apply schema migrations via alembic locall
 ```bash
 cd backend 
 .venv/bin/alembic upgrade head
-```
-
-Run the database server
-```bash
-podman-compose up -d
 ```
 
 Run flutter in debug mode locally
