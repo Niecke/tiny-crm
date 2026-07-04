@@ -4,9 +4,15 @@ RUN flutter precache --web
 COPY pubspec.* ./
 RUN flutter pub get
 COPY . .
-RUN export APP_VERSION=$(date -u +%Y%m%d%H%M%S) && \
-    echo "{\"version\":\"$APP_VERSION\"}" > web/version.json && \
-    flutter build web --release --dart-define=APP_VERSION=$APP_VERSION --wasm
+# Git commit of this build, passed in from CI (git isn't available in-container).
+# It's the single version identifier: baked into the app via --dart-define
+# (shown in the footer) and written to version.json, which already-open clients
+# poll so they reload themselves whenever a new commit is shipped.
+ARG GIT_COMMIT=dev
+RUN echo "{\"version\":\"$GIT_COMMIT\"}" > web/version.json && \
+    flutter build web --release \
+      --dart-define=GIT_COMMIT=$GIT_COMMIT \
+      --wasm
 
 FROM caddy:alpine
 COPY --from=builder /app/build/web /srv

@@ -14,6 +14,7 @@ import 'pages/health_page.dart';
 import 'pages/login_page.dart';
 import 'pages/profile_page.dart';
 import 'pages/projects_page.dart';
+import 'widgets/app_footer.dart';
 
 final routerProvider = Provider<GoRouter>((ref) => _buildRouter(ref));
 
@@ -168,7 +169,12 @@ class AppShell extends ConsumerWidget {
           const SizedBox(width: 8),
         ],
       ),
-      body: child,
+      body: Column(
+        children: [
+          Expanded(child: child),
+          const AppFooter(),
+        ],
+      ),
     );
   }
 }
