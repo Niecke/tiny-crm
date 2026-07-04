@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     # Must be overridden in prod with a long random secret
     jwt_secret: str = "CHANGE_ME_IN_PROD"
 
+    # Git commit of the running build, injected at image build time via the
+    # GIT_COMMIT build arg (git isn't available inside the build container).
+    git_commit: str = "unknown"
+
     # S3-compatible storage — set S3_ENDPOINT_URL for MinIO/Hetzner; leave unset for AWS
     s3_endpoint_url: str | None = None
     s3_access_key: str = "minioadmin"

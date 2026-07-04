@@ -35,6 +35,8 @@ jobs:
         with:
           context: ./frontend
           push: true
+          build-args: |
+            GIT_COMMIT=${{ github.sha }}
           tags: |
             europe-west1-docker.pkg.dev/niecke-it/tiny-crm/frontend:latest
             europe-west1-docker.pkg.dev/niecke-it/tiny-crm/frontend:${{ github.sha }}

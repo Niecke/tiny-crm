@@ -6,3 +6,5 @@ __pycache__/
 .ruff_cache/
 .pytest_cache/
 .env
+# Generated during the Docker build (see Dockerfile / app/version.py)
+build_timestamp.txt
