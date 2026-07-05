@@ -1,14 +1,14 @@
 import 'dart:async';
-import 'dart:js_interop';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:web/web.dart' as web;
 
+import '../core/web_download.dart';
 import '../models/document.dart';
 import '../providers/documents_provider.dart';
+import '../widgets/document_viewer.dart';
 
 class DocumentsPage extends ConsumerStatefulWidget {
   const DocumentsPage({super.key});
@@ -393,16 +393,22 @@ class _DocumentCard extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AspectRatio(
-            aspectRatio: 1 / 1.414,
-            child: doc.hasPreview
-                ? _PreviewImage(docId: doc.id)
-                : Container(
-                    color: surface,
-                    child: Center(
-                      child: Icon(_formatIcon(doc.format), size: 48),
-                    ),
-                  ),
+          Tooltip(
+            message: 'Open document',
+            child: InkWell(
+              onTap: () => showDocumentViewer(context, doc),
+              child: AspectRatio(
+                aspectRatio: 1 / 1.414,
+                child: doc.hasPreview
+                    ? _PreviewImage(docId: doc.id)
+                    : Container(
+                        color: surface,
+                        child: Center(
+                          child: Icon(_formatIcon(doc.format), size: 48),
+                        ),
+                      ),
+              ),
+            ),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(10, 8, 4, 10),
@@ -520,6 +526,7 @@ class _ActionMenu extends ConsumerWidget {
     return PopupMenuButton<String>(
       onSelected: (action) => _handle(context, ref, action),
       itemBuilder: (_) => [
+        const PopupMenuItem(value: 'view', child: Text('View')),
         const PopupMenuItem(value: 'download', child: Text('Download')),
         const PopupMenuItem(value: 'edit', child: Text('Edit metadata')),
         const PopupMenuItem(value: 'replace', child: Text('Replace file')),
@@ -537,6 +544,8 @@ class _ActionMenu extends ConsumerWidget {
     String action,
   ) async {
     switch (action) {
+      case 'view':
+        showDocumentViewer(context, doc);
       case 'download':
         await _download(context, ref);
       case 'edit':
@@ -558,12 +567,10 @@ class _ActionMenu extends ConsumerWidget {
       final bytes = await ref
           .read(documentsRepositoryProvider)
           .downloadBytes(doc.id);
-      final ext =
-          {'pdf': 'pdf', 'markdown': 'md', 'txt': 'txt'}[doc.format] ?? 'bin';
-      _triggerBrowserDownload(
+      downloadBytesToBrowser(
         bytes,
-        '${doc.title}.$ext',
-        _mimeType(doc.format),
+        '${doc.title}.${extensionForFormat(doc.format)}',
+        mimeTypeForFormat(doc.format),
       );
     } catch (e) {
       if (context.mounted) {
@@ -572,32 +579,6 @@ class _ActionMenu extends ConsumerWidget {
         ).showSnackBar(SnackBar(content: Text('Download failed: $e')));
       }
     }
-  }
-
-  void _triggerBrowserDownload(
-    List<int> bytes,
-    String filename,
-    String mimeType,
-  ) {
-    // Pass the bytes as a typed array (BufferSource). If we hand Blob a JS
-    // array of plain numbers instead, each byte is coerced to its decimal
-    // string, producing a file that contains only the digits 0-9.
-    final data = Uint8List.fromList(bytes);
-    final blob = web.Blob([data.toJS].toJS, web.BlobPropertyBag(type: mimeType));
-    final url = web.URL.createObjectURL(blob);
-    final anchor = web.document.createElement('a') as web.HTMLAnchorElement;
-    anchor.href = url;
-    anchor.download = filename;
-    anchor.click();
-    web.URL.revokeObjectURL(url);
-  }
-
-  String _mimeType(String fmt) {
-    return switch (fmt) {
-      'pdf' => 'application/pdf',
-      'markdown' => 'text/markdown',
-      _ => 'text/plain',
-    };
   }
 
   Future<void> _replaceFile(BuildContext context, WidgetRef ref) async {
