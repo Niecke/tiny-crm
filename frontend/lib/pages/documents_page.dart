@@ -151,12 +151,11 @@ class _UploadDialogState extends ConsumerState<_UploadDialog> {
   }
 
   Future<void> _pickFile() async {
-    final result = await FilePicker.pickFiles(
+    final file = await FilePicker.pickFile(
       type: FileType.custom,
       allowedExtensions: ['pdf', 'md', 'markdown', 'txt'],
     );
-    if (result == null || result.files.isEmpty) return;
-    final file = result.files.first;
+    if (file == null) return;
     final Uint8List bytes;
     try {
       bytes = await file.readAsBytes();
@@ -591,12 +590,11 @@ class _ActionMenu extends ConsumerWidget {
   }
 
   Future<void> _replaceFile(BuildContext context, WidgetRef ref) async {
-    final result = await FilePicker.pickFiles(
+    final file = await FilePicker.pickFile(
       type: FileType.custom,
       allowedExtensions: ['pdf', 'md', 'markdown', 'txt'],
     );
-    if (result == null || result.files.isEmpty) return;
-    final file = result.files.first;
+    if (file == null) return;
     try {
       final bytes = await file.readAsBytes();
       await ref
