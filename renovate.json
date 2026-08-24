@@ -1,11 +1,62 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended"
+    "config:recommended",
+    "security:openssf-scorecard",
+    "helpers:pinGitHubActionDigests"
   ],
   "baseBranches": [
     "dev"
   ],
-  "minimumReleaseAge": "7 days",
-  "internalChecksFilter": "strict"
+  "minimumReleaseAge": "3 days",
+  "internalChecksFilter": "strict",
+  "pinDigests": true,
+  "osvVulnerabilityAlerts": true,
+  "configMigration": true,
+  "dependencyDashboard": true,
+  "dependencyDashboardOSVVulnerabilitySummary": "unresolved",
+  "labels": [
+    "dependencies"
+  ],
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2,
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": [
+      "before 5am on monday"
+    ]
+  },
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "minimumReleaseAge": null,
+    "labels": [
+      "dependencies",
+      "security"
+    ]
+  },
+  "packageRules": [
+    {
+      "description": "Never group unrelated packages into one PR - each update stays individually reviewable.",
+      "matchPackageNames": [
+        "*"
+      ],
+      "groupName": null
+    },
+    {
+      "description": "Majors get a longer cooldown and explicit dashboard approval before a branch is even created.",
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "minimumReleaseAge": "14 days",
+      "dependencyDashboardApproval": true
+    },
+    {
+      "description": "Digest-only updates of already-pinned images carry no new version, so the age gate does not apply.",
+      "matchUpdateTypes": [
+        "digest",
+        "pinDigest"
+      ],
+      "minimumReleaseAge": null
+    }
+  ]
 }

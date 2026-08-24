@@ -154,13 +154,22 @@ class _UploadDialogState extends ConsumerState<_UploadDialog> {
     final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf', 'md', 'markdown', 'txt'],
-      withData: true,
     );
     if (result == null || result.files.isEmpty) return;
     final file = result.files.first;
-    if (file.bytes == null) return;
+    final Uint8List bytes;
+    try {
+      bytes = await file.readAsBytes();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not read file: $e')));
+      }
+      return;
+    }
     setState(() {
-      _bytes = file.bytes;
+      _bytes = bytes;
       _filename = file.name;
       if (_titleCtrl.text.isEmpty) {
         _titleCtrl.text = file.name.replaceAll(RegExp(r'\.[^.]+$'), '');
@@ -585,15 +594,14 @@ class _ActionMenu extends ConsumerWidget {
     final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf', 'md', 'markdown', 'txt'],
-      withData: true,
     );
     if (result == null || result.files.isEmpty) return;
     final file = result.files.first;
-    if (file.bytes == null) return;
     try {
+      final bytes = await file.readAsBytes();
       await ref
           .read(documentsRepositoryProvider)
-          .replaceContent(id: doc.id, bytes: file.bytes!, filename: file.name);
+          .replaceContent(id: doc.id, bytes: bytes, filename: file.name);
       onChanged();
     } catch (e) {
       if (context.mounted) {
