@@ -1,7 +1,7 @@
 FROM docker.io/library/python:3.14-slim
 
 # uv handles dependency management; copy its static binary from the official image.
-COPY --from=ghcr.io/astral-sh/uv:0.11.25 /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:0.11.25@sha256:1e3808aa9023d0980e7c15b1fa7c1ac16ff35925780cf5c459858b2d693f01a9 /uv /uvx /bin/
 
 WORKDIR /app
 
