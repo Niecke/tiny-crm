@@ -1,5 +1,16 @@
 :8080 {
-    root * /srv
-    file_server
-    try_files {path} /index.html
+	root * /srv
+
+	# Flutter's web output has no content hashes in its filenames — every
+	# build ships the same index.html, flutter_bootstrap.js, main.dart.js,
+	# main.dart.wasm, … Without an explicit Cache-Control the browser falls
+	# back to heuristic freshness (10% of the Last-Modified age) and keeps
+	# serving the old build from disk, even across a normal reload. That is
+	# what made installed PWAs run stale code after a deploy.
+	# "no-cache" still stores the file, it just always revalidates: the ETag
+	# turns almost every request into a cheap 304.
+	header Cache-Control "no-cache"
+
+	file_server
+	try_files {path} /index.html
 }
