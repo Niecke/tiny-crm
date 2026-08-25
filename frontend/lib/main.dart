@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'api.dart';
@@ -38,6 +39,21 @@ class App extends ConsumerWidget {
       title: 'tinyCRM',
       theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF48BB78))),
       routerConfig: router,
+      // en_GB rather than en_US: it starts the week on Monday in the date
+      // pickers. UI strings are the same English either way.
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [Locale('en', 'GB')],
+      locale: const Locale('en', 'GB'),
+      // Time pickers follow the platform's 12h/24h setting unless told
+      // otherwise; the app is 24h everywhere, so force it.
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+        child: child!,
+      ),
     );
   }
 }

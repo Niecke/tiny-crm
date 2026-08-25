@@ -24,6 +24,13 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://crm:crm@db:5432/crm
       S3_ENDPOINT_URL: http://minio:9000
+      # Caddy proxies /api/* to this service from the container network, so the
+      # peer address is Caddy's, not the user's. Without this, uvicorn discards
+      # X-Forwarded-For (it only trusts 127.0.0.1 by default) and the login
+      # throttle buckets every user under one address.
+      # Requires that port 8000 is NOT publicly reachable in production —
+      # anything that can connect directly could forge X-Forwarded-For.
+      FORWARDED_ALLOW_IPS: 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
     ports:
       - "8000:8000"
     depends_on:

@@ -35,7 +35,7 @@
     },
     "sqlalchemy.engine": {
       "handlers": ["default"],
-      "level": "INFO",
+      "level": "WARNING",
       "propagate": false
     }
   }

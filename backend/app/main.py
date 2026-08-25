@@ -1,3 +1,4 @@
+import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -8,9 +9,10 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import auth_backend, fastapi_users
-from app.config import settings
+from app.config import Environment, settings
 from app.db import get_session
 from app.logging_config import configure_logging
+from app.ratelimit import count_failed_logins, enforce_login_rate_limit
 from app.routers import contacts, documents, interactions, projects, tasks, users
 from app.schemas.user import UserRead, UserUpdate
 from app.storage import check_storage
@@ -20,10 +22,40 @@ from app.version import BUILD_TIMESTAMP, GIT_COMMIT
 # its own defaults, since uvicorn imports this module on startup).
 configure_logging()
 
+logger = logging.getLogger(__name__)
+
+
+class InsecureConfigurationError(RuntimeError):
+    """Raised at startup when a production instance still runs on dev defaults."""
+
+
+def check_secure_defaults() -> None:
+    """Warn about unsafe built-in defaults; refuse to start on them in production.
+
+    Raising here aborts uvicorn's startup, which exits with code 3 — so a
+    misconfigured production container fails immediately and visibly instead of
+    serving traffic with a known secret or a wildcard CORS policy.
+    """
+    problems = settings.insecure_defaults()
+    if not problems:
+        return
+
+    if settings.environment is Environment.production:
+        for problem in problems:
+            logger.error("Insecure configuration: %s", problem)
+        raise InsecureConfigurationError(
+            f"Refusing to start with ENVIRONMENT=production and "
+            f"{len(problems)} insecure default(s); see the errors above."
+        )
+
+    for problem in problems:
+        logger.warning("Insecure default (allowed outside production): %s", problem)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Runs some checks when booting the application"""
+    check_secure_defaults()
     await check_storage()
     yield
 
@@ -40,15 +72,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Records failed logins for the throttle below. Registered as middleware rather
+# than a dependency because only the response reveals whether the credentials
+# were accepted.
+app.middleware("http")(count_failed_logins)
+
 app.include_router(contacts.router)
 app.include_router(tasks.router)
 app.include_router(documents.router)
 app.include_router(projects.router)
 app.include_router(interactions.router)
+# The throttle covers logout as well as login. That is deliberate: both are the
+# credential surface, and the budget is generous enough that no real session
+# hits it.
 app.include_router(
     fastapi_users.get_auth_router(auth_backend),
     prefix="/auth/jwt",
     tags=["auth"],
+    dependencies=[Depends(enforce_login_rate_limit)],
 )
 # Custom password-change endpoint (must register before fastapi-users users router
 # so the more specific /users/me/password route resolves first).
