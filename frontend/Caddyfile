@@ -1,10 +1,8 @@
-example.de {
-    encode zstd gzip
-
-    handle /api/* {
-        uri strip_prefix /api
-        reverse_proxy backend:8000
-    }
+# Static file server inside the frontend container. The public entrypoint is a
+# separate Caddy on the host (infrastructure/scripts/niecke-it/caddy/Caddyfile)
+# that terminates TLS, routes /api/* to the backend and everything else here.
+:8080 {
+    root * /srv
 
     # Flutter's web output has no content hashes in its filenames — every
     # build ships the same index.html, flutter_bootstrap.js, main.dart.js,
@@ -13,10 +11,10 @@ example.de {
     # serving the old build from disk, even across a normal reload. That is
     # what made installed PWAs run stale code after a deploy.
     # "no-cache" still stores the file, it just always revalidates: the ETag
-    # turns almost every request into a cheap 304.
+    # turns almost every request into a cheap 304. The edge proxy passes the
+    # header through, so it only needs to be set here.
     header Cache-Control "no-cache"
 
-    handle {
-        reverse_proxy frontend:8080
-    }
+    file_server
+    try_files {path} /index.html
 }
