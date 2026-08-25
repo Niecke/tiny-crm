@@ -1,4 +1,4 @@
-FROM ghcr.io/cirruslabs/flutter:stable AS builder
+FROM ghcr.io/cirruslabs/flutter:stable@sha256:46691e311715845de03a3ba4753a475476936805b29431b1f00f1816981033f8 AS builder
 WORKDIR /app
 RUN flutter precache --web
 COPY pubspec.* ./
@@ -14,7 +14,7 @@ RUN echo "{\"version\":\"$GIT_COMMIT\"}" > web/version.json && \
       --dart-define=GIT_COMMIT=$GIT_COMMIT \
       --wasm
 
-FROM caddy:alpine
+FROM caddy:alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
 COPY --from=builder /app/build/web /srv
 COPY Caddyfile /etc/caddy/Caddyfile
 

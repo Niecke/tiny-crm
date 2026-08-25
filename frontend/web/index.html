@@ -41,6 +41,19 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
+  <!--
+    Ask the browser to keep our storage (the JWT lives in localStorage).
+    Without this Android can evict site data under storage pressure, which
+    logs the user out of the installed PWA. Installed PWAs are normally
+    granted this without a prompt.
+  -->
+  <script>
+    if (navigator.storage && navigator.storage.persist) {
+      navigator.storage.persisted().then(function (persisted) {
+        if (!persisted) navigator.storage.persist();
+      });
+    }
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
