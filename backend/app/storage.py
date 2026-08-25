@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import AsyncIterator
+from typing import BinaryIO
 
 import aioboto3
 from botocore.config import Config
@@ -72,6 +73,22 @@ async def put_object(key: str, data: bytes, content_type: str) -> None:
             Key=key,
             Body=data,
             ContentType=content_type,
+        )
+
+
+async def put_object_stream(key: str, fileobj: BinaryIO, content_type: str) -> None:
+    """Upload straight from a file-like object.
+
+    aioboto3 pulls the object in parts and switches to a multipart upload past
+    8 MB, so the body never has to exist in memory as one blob the way
+    put_object's `bytes` argument does. The caller keeps the file positioned at
+    the start."""
+    async with _session.client("s3", **_client_kwargs()) as s3:  # type: ignore[arg-type]
+        await s3.upload_fileobj(  # type: ignore[attr-defined]
+            fileobj,
+            settings.s3_bucket,
+            key,
+            ExtraArgs={"ContentType": content_type},
         )
 
 

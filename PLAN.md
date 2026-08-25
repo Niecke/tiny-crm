@@ -93,9 +93,10 @@ Priorities: **P0** not a CRM without it · **P1** daily friction · **P2** expec
       *Done:* all five list endpoints return `Page[T]` (`items`, `total`, `skip`, `limit`) via `app/schemas/page.py` and `count_rows()` in `app/db.py`; `limit` is validated `1..200`. Every list also got a **stable sort with an `id` tiebreaker** — paging over a non-unique order lets rows repeat or vanish between pages, so this was load-bearing, not cosmetic. Frontend: `PagedResult<T>` (named to avoid the clash with Flutter's own `Page`), a `PaginationBar` footer showing "1–25 of 213" that hides itself when everything fits, and per-surface `skip` state that resets to 0 whenever the query changes.
       *Pickers are separate:* contact/task/document pickers and id-to-name lookups need the whole set, so they use `listAll()` (walks pages at `limit=200`) behind `allContactsProvider` / `allTasksProvider` / `allDocumentsProvider` — paging those would have reintroduced the same silent truncation inside the pickers. These are invalidated alongside their paged counterparts.
 
-- [ ] **T06 · P1 · Stream document uploads**
-      `await file.read()` buffers the whole file before the size check, so the 25 MB cap is enforced after the memory is already spent. Downloads already stream.
-      *Files:* `backend/app/routers/documents.py`.
+- [x] **T06 · P1 · Stream document uploads**
+      `await file.read()` buffered the whole file before the size check, so the 25 MB cap was enforced after the memory was already spent.
+      *Done:* `_checked_size()` reads the length Starlette already recorded (`UploadFile.size`, falling back to a seek) and rejects with `413` before anything is read; the body then goes to S3 through `put_object_stream()` in `storage.py`, which hands the spooled file object to `upload_fileobj` — parts on the wire, multipart past 8 MB, never one blob in memory. PDF previews are the one exception and are documented as such: pymupdf needs the whole document, so `_render_preview()` materialises it — after the size check, so bounded by the cap.
+      *Not covered:* Starlette parses the multipart body before the handler runs, so an oversized upload is still spooled to a temp file (disk, not memory) before the 413. Rejecting on `Content-Length` needs a middleware, like `ratelimit.py` — separate task if the disk churn matters.
 
 - [ ] **T07 · P2 · Human-readable errors and consistent delete confirmation**
       Error states render `'Error: $e'` — a raw Dio stack description. Contact deletes confirm; task and document deletes do not.
