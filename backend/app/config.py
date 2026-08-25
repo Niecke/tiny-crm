@@ -1,14 +1,21 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Placeholder value shipped in the defaults; main.py warns when it survives
+# into a running instance.
+DEFAULT_JWT_SECRET = "CHANGE_ME_IN_PROD"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     database_url: str = "postgresql+asyncpg://crm:crm@localhost:5432/crm"
+    # SQLAlchemy statement logging. Off by default: echo prints every statement
+    # together with its bound parameters, i.e. contact and document data.
+    db_echo: bool = False
     # Locked down to the real domain in prod via env var
     cors_origins: list[str] = ["*"]
     # Must be overridden in prod with a long random secret
-    jwt_secret: str = "CHANGE_ME_IN_PROD"
+    jwt_secret: str = DEFAULT_JWT_SECRET
     # How long a login stays valid. There is no refresh token, so this is also
     # the hard re-login interval. ~9 months keeps the Android PWA logged in.
     jwt_lifetime_seconds: int = 60 * 60 * 24 * 270

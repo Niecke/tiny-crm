@@ -1,3 +1,4 @@
+import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -8,7 +9,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import auth_backend, fastapi_users
-from app.config import settings
+from app.config import DEFAULT_JWT_SECRET, settings
 from app.db import get_session
 from app.logging_config import configure_logging
 from app.routers import contacts, documents, interactions, projects, tasks, users
@@ -20,10 +21,17 @@ from app.version import BUILD_TIMESTAMP, GIT_COMMIT
 # its own defaults, since uvicorn imports this module on startup).
 configure_logging()
 
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Runs some checks when booting the application"""
+    if settings.jwt_secret == DEFAULT_JWT_SECRET:
+        logger.warning(
+            "JWT_SECRET is still the built-in default — anyone who knows it can mint "
+            "valid tokens for this instance. Set JWT_SECRET in the environment."
+        )
     await check_storage()
     yield
 

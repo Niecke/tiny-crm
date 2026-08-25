@@ -11,8 +11,8 @@ class Base(DeclarativeBase):
     pass
 
 
-# echo=True logs every SQL statement — useful while learning, disable in prod
-engine = create_async_engine(settings.database_url, echo=True)
+# echo logs every SQL statement — useful while learning, off unless DB_ECHO=true
+engine = create_async_engine(settings.database_url, echo=settings.db_echo)
 
 # expire_on_commit=False: objects stay usable after session.commit()
 # without this, accessing an attribute after commit triggers a lazy load error
