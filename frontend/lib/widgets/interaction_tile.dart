@@ -3,6 +3,7 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/date_time_text.dart';
+import '../models/contact.dart';
 import '../models/interaction.dart';
 import '../pages/interaction_form_page.dart';
 import '../providers/contacts_provider.dart';
@@ -26,7 +27,7 @@ class InteractionTile extends ConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
     // Past and still not confirmed as happened — the one state worth flagging.
     final overdue = interaction.isOverdue;
-    final contacts = ref.watch(contactsProvider('')).asData?.value ?? [];
+    final contacts = ref.watch(allContactsProvider).asData?.value ?? <Contact>[];
     final names = contacts
         .where((c) => interaction.contactIds.contains(c.id))
         .map((c) => c.name)

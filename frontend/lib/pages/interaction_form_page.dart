@@ -159,7 +159,7 @@ class _InteractionFormPageState extends ConsumerState<InteractionFormPage>
 
   @override
   Widget build(BuildContext context) {
-    final contactsAsync = ref.watch(contactsProvider(''));
+    final contactsAsync = ref.watch(allContactsProvider);
     final typed = parseWhen(_when.text);
     final planned = typed != null && typed.isAfter(DateTime.now());
 

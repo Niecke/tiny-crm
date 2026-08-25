@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../models/paged_result.dart';
 import '../models/interaction.dart';
 
 class InteractionsRepository {
@@ -9,25 +10,26 @@ class InteractionsRepository {
 
   /// [upcoming] null returns everything, true only planned entries (soonest
   /// first), false only the past activity log (newest first).
-  Future<List<Interaction>> list({
+  Future<PagedResult<Interaction>> list({
     String? search,
     String? contactId,
     String? kind,
     bool? upcoming,
+    int skip = 0,
+    int limit = kPageSize,
   }) async {
-    final params = <String, dynamic>{
-      if (search != null && search.isNotEmpty) 'search': search,
-      'contact_id': ?contactId,
-      'kind': ?kind,
-      'upcoming': ?upcoming,
-    };
-    final res = await _dio.get<List<dynamic>>(
+    final res = await _dio.get<Map<String, dynamic>>(
       '/interactions/',
-      queryParameters: params.isEmpty ? null : params,
+      queryParameters: <String, dynamic>{
+        if (search != null && search.isNotEmpty) 'search': search,
+        'contact_id': ?contactId,
+        'kind': ?kind,
+        'upcoming': ?upcoming,
+        'skip': skip,
+        'limit': limit,
+      },
     );
-    return res.data!
-        .map((e) => Interaction.fromJson(e as Map<String, dynamic>))
-        .toList();
+    return PagedResult.fromJson(res.data!, Interaction.fromJson);
   }
 
   Future<Interaction> create(Map<String, dynamic> data) async {

@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../models/paged_result.dart';
 import '../models/project.dart';
 
 class ProjectsRepository {
@@ -7,17 +8,20 @@ class ProjectsRepository {
 
   final Dio _dio;
 
-  Future<List<Project>> list({String? search}) async {
-    final params = <String, dynamic>{
-      if (search != null && search.isNotEmpty) 'search': search,
-    };
-    final res = await _dio.get<List<dynamic>>(
+  Future<PagedResult<Project>> list({
+    String? search,
+    int skip = 0,
+    int limit = kPageSize,
+  }) async {
+    final res = await _dio.get<Map<String, dynamic>>(
       '/projects/',
-      queryParameters: params.isEmpty ? null : params,
+      queryParameters: <String, dynamic>{
+        if (search != null && search.isNotEmpty) 'search': search,
+        'skip': skip,
+        'limit': limit,
+      },
     );
-    return res.data!
-        .map((e) => Project.fromJson(e as Map<String, dynamic>))
-        .toList();
+    return PagedResult.fromJson(res.data!, Project.fromJson);
   }
 
   Future<Project> create(Map<String, dynamic> data) async {

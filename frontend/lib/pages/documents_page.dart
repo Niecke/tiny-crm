@@ -9,6 +9,7 @@ import '../core/web_download.dart';
 import '../models/document.dart';
 import '../providers/documents_provider.dart';
 import '../widgets/document_viewer.dart';
+import '../widgets/pagination_bar.dart';
 
 class DocumentsPage extends ConsumerStatefulWidget {
   const DocumentsPage({super.key});
@@ -20,6 +21,7 @@ class DocumentsPage extends ConsumerStatefulWidget {
 class _DocumentsPageState extends ConsumerState<DocumentsPage> {
   final _searchController = TextEditingController();
   String _search = '';
+  int _skip = 0;
   Timer? _debounce;
 
   @override
@@ -31,7 +33,9 @@ class _DocumentsPageState extends ConsumerState<DocumentsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final docsAsync = ref.watch(documentsProvider(_search));
+    final docsAsync = ref.watch(
+      documentsProvider((search: _search, skip: _skip)),
+    );
 
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -52,7 +56,10 @@ class _DocumentsPageState extends ConsumerState<DocumentsPage> {
                             onPressed: () {
                               _debounce?.cancel();
                               _searchController.clear();
-                              setState(() => _search = '');
+                              setState(() {
+                                _search = '';
+                                _skip = 0;
+                              });
                             },
                           ),
                     isDense: true,
@@ -61,7 +68,11 @@ class _DocumentsPageState extends ConsumerState<DocumentsPage> {
                   onChanged: (v) {
                     _debounce?.cancel();
                     _debounce = Timer(const Duration(seconds: 1), () {
-                      setState(() => _search = v.trim());
+                      // Back to page 1: the old offset means nothing here.
+                      setState(() {
+                        _search = v.trim();
+                        _skip = 0;
+                      });
                     });
                   },
                 ),
@@ -84,29 +95,41 @@ class _DocumentsPageState extends ConsumerState<DocumentsPage> {
                   style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
               ),
-              data: (docs) => docs.isEmpty
+              data: (page) => page.items.isEmpty
                   ? const Center(child: Text('No documents yet.'))
-                  : Align(
-                      alignment: Alignment.topLeft,
-                      child: SingleChildScrollView(
-                        child: Wrap(
-                          alignment: WrapAlignment.start,
-                          spacing: 12,
-                          runSpacing: 12,
-                          children: docs
-                              .map(
-                                (doc) => SizedBox(
-                                  width: 360,
-                                  child: _DocumentCard(
-                                    doc: doc,
-                                    onChanged: () =>
-                                        ref.invalidate(documentsProvider),
-                                  ),
-                                ),
-                              )
-                              .toList(),
+                  : Column(
+                      children: [
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.topLeft,
+                            child: SingleChildScrollView(
+                              child: Wrap(
+                                alignment: WrapAlignment.start,
+                                spacing: 12,
+                                runSpacing: 12,
+                                children: page.items
+                                    .map(
+                                      (doc) => SizedBox(
+                                        width: 360,
+                                        child: _DocumentCard(
+                                          doc: doc,
+                                          onChanged: () {
+                                            ref.invalidate(documentsProvider);
+                                            ref.invalidate(allDocumentsProvider);
+                                          },
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
+                        PaginationBar(
+                          page: page,
+                          onSkipChanged: (skip) => setState(() => _skip = skip),
+                        ),
+                      ],
                     ),
             ),
           ),
@@ -119,7 +142,12 @@ class _DocumentsPageState extends ConsumerState<DocumentsPage> {
     showDialog<void>(
       context: context,
       builder: (_) =>
-          _UploadDialog(onUploaded: () => ref.invalidate(documentsProvider)),
+          _UploadDialog(
+            onUploaded: () {
+              ref.invalidate(documentsProvider);
+              ref.invalidate(allDocumentsProvider);
+            },
+          ),
     );
   }
 }

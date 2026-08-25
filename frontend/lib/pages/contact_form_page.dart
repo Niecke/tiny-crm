@@ -77,6 +77,7 @@ class _ContactFormPageState extends ConsumerState<ContactFormPage> {
 
     // Invalidate here — every watcher of contactsProvider refetches automatically
     ref.invalidate(contactsProvider);
+    ref.invalidate(allContactsProvider);
 
     if (mounted) Navigator.pop(context);
   }

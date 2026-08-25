@@ -88,10 +88,10 @@ Priorities: **P0** not a CRM without it · **P1** daily friction · **P2** expec
       **Requires `FORWARDED_ALLOW_IPS`** on any deployment where Caddy fronts the API (set in `compose.full.yml`); without it uvicorn discards `X-Forwarded-For` and every user shares one bucket. That in turn requires the backend port not to be publicly reachable, or `X-Forwarded-For` can be forged.
       *Does not cover:* an attacker rotating source addresses — see T34.
 
-- [ ] **T05 · P1 · Stop lists truncating silently**
-      API defaults are 50 contacts / 200 tasks, interactions and projects per page; the Flutter repositories never send `skip` or `limit`. Past 50 contacts the dashboard just stops — no error, no "load more".
-      *Done when:* list endpoints return a total count, repositories page through it, and lists either paginate or infinite-scroll.
-      *Files:* `frontend/lib/repositories/*.dart`, every backend router.
+- [x] **T05 · P1 · Stop lists truncating silently**
+      API defaults were 50 contacts / 200 everything else, and the Flutter repositories never sent `skip` or `limit`, so past 50 contacts the dashboard just stopped.
+      *Done:* all five list endpoints return `Page[T]` (`items`, `total`, `skip`, `limit`) via `app/schemas/page.py` and `count_rows()` in `app/db.py`; `limit` is validated `1..200`. Every list also got a **stable sort with an `id` tiebreaker** — paging over a non-unique order lets rows repeat or vanish between pages, so this was load-bearing, not cosmetic. Frontend: `PagedResult<T>` (named to avoid the clash with Flutter's own `Page`), a `PaginationBar` footer showing "1–25 of 213" that hides itself when everything fits, and per-surface `skip` state that resets to 0 whenever the query changes.
+      *Pickers are separate:* contact/task/document pickers and id-to-name lookups need the whole set, so they use `listAll()` (walks pages at `limit=200`) behind `allContactsProvider` / `allTasksProvider` / `allDocumentsProvider` — paging those would have reintroduced the same silent truncation inside the pickers. These are invalidated alongside their paged counterparts.
 
 - [ ] **T06 · P1 · Stream document uploads**
       `await file.read()` buffers the whole file before the size check, so the 25 MB cap is enforced after the memory is already spent. Downloads already stream.

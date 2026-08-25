@@ -4,16 +4,17 @@ import json
 import logging
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import current_active_user
 from app.auth.users import User
-from app.db import get_session
+from app.db import count_rows, get_session
 from app.models.document import Document
 from app.schemas.document import DocumentRead, DocumentUpdate
+from app.schemas.page import Page
 from app.storage import delete_object, get_object_stream, put_object
 
 logger = logging.getLogger(__name__)
@@ -57,19 +58,27 @@ def _content_type(fmt: str) -> str:
     return {"pdf": "application/pdf", "markdown": "text/markdown", "txt": "text/plain"}[fmt]
 
 
-@router.get("/", response_model=list[DocumentRead])
+@router.get("/", response_model=Page[DocumentRead])
 async def list_documents(
-    skip: int = 0,
-    limit: int = 50,
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=200),
     search: str | None = None,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
-) -> list[Document]:
+) -> Page[DocumentRead]:
     q = select(Document).where(Document.user_id == user.id)
     if search:
         q = q.where(Document.title.ilike(f"%{search}%"))
-    result = await session.execute(q.offset(skip).limit(limit))
-    return list(result.scalars().all())
+    total = await count_rows(session, q)
+    result = await session.execute(
+        q.order_by(Document.created_at.desc(), Document.id.asc()).offset(skip).limit(limit)
+    )
+    return Page[DocumentRead](
+        items=[DocumentRead.model_validate(d) for d in result.scalars().all()],
+        total=total,
+        skip=skip,
+        limit=limit,
+    )
 
 
 @router.post("/", response_model=DocumentRead, status_code=201)

@@ -97,6 +97,7 @@ class _TaskFormPageState extends ConsumerState<TaskFormPage>
     }
 
     ref.invalidate(tasksProvider);
+    ref.invalidate(allTasksProvider);
     if (mounted) Navigator.pop(context);
   }
 

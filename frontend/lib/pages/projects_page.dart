@@ -9,12 +9,14 @@ import 'package:web/web.dart' as web;
 
 import '../models/contact.dart';
 import '../models/document.dart';
+import '../models/paged_result.dart';
 import '../models/project.dart';
 import '../models/task.dart';
 import '../providers/contacts_provider.dart';
 import '../providers/documents_provider.dart';
 import '../providers/projects_provider.dart';
 import '../providers/tasks_provider.dart';
+import '../widgets/pagination_bar.dart';
 import 'contact_detail_page.dart';
 import 'project_form_page.dart';
 import 'task_form_page.dart';
@@ -30,6 +32,7 @@ class _ProjectsPageState extends ConsumerState<ProjectsPage>
     with SingleTickerProviderStateMixin {
   final _searchController = TextEditingController();
   String _search = '';
+  int _skip = 0;
   String? _selectedId;
   Timer? _debounce;
   late final TabController _tabController;
@@ -50,7 +53,9 @@ class _ProjectsPageState extends ConsumerState<ProjectsPage>
 
   @override
   Widget build(BuildContext context) {
-    final projectsAsync = ref.watch(projectsProvider(_search));
+    final projectsAsync = ref.watch(
+      projectsProvider((search: _search, skip: _skip)),
+    );
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -67,17 +72,25 @@ class _ProjectsPageState extends ConsumerState<ProjectsPage>
                   onSearchChanged: (v) {
                     _debounce?.cancel();
                     _debounce = Timer(const Duration(seconds: 1), () {
-                      setState(() => _search = v.trim());
+                      // Back to page 1: the old offset means nothing here.
+                      setState(() {
+                        _search = v.trim();
+                        _skip = 0;
+                      });
                     });
                   },
                   onSearchCleared: () {
                     _debounce?.cancel();
                     _searchController.clear();
-                    setState(() => _search = '');
+                    setState(() {
+                      _search = '';
+                      _skip = 0;
+                    });
                   },
                   onSelected: (id) => setState(() => _selectedId = id),
                   onNarrow: null,
                   projectsAsync: projectsAsync,
+                  onSkipChanged: (skip) => setState(() => _skip = skip),
                 ),
               ),
               const VerticalDivider(width: 1),
@@ -85,10 +98,12 @@ class _ProjectsPageState extends ConsumerState<ProjectsPage>
                 child: projectsAsync.when(
                   loading: () => const Center(child: CircularProgressIndicator()),
                   error: (e, _) => Center(child: Text('Error: $e')),
-                  data: (projects) {
+                  data: (page) {
                     final project = _selectedId == null
                         ? null
-                        : projects.where((p) => p.id == _selectedId).firstOrNull;
+                        : page.items
+                            .where((p) => p.id == _selectedId)
+                            .firstOrNull;
                     return _ProjectDetail(
                       project: project,
                       onChanged: () => ref.invalidate(projectsProvider),
@@ -115,13 +130,20 @@ class _ProjectsPageState extends ConsumerState<ProjectsPage>
                       onSearchChanged: (v) {
                         _debounce?.cancel();
                         _debounce = Timer(const Duration(seconds: 1), () {
-                          setState(() => _search = v.trim());
+                          // Back to page 1: the old offset means nothing here.
+                          setState(() {
+                            _search = v.trim();
+                            _skip = 0;
+                          });
                         });
                       },
                       onSearchCleared: () {
                         _debounce?.cancel();
                         _searchController.clear();
-                        setState(() => _search = '');
+                        setState(() {
+                          _search = '';
+                          _skip = 0;
+                        });
                       },
                       onSelected: (id) {
                         setState(() => _selectedId = id);
@@ -129,15 +151,16 @@ class _ProjectsPageState extends ConsumerState<ProjectsPage>
                       },
                       onNarrow: () => _tabController.animateTo(1),
                       projectsAsync: projectsAsync,
+                      onSkipChanged: (skip) => setState(() => _skip = skip),
                     ),
                     projectsAsync.when(
                       loading: () =>
                           const Center(child: CircularProgressIndicator()),
                       error: (e, _) => Center(child: Text('Error: $e')),
-                      data: (projects) {
+                      data: (page) {
                         final project = _selectedId == null
                             ? null
-                            : projects
+                            : page.items
                                 .where((p) => p.id == _selectedId)
                                 .firstOrNull;
                         return _ProjectDetail(
@@ -174,6 +197,7 @@ class _ProjectList extends StatelessWidget {
     required this.onSelected,
     required this.onNarrow,
     required this.projectsAsync,
+    required this.onSkipChanged,
   });
 
   final String search;
@@ -183,7 +207,8 @@ class _ProjectList extends StatelessWidget {
   final VoidCallback onSearchCleared;
   final ValueChanged<String> onSelected;
   final VoidCallback? onNarrow;
-  final AsyncValue<List<Project>> projectsAsync;
+  final AsyncValue<PagedResult<Project>> projectsAsync;
+  final ValueChanged<int> onSkipChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -237,7 +262,8 @@ class _ProjectList extends StatelessWidget {
                 ),
               ),
             ),
-            data: (projects) {
+            data: (page) {
+              final projects = page.items;
               if (projects.isEmpty) {
                 return const Center(child: Text('No projects yet.'));
               }
@@ -295,7 +321,12 @@ class _ProjectList extends StatelessWidget {
                   );
                 }
               }
-              return ListView(children: items);
+              return Column(
+                children: [
+                  Expanded(child: ListView(children: items)),
+                  PaginationBar(page: page, onSkipChanged: onSkipChanged),
+                ],
+              );
             },
           ),
         ),
@@ -364,7 +395,7 @@ class _ProjectDetail extends ConsumerWidget {
           _LinkSection<Contact>(
             title: 'Contacts',
             linkedIds: p.contactIds,
-            allAsync: ref.watch(contactsProvider('')),
+            allAsync: ref.watch(allContactsProvider),
             labelOf: (c) => c.name,
             idOf: (c) => c.id,
             onUpdate: (ids) => _updateLinks(ref, p, contactIds: ids),
@@ -377,9 +408,7 @@ class _ProjectDetail extends ConsumerWidget {
           _LinkSection<Task>(
             title: 'Tasks',
             linkedIds: p.taskIds,
-            allAsync: ref.watch(
-              tasksProvider((search: '', includeDone: true)),
-            ),
+            allAsync: ref.watch(allTasksProvider),
             labelOf: (t) => t.title,
             idOf: (t) => t.id,
             onUpdate: (ids) => _updateLinks(ref, p, taskIds: ids),
@@ -392,7 +421,7 @@ class _ProjectDetail extends ConsumerWidget {
           _LinkSection<Document>(
             title: 'Documents',
             linkedIds: p.documentIds,
-            allAsync: ref.watch(documentsProvider('')),
+            allAsync: ref.watch(allDocumentsProvider),
             labelOf: (d) => d.title,
             idOf: (d) => d.id,
             onUpdate: (ids) => _updateLinks(ref, p, documentIds: ids),

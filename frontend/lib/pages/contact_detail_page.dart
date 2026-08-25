@@ -5,6 +5,7 @@ import '../models/contact.dart';
 import '../providers/contacts_provider.dart';
 import '../providers/interactions_provider.dart';
 import '../widgets/interaction_tile.dart';
+import '../widgets/pagination_bar.dart';
 import 'contact_form_page.dart';
 import 'interaction_form_page.dart';
 
@@ -36,6 +37,7 @@ class ContactDetailPage extends ConsumerWidget {
     await ref.read(contactsRepositoryProvider).delete(contact.id);
     // Invalidate → contactsProvider refetches → ContactsPage list updates automatically
     ref.invalidate(contactsProvider);
+    ref.invalidate(allContactsProvider);
     if (context.mounted) Navigator.pop(context);
   }
 
@@ -129,19 +131,29 @@ class _Field extends StatelessWidget {
 
 
 /// Everything logged or planned with this contact, newest first.
-class _InteractionsSection extends ConsumerWidget {
+class _InteractionsSection extends ConsumerStatefulWidget {
   const _InteractionsSection({required this.contact});
 
   final Contact contact;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_InteractionsSection> createState() =>
+      _InteractionsSectionState();
+}
+
+class _InteractionsSectionState extends ConsumerState<_InteractionsSection> {
+  int _skip = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final contact = widget.contact;
     final async = ref.watch(
       interactionsProvider((
         search: '',
         contactId: contact.id,
         kind: null,
         upcoming: null,
+        skip: _skip,
       )),
     );
 
@@ -179,7 +191,7 @@ class _InteractionsSection extends ConsumerWidget {
               'Error: $e',
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
-            data: (items) => items.isEmpty
+            data: (page) => page.items.isEmpty
                 ? const Padding(
                     padding: EdgeInsets.symmetric(vertical: 8),
                     child: Text(
@@ -189,7 +201,12 @@ class _InteractionsSection extends ConsumerWidget {
                   )
                 : Column(
                     children: [
-                      for (final i in items) InteractionTile(interaction: i),
+                      for (final i in page.items)
+                        InteractionTile(interaction: i),
+                      PaginationBar(
+                        page: page,
+                        onSkipChanged: (skip) => setState(() => _skip = skip),
+                      ),
                     ],
                   ),
           ),

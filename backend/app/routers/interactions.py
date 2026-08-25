@@ -2,13 +2,13 @@ from datetime import UTC, datetime
 from typing import cast
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import current_active_user
 from app.auth.users import User
-from app.db import get_session
+from app.db import count_rows, get_session
 from app.models.contact import Contact
 from app.models.interaction import Interaction, interaction_contacts
 from app.schemas.interaction import (
@@ -17,6 +17,7 @@ from app.schemas.interaction import (
     InteractionRead,
     InteractionUpdate,
 )
+from app.schemas.page import Page
 
 router = APIRouter(prefix="/interactions", tags=["interactions"])
 
@@ -50,17 +51,17 @@ async def _load_contacts(session: AsyncSession, ids: list[UUID], user_id: UUID) 
     return found
 
 
-@router.get("/", response_model=list[InteractionRead])
+@router.get("/", response_model=Page[InteractionRead])
 async def list_interactions(
-    skip: int = 0,
-    limit: int = 200,
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=200),
     search: str | None = None,
     contact_id: UUID | None = None,
     kind: InteractionKind | None = None,
     upcoming: bool | None = None,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
-) -> list[InteractionRead]:
+) -> Page[InteractionRead]:
     """List interactions, newest first.
 
     `upcoming=true` returns only planned (future) entries, oldest first so the
@@ -78,14 +79,27 @@ async def list_interactions(
         ).where(interaction_contacts.c.contact_id == contact_id)
     now = datetime.now(UTC)
     if upcoming is True:
-        query = query.where(Interaction.occurred_at >= now).order_by(Interaction.occurred_at.asc())
+        query = query.where(Interaction.occurred_at >= now)
     elif upcoming is False:
-        query = query.where(Interaction.occurred_at < now).order_by(Interaction.occurred_at.desc())
+        query = query.where(Interaction.occurred_at < now)
+
+    total = await count_rows(session, query)
+
+    # Ascending for planned entries so the next appointment comes up top,
+    # descending everywhere else so the newest log entry does. id breaks ties,
+    # otherwise rows can repeat or vanish between pages.
+    if upcoming is True:
+        query = query.order_by(Interaction.occurred_at.asc(), Interaction.id.asc())
     else:
-        query = query.order_by(Interaction.occurred_at.desc())
+        query = query.order_by(Interaction.occurred_at.desc(), Interaction.id.asc())
 
     result = await session.execute(query.offset(skip).limit(limit))
-    return [_to_read(i) for i in result.scalars().all()]
+    return Page[InteractionRead](
+        items=[_to_read(i) for i in result.scalars().all()],
+        total=total,
+        skip=skip,
+        limit=limit,
+    )
 
 
 @router.get("/{interaction_id}", response_model=InteractionRead)
