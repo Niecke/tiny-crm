@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["*"]
     # Must be overridden in prod with a long random secret
     jwt_secret: str = "CHANGE_ME_IN_PROD"
+    # How long a login stays valid. There is no refresh token, so this is also
+    # the hard re-login interval. ~9 months keeps the Android PWA logged in.
+    jwt_lifetime_seconds: int = 60 * 60 * 24 * 270
 
     # Git commit of the running build, injected at image build time via the
     # GIT_COMMIT build arg (git isn't available inside the build container).
