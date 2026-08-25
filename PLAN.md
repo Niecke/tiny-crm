@@ -108,11 +108,18 @@ Priorities: **P0** not a CRM without it · **P1** daily friction · **P2** expec
 
 - [ ] **T08 · P0 · Backend test suite**
       pytest, pytest-asyncio, httpx and mypy strict are configured; `backend/tests/` does not exist. Start with **cross-user isolation** — every endpoint reimplements the same `user_id` ownership check by hand, and one missed comparison leaks another tenant's data. Then auth-required, CRUD round-trip and validation per router, against a throwaway Postgres.
+      *Started:* `backend/tests/` now exists with 16 tests — unit tests for the insecure-defaults guard, the login throttle's sliding window and the upload size/format guards, plus one in-process API test for `/version` (`pythonpath = ["."]` in `pyproject.toml` makes `app` importable without installing it). The router coverage and cross-user isolation below are still outstanding.
       *Done when:* `uv run pytest` covers all six routers, isolation included.
 
-- [ ] **T09 · P0 · CI gate before the image build**
-      Both workflows go straight to `docker build`; nothing blocks a broken `main`.
-      *Done when:* a PR workflow runs `ruff check`, `ruff format --check`, `mypy`, `pytest`, `flutter analyze` and `flutter test`, and the build workflows depend on it.
+- [x] **T09 · P0 · CI gate before the image build**
+      Both workflows went straight to `docker build`; nothing blocked a broken `main`.
+      *Done:* `.github/workflows/ci.yml` replaces the two per-component build workflows. On a PR into `main`: **Backend tests** (`ruff check`, `ruff format --check`, `pytest`) and **Frontend tests** (`flutter analyze`, `flutter test`, in the same SDK digest the image builds with) must pass before **Build backend** / **Build frontend** push `ci-<short-head-sha>` to the registry, and **Integration test** then starts those exact images with Postgres and MinIO (`compose.ci.yml`, own project name) and drives `ci/smoke.sh` through login, a contact round-trip and a document round-trip. Pushes to `dev` run the two test jobs only — no registry writes.
+      `.github/workflows/promote.yml` runs on merge to `main` and only re-tags: it resolves the merged PR's head sha (GitHub API, merge-parent fallback), then `docker buildx imagetools create` copies that manifest to `<short-main-sha>` and `latest`. The digest that passed the integration test is the digest that deploys — nothing is rebuilt, so nothing can drift between test and release.
+      **Still to do in GitHub settings:** make `Backend tests`, `Frontend tests`, `Build backend`, `Build frontend` and `Integration test` required status checks on `main`, and stop allowing direct pushes — the promote workflow has no images to promote for a commit that never went through a PR.
+      *Note:* `mypy` is deliberately **not** in the gate yet — see T35.
+
+- [ ] **T35 · P1 · Get mypy green, then gate on it**
+      `uv run mypy app` reports 20 errors (aioboto3 stub mismatches in `storage.py`, untyped pymupdf calls in `documents.py`, two in `projects.py`), so it cannot be a required check without being red from day one. Fix or explicitly `# type: ignore` each, then add the step to the **Backend tests** job.
 
 - [ ] **T10 · P0 · Backups with a rehearsed restore**
       The nightly-backup plan died with the move from SQLite to Postgres. Needs scheduled `pg_dump`, offsite copies, MinIO bucket replication for documents.
@@ -218,7 +225,7 @@ Priorities: **P0** not a CRM without it · **P1** daily friction · **P2** expec
 Dependency- and leverage-ordered, not a strict ranking:
 
 1. **T03–T07** — close the remaining shipped issues. Days, not weeks.
-2. **T08, T09** — tests and a CI gate, before the model grows.
+2. **T08** — the rest of the test suite (the CI gate that runs it landed with T09).
 3. **T10** — backups. Unblocks nothing, which is exactly why it gets deferred forever.
 4. **T12 → T13** — Organizations, then Deals. Turns a contact book into a CRM.
 5. **T14 → T15** — link tasks, then build the timeline; it becomes the main screen.
