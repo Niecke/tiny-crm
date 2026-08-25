@@ -19,9 +19,11 @@ void main() {
     dio = Dio(BaseOptions(
       baseUrl: config.apiUrl,
       validateStatus: (status) => status != null,
-    ))..interceptors.add(AuthInterceptor(
+    ))
+      ..interceptors.add(AuthInterceptor(
         onUnauthorized: () => container.read(authProvider.notifier).logout(),
-      ));
+      ))
+      ..interceptors.add(ErrorInterceptor());
     runApp(UncontrolledProviderScope(container: container, child: const App()));
     VersionCheckService.start();
   }, (error, stack) {

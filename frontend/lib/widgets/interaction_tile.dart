@@ -3,11 +3,13 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/date_time_text.dart';
+import '../core/error_text.dart';
 import '../models/contact.dart';
 import '../models/interaction.dart';
 import '../pages/interaction_form_page.dart';
 import '../providers/contacts_provider.dart';
 import '../providers/interactions_provider.dart';
+import 'confirm_dialog.dart';
 
 class InteractionTile extends ConsumerWidget {
   const InteractionTile({
@@ -106,9 +108,20 @@ class InteractionTile extends ConsumerWidget {
               ),
               tooltip: interaction.done ? 'Mark as not happened' : 'Mark as happened',
               onPressed: () async {
-                await ref
-                    .read(interactionsRepositoryProvider)
-                    .update(interaction.id, {'done': !interaction.done});
+                try {
+                  await ref
+                      .read(interactionsRepositoryProvider)
+                      .update(interaction.id, {'done': !interaction.done});
+                } catch (e) {
+                  if (context.mounted) {
+                    showErrorSnackBar(
+                      context,
+                      e,
+                      prefix: 'Could not update interaction.',
+                    );
+                  }
+                  return;
+                }
                 ref.invalidate(interactionsProvider);
               },
             ),
@@ -117,9 +130,23 @@ class InteractionTile extends ConsumerWidget {
                 icon: const Icon(Icons.delete_outline),
                 tooltip: 'Delete',
                 onPressed: () async {
-                  await ref
-                      .read(interactionsRepositoryProvider)
-                      .delete(interaction.id);
+                  final confirmed = await confirmDelete(
+                    context,
+                    title: 'Delete interaction?',
+                    message:
+                        '"${interaction.subject}" will be permanently deleted.',
+                  );
+                  if (!confirmed || !context.mounted) return;
+                  try {
+                    await ref
+                        .read(interactionsRepositoryProvider)
+                        .delete(interaction.id);
+                  } catch (e) {
+                    if (context.mounted) {
+                      showErrorSnackBar(context, e, prefix: 'Delete failed.');
+                    }
+                    return;
+                  }
                   ref.invalidate(interactionsProvider);
                 },
               ),

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/error_text.dart';
 import '../models/contact.dart';
 import '../providers/contacts_provider.dart';
 import '../providers/interactions_provider.dart';
+import '../widgets/confirm_dialog.dart';
 import '../widgets/interaction_tile.dart';
 import '../widgets/pagination_bar.dart';
 import 'contact_form_page.dart';
@@ -15,26 +17,20 @@ class ContactDetailPage extends ConsumerWidget {
   final Contact contact;
 
   Future<void> _delete(BuildContext context, WidgetRef ref) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete contact'),
-        content: Text('Delete "${contact.name}"? This cannot be undone.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final confirmed = await confirmDelete(
+      context,
+      title: 'Delete contact?',
+      message: '"${contact.name}" will be permanently deleted.',
     );
-    if (confirmed != true || !context.mounted) return;
-    await ref.read(contactsRepositoryProvider).delete(contact.id);
+    if (!confirmed || !context.mounted) return;
+    try {
+      await ref.read(contactsRepositoryProvider).delete(contact.id);
+    } catch (e) {
+      if (context.mounted) {
+        showErrorSnackBar(context, e, prefix: 'Delete failed.');
+      }
+      return;
+    }
     // Invalidate → contactsProvider refetches → ContactsPage list updates automatically
     ref.invalidate(contactsProvider);
     ref.invalidate(allContactsProvider);
@@ -188,7 +184,7 @@ class _InteractionsSectionState extends ConsumerState<_InteractionsSection> {
               child: LinearProgressIndicator(),
             ),
             error: (e, _) => Text(
-              'Error: $e',
+              errorText(e),
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
             data: (page) => page.items.isEmpty

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/error_text.dart';
 import '../providers/user_provider.dart';
 
 class ChangePasswordPage extends ConsumerStatefulWidget {
@@ -61,7 +62,7 @@ class _ChangePasswordPageState extends ConsumerState<ChangePasswordPage> {
         } else if (detail is Map && detail['code'] == 'INVALID_PASSWORD') {
           _error = 'New password is invalid: ${detail['reason'] ?? ''}';
         } else {
-          _error = 'Password change failed (${code ?? '?'}).';
+          _error = errorText(e);
         }
       });
     } finally {

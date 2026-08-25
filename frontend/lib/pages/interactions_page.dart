@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/error_text.dart';
 import '../models/interaction.dart';
 import '../providers/interactions_provider.dart';
 import '../widgets/interaction_tile.dart';
@@ -213,7 +214,7 @@ class _PanelState extends ConsumerState<_Panel> {
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(
                 child: SelectableText(
-                  'Error: $e',
+                  errorText(e),
                   style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
               ),

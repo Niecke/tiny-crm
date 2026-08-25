@@ -98,9 +98,11 @@ Priorities: **P0** not a CRM without it · **P1** daily friction · **P2** expec
       *Done:* `_checked_size()` reads the length Starlette already recorded (`UploadFile.size`, falling back to a seek) and rejects with `413` before anything is read; the body then goes to S3 through `put_object_stream()` in `storage.py`, which hands the spooled file object to `upload_fileobj` — parts on the wire, multipart past 8 MB, never one blob in memory. PDF previews are the one exception and are documented as such: pymupdf needs the whole document, so `_render_preview()` materialises it — after the size check, so bounded by the cap.
       *Not covered:* Starlette parses the multipart body before the handler runs, so an oversized upload is still spooled to a temp file (disk, not memory) before the 413. Rejecting on `Content-Length` needs a middleware, like `ratelimit.py` — separate task if the disk churn matters.
 
-- [ ] **T07 · P2 · Human-readable errors and consistent delete confirmation**
-      Error states render `'Error: $e'` — a raw Dio stack description. Contact deletes confirm; task and document deletes do not.
-      *Files:* `frontend/lib/pages/*.dart`.
+- [x] **T07 · P2 · Human-readable errors and consistent delete confirmation**
+      Error states rendered `'Error: $e'` — a raw Dio stack description — and deletes confirmed or not depending on the screen.
+      *Done:* `core/error_text.dart` maps a failure to one actionable sentence (transport vs. status, `Retry-After` for 429, and the server's own `detail` when there is one, including FastAPI's validation list) plus `showErrorSnackBar()` for in-place reporting; `widgets/confirm_dialog.dart` gives every delete the same `confirmDelete()` dialog — task and interaction deletes now ask, like contacts, projects and documents already did. Mutations that previously threw into the void (done-toggles, link edits, all four form saves, upload) now report and, on a form, stop the button spinning.
+      *Load-bearing detail:* `validateStatus` accepts every status so the 401 handler can see one, which meant error bodies flowed into the repositories and blew up as cast errors — that, not the HTTP status, was what reached the UI. New `ErrorInterceptor` in `api.dart` turns anything from 400 up back into a thrown `DioException`, so `errorText()` has something real to read.
+      *Tests:* `frontend/test/error_text_test.dart` (8 cases).
 
 ### B — Safety net (do before the model grows)
 

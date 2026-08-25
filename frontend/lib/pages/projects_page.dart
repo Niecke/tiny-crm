@@ -7,6 +7,7 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:web/web.dart' as web;
 
+import '../core/error_text.dart';
 import '../models/contact.dart';
 import '../models/document.dart';
 import '../models/paged_result.dart';
@@ -17,6 +18,7 @@ import '../providers/documents_provider.dart';
 import '../providers/projects_provider.dart';
 import '../providers/tasks_provider.dart';
 import '../widgets/pagination_bar.dart';
+import '../widgets/confirm_dialog.dart';
 import 'contact_detail_page.dart';
 import 'project_form_page.dart';
 import 'task_form_page.dart';
@@ -97,7 +99,7 @@ class _ProjectsPageState extends ConsumerState<ProjectsPage>
               Expanded(
                 child: projectsAsync.when(
                   loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => Center(child: Text('Error: $e')),
+                  error: (e, _) => Center(child: Text(errorText(e))),
                   data: (page) {
                     final project = _selectedId == null
                         ? null
@@ -156,7 +158,7 @@ class _ProjectsPageState extends ConsumerState<ProjectsPage>
                     projectsAsync.when(
                       loading: () =>
                           const Center(child: CircularProgressIndicator()),
-                      error: (e, _) => Center(child: Text('Error: $e')),
+                      error: (e, _) => Center(child: Text(errorText(e))),
                       data: (page) {
                         final project = _selectedId == null
                             ? null
@@ -256,7 +258,7 @@ class _ProjectList extends StatelessWidget {
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Center(
               child: SelectableText(
-                'Error: $e',
+                errorText(e),
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.error,
                 ),
@@ -398,7 +400,7 @@ class _ProjectDetail extends ConsumerWidget {
             allAsync: ref.watch(allContactsProvider),
             labelOf: (c) => c.name,
             idOf: (c) => c.id,
-            onUpdate: (ids) => _updateLinks(ref, p, contactIds: ids),
+            onUpdate: (ids) => _updateLinks(context, ref, p, contactIds: ids),
             onTap: (ctx, c) => Navigator.push(
               ctx,
               MaterialPageRoute(builder: (_) => ContactDetailPage(contact: c)),
@@ -411,7 +413,7 @@ class _ProjectDetail extends ConsumerWidget {
             allAsync: ref.watch(allTasksProvider),
             labelOf: (t) => t.title,
             idOf: (t) => t.id,
-            onUpdate: (ids) => _updateLinks(ref, p, taskIds: ids),
+            onUpdate: (ids) => _updateLinks(context, ref, p, taskIds: ids),
             onTap: (ctx, t) => Navigator.push(
               ctx,
               MaterialPageRoute(builder: (_) => TaskFormPage(task: t)),
@@ -424,7 +426,7 @@ class _ProjectDetail extends ConsumerWidget {
             allAsync: ref.watch(allDocumentsProvider),
             labelOf: (d) => d.title,
             idOf: (d) => d.id,
-            onUpdate: (ids) => _updateLinks(ref, p, documentIds: ids),
+            onUpdate: (ids) => _updateLinks(context, ref, p, documentIds: ids),
             onTap: (ctx, d) => _showDocumentInfo(ctx, d),
           ),
         ],
@@ -433,6 +435,7 @@ class _ProjectDetail extends ConsumerWidget {
   }
 
   Future<void> _updateLinks(
+    BuildContext context,
     WidgetRef ref,
     Project p, {
     List<String>? contactIds,
@@ -443,7 +446,14 @@ class _ProjectDetail extends ConsumerWidget {
     if (contactIds != null) body['contact_ids'] = contactIds;
     if (taskIds != null) body['task_ids'] = taskIds;
     if (documentIds != null) body['document_ids'] = documentIds;
-    await ref.read(projectsRepositoryProvider).update(p.id, body);
+    try {
+      await ref.read(projectsRepositoryProvider).update(p.id, body);
+    } catch (e) {
+      if (context.mounted) {
+        showErrorSnackBar(context, e, prefix: 'Could not update links.');
+      }
+      return;
+    }
     ref.invalidate(projectsProvider);
   }
 
@@ -452,28 +462,20 @@ class _ProjectDetail extends ConsumerWidget {
     WidgetRef ref,
     Project p,
   ) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete project?'),
-        content: Text('"${p.name}" will be permanently deleted.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final confirmed = await confirmDelete(
+      context,
+      title: 'Delete project?',
+      message: '"${p.name}" will be permanently deleted.',
     );
-    if (confirmed != true) return;
-    await ref.read(projectsRepositoryProvider).delete(p.id);
+    if (!confirmed || !context.mounted) return;
+    try {
+      await ref.read(projectsRepositoryProvider).delete(p.id);
+    } catch (e) {
+      if (context.mounted) {
+        showErrorSnackBar(context, e, prefix: 'Delete failed.');
+      }
+      return;
+    }
     ref.invalidate(projectsProvider);
   }
 
@@ -514,7 +516,7 @@ class _LinkSection<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     return allAsync.when(
       loading: () => const SizedBox.shrink(),
-      error: (e, _) => Text('Error loading $title: $e'),
+      error: (e, _) => Text('Could not load $title. ${errorText(e)}'),
       data: (all) {
         final linkedSet = linkedIds.toSet();
         final linked = all.where((item) => linkedSet.contains(idOf(item))).toList();
@@ -629,9 +631,7 @@ class _DocumentInfoDialogState extends ConsumerState<_DocumentInfoDialog> {
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Download failed: $e')));
+        showErrorSnackBar(context, e, prefix: 'Download failed.');
       }
     } finally {
       if (mounted) setState(() => _downloading = false);

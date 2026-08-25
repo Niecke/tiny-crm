@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/error_text.dart';
 import '../models/user.dart';
 import '../providers/user_provider.dart';
 
@@ -19,7 +20,7 @@ class ProfilePage extends ConsumerWidget {
           padding: const EdgeInsets.all(24),
           child: profile.when(
             loading: () => const CircularProgressIndicator(),
-            error: (e, _) => Text('Failed to load profile: $e'),
+            error: (e, _) => Text('Could not load profile. ${errorText(e)}'),
             data: (user) => _ProfileContent(user: user),
           ),
         ),

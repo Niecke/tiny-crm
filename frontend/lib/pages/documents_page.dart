@@ -6,7 +6,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/web_download.dart';
+import '../core/error_text.dart';
 import '../models/document.dart';
+import '../widgets/confirm_dialog.dart';
 import '../providers/documents_provider.dart';
 import '../widgets/document_viewer.dart';
 import '../widgets/pagination_bar.dart';
@@ -91,7 +93,7 @@ class _DocumentsPageState extends ConsumerState<DocumentsPage> {
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(
                 child: SelectableText(
-                  'Error: $e',
+                  errorText(e),
                   style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
               ),
@@ -191,7 +193,9 @@ class _UploadDialogState extends ConsumerState<_UploadDialog> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Could not read file: $e')));
+        ).showSnackBar(
+          const SnackBar(content: Text('Could not read that file.')),
+        );
       }
       return;
     }
@@ -227,6 +231,8 @@ class _UploadDialogState extends ConsumerState<_UploadDialog> {
           );
       widget.onUploaded();
       if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) showErrorSnackBar(context, e, prefix: 'Upload failed.');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -610,9 +616,7 @@ class _ActionMenu extends ConsumerWidget {
       );
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Download failed: $e')));
+        showErrorSnackBar(context, e, prefix: 'Download failed.');
       }
     }
   }
@@ -631,43 +635,24 @@ class _ActionMenu extends ConsumerWidget {
       onChanged();
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Replace failed: $e')));
+        showErrorSnackBar(context, e, prefix: 'Replace failed.');
       }
     }
   }
 
   Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete document?'),
-        content: Text('"${doc.title}" will be permanently deleted.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final confirmed = await confirmDelete(
+      context,
+      title: 'Delete document?',
+      message: '"${doc.title}" will be permanently deleted.',
     );
-    if (confirmed != true) return;
+    if (!confirmed || !context.mounted) return;
     try {
       await ref.read(documentsRepositoryProvider).delete(doc.id);
       onChanged();
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Delete failed: $e')));
+        showErrorSnackBar(context, e, prefix: 'Delete failed.');
       }
     }
   }

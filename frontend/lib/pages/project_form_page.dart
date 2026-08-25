@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/error_text.dart';
 import '../models/project.dart';
 import '../providers/projects_provider.dart';
 
@@ -81,10 +82,18 @@ class _ProjectFormPageState extends ConsumerState<ProjectFormPage>
     };
 
     final repo = ref.read(projectsRepositoryProvider);
-    if (_isEdit) {
-      await repo.update(widget.project!.id, body);
-    } else {
-      await repo.create(body);
+    try {
+      if (_isEdit) {
+        await repo.update(widget.project!.id, body);
+      } else {
+        await repo.create(body);
+      }
+    } catch (e) {
+      if (mounted) {
+        showErrorSnackBar(context, e, prefix: 'Could not save project.');
+        setState(() => _saving = false);
+      }
+      return;
     }
 
     ref.invalidate(projectsProvider);

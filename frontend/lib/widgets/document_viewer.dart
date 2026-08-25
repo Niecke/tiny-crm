@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pdfrx/pdfrx.dart';
 
 import '../core/web_download.dart';
+import '../core/error_text.dart';
 import '../models/document.dart';
 import '../providers/documents_provider.dart';
 
@@ -50,9 +51,7 @@ class _DocumentViewerState extends ConsumerState<_DocumentViewer> {
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Download failed: $e')));
+        showErrorSnackBar(context, e, prefix: 'Download failed.');
       }
     }
   }

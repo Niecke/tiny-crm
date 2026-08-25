@@ -5,6 +5,7 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/error_text.dart';
 import '../models/contact.dart';
 import '../models/task.dart';
 import '../providers/contacts_provider.dart';
@@ -12,6 +13,7 @@ import '../providers/interactions_provider.dart';
 import '../providers/tasks_provider.dart';
 import '../widgets/interaction_tile.dart';
 import '../widgets/pagination_bar.dart';
+import '../widgets/confirm_dialog.dart';
 import 'contact_detail_page.dart';
 import 'contact_form_page.dart';
 import 'interaction_form_page.dart';
@@ -154,7 +156,7 @@ class _UpcomingPanelState extends ConsumerState<_UpcomingPanel> {
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(
                 child: SelectableText(
-                  'Error: $e',
+                  errorText(e),
                   style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
               ),
@@ -280,7 +282,7 @@ class _ContactsPanelState extends ConsumerState<_ContactsPanel> {
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(
                 child: SelectableText(
-                  'Error: $e',
+                  errorText(e),
                   style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
               ),
@@ -439,7 +441,7 @@ class _TasksPanelState extends ConsumerState<_TasksPanel> {
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(
                 child: SelectableText(
-                  'Error: $e',
+                  errorText(e),
                   style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
               ),
@@ -498,9 +500,16 @@ class _TaskTile extends ConsumerWidget {
           ),
           tooltip: task.done ? 'Mark undone' : 'Mark done',
           onPressed: () async {
-            await ref.read(tasksRepositoryProvider).update(task.id, {
-              'done': !task.done,
-            });
+            try {
+              await ref.read(tasksRepositoryProvider).update(task.id, {
+                'done': !task.done,
+              });
+            } catch (e) {
+              if (context.mounted) {
+                showErrorSnackBar(context, e, prefix: 'Could not update task.');
+              }
+              return;
+            }
             ref.invalidate(tasksProvider);
             ref.invalidate(allTasksProvider);
           },
@@ -553,7 +562,20 @@ class _TaskTile extends ConsumerWidget {
           icon: const Icon(Icons.delete_outline),
           tooltip: 'Delete',
           onPressed: () async {
-            await ref.read(tasksRepositoryProvider).delete(task.id);
+            final confirmed = await confirmDelete(
+              context,
+              title: 'Delete task?',
+              message: '"${task.title}" will be permanently deleted.',
+            );
+            if (!confirmed || !context.mounted) return;
+            try {
+              await ref.read(tasksRepositoryProvider).delete(task.id);
+            } catch (e) {
+              if (context.mounted) {
+                showErrorSnackBar(context, e, prefix: 'Delete failed.');
+              }
+              return;
+            }
             ref.invalidate(tasksProvider);
             ref.invalidate(allTasksProvider);
           },
