@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     # the hard re-login interval. ~9 months keeps the Android PWA logged in.
     jwt_lifetime_seconds: int = 60 * 60 * 24 * 270
 
+    # Login throttling, counted per client address over a sliding window.
+    # Only failed logins count, so a legitimate mistype costs almost nothing.
+    login_max_failures: int = 10
+    login_failure_window_seconds: int = 300
+
     # Git commit of the running build, injected at image build time via the
     # GIT_COMMIT build arg (git isn't available inside the build container).
     git_commit: str = "unknown"

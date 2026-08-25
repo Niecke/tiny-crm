@@ -12,6 +12,7 @@ from app.auth import auth_backend, fastapi_users
 from app.config import Environment, settings
 from app.db import get_session
 from app.logging_config import configure_logging
+from app.ratelimit import count_failed_logins, enforce_login_rate_limit
 from app.routers import contacts, documents, interactions, projects, tasks, users
 from app.schemas.user import UserRead, UserUpdate
 from app.storage import check_storage
@@ -71,15 +72,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Records failed logins for the throttle below. Registered as middleware rather
+# than a dependency because only the response reveals whether the credentials
+# were accepted.
+app.middleware("http")(count_failed_logins)
+
 app.include_router(contacts.router)
 app.include_router(tasks.router)
 app.include_router(documents.router)
 app.include_router(projects.router)
 app.include_router(interactions.router)
+# The throttle covers logout as well as login. That is deliberate: both are the
+# credential surface, and the budget is generous enough that no real session
+# hits it.
 app.include_router(
     fastapi_users.get_auth_router(auth_backend),
     prefix="/auth/jwt",
     tags=["auth"],
+    dependencies=[Depends(enforce_login_rate_limit)],
 )
 # Custom password-change endpoint (must register before fastapi-users users router
 # so the more specific /users/me/password route resolves first).

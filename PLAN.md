@@ -82,9 +82,11 @@ Priorities: **P0** not a CRM without it · **P1** daily friction · **P2** expec
       `cors_origins = ["*"]` and MinIO `minioadmin/minioadmin` shipped as silent defaults alongside the placeholder JWT secret.
       *Done:* `ENVIRONMENT` setting (`development` | `production`) plus `Settings.insecure_defaults()`, checked by `check_secure_defaults()` in the `lifespan` hook. Development logs a warning per problem and continues; production logs each one at ERROR and raises `InsecureConfigurationError`, which aborts uvicorn startup with exit code 3. Supersedes the T02 warning. **Set `ENVIRONMENT=production` on the deployed instance — the check is inert without it.**
 
-- [ ] **T04 · P0 · Rate-limit login**
-      `/auth/jwt/login` is unthrottled, with no lockout and no failed-attempt logging. One well-known admin account is the whole attack surface.
-      *Done when:* repeated failures from one IP are throttled, and each failure is logged at WARNING with the source address.
+- [x] **T04 · P0 · Rate-limit login (layer 1: per-address, in-memory)**
+      `/auth/jwt/login` was unthrottled, with no lockout and no failed-attempt logging.
+      *Done:* `app/ratelimit.py` — sliding window of failed logins per client address (`LOGIN_MAX_FAILURES`, default 10 per `LOGIN_FAILURE_WINDOW_SECONDS`, default 300). Over budget returns `429` with `Retry-After`. Counting happens in a middleware, because a dependency runs before the handler and cannot see whether credentials were accepted; only failures consume budget, so a mistype costs nothing. Every failure logs at WARNING with the source address. No cache server: the Dockerfile runs a single uvicorn worker, so a module-level dict is process-global — the map is swept and hard-capped so a rotating-IP flood cannot grow it without bound.
+      **Requires `FORWARDED_ALLOW_IPS`** on any deployment where Caddy fronts the API (set in `compose.full.yml`); without it uvicorn discards `X-Forwarded-For` and every user shares one bucket. That in turn requires the backend port not to be publicly reachable, or `X-Forwarded-For` can be forged.
+      *Does not cover:* an attacker rotating source addresses — see T34.
 
 - [ ] **T05 · P1 · Stop lists truncating silently**
       API defaults are 50 contacts / 200 tasks, interactions and projects per page; the Flutter repositories never send `skip` or `limit`. Past 50 contacts the dashboard just stops — no error, no "load more".
@@ -171,6 +173,11 @@ Priorities: **P0** not a CRM without it · **P1** daily friction · **P2** expec
 - [ ] **T24 · P1 · Short-lived tokens with refresh, and a real logout**
       `jwt_lifetime_seconds` is 270 days with no refresh token and no denylist. A leaked token stays valid until it expires; changing the password does not invalidate it; logout only clears client storage.
       *Done when:* short access token + refresh token, revoked on password change and on explicit sign-out.
+
+- [ ] **T34 · P1 · Rate-limit login (layer 2: durable per-account backoff)**
+      T04 throttles per source address, which an attacker rotating IPs walks straight through, and its window resets on every redeploy. Add `failed_login_count` and `locked_until` to the user table (Postgres, no new infrastructure) so the budget follows the *account* and survives restarts.
+      *Use exponential backoff* (`locked_until = now + 2^n` seconds, capped around 15 min), not a hard lock — a hard lock hands an attacker a way to lock the operator out of their own CRM on purpose.
+      *Needs:* an Alembic migration on `user`.
 
 - [ ] **T25 · P2 · User administration in the app**
       Teams stay out of scope, but every row is already `user_id`-scoped, so a second account is a UI problem, not a data-model one. At minimum: create and deactivate users without a shell.
