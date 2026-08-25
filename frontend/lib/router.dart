@@ -6,11 +6,13 @@ import 'package:go_router/go_router.dart';
 import 'features/auth/auth_provider.dart';
 import 'providers/contacts_provider.dart';
 import 'providers/documents_provider.dart';
+import 'providers/interactions_provider.dart';
 import 'providers/projects_provider.dart';
 import 'pages/change_password_page.dart';
 import 'pages/dashboard_page.dart';
 import 'pages/documents_page.dart';
 import 'pages/health_page.dart';
+import 'pages/interactions_page.dart';
 import 'pages/login_page.dart';
 import 'pages/profile_page.dart';
 import 'pages/projects_page.dart';
@@ -59,6 +61,10 @@ GoRouter _buildRouter(Ref ref) {
           GoRoute(
             path: '/documents',
             builder: (context, state) => const DocumentsPage(),
+          ),
+          GoRoute(
+            path: '/interactions',
+            builder: (context, state) => const InteractionsPage(),
           ),
           GoRoute(
             path: '/health',
@@ -119,6 +125,7 @@ class AppShell extends ConsumerWidget {
               ('Dashboard', '/'),
               ('Projects', '/projects'),
               ('Documents', '/documents'),
+              ('Activity', '/interactions'),
             ])
               TextButton(
                 onPressed: () => context.go(path),
@@ -144,6 +151,10 @@ class AppShell extends ConsumerWidget {
               itemBuilder: (_) => const [
                 PopupMenuItem(value: '/projects', child: Text('Projects')),
                 PopupMenuItem(value: '/documents', child: Text('Documents')),
+                PopupMenuItem(
+                  value: '/interactions',
+                  child: Text('Activity'),
+                ),
               ],
             ),
           IconButton(
@@ -152,6 +163,7 @@ class AppShell extends ConsumerWidget {
               ref.invalidate(tasksProvider),
               ref.invalidate(documentsProvider),
               ref.invalidate(projectsProvider),
+              ref.invalidate(interactionsProvider),
             },
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh',

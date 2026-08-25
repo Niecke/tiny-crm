@@ -25,6 +25,11 @@ cd backend
 uv run alembic upgrade head
 ```
 
+Create new alembic migration
+```bash
+uv run alembic revision --autogenerate -m "add phone to contacts"
+```
+
 Run the backend locally
 ```bash
 cd backend
@@ -44,6 +49,11 @@ Containers are build each time to get latest code changes.
 podman-compose -f compose.full.yml build frontend && \
   podman-compose -f compose.full.yml build backend && \
   podman-compose -f compose.full.yml up -d --force-recreate frontend backend
+```
+
+Shutdown again
+```bash
+podman-compose -f compose.full.yml down
 ```
 
 ## Flutter Setup
