@@ -2,19 +2,21 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import current_active_user
 from app.auth.users import User
-from app.db import get_session
+from app.db import count_rows, get_session
 from app.models.document import Document
 from app.schemas.document import DocumentRead, DocumentUpdate
-from app.storage import delete_object, get_object_stream, put_object
+from app.schemas.page import Page
+from app.storage import delete_object, get_object_stream, put_object, put_object_stream
 
 logger = logging.getLogger(__name__)
 
@@ -37,9 +39,34 @@ def _detect_format(filename: str, content_type: str) -> str | None:
     return _ALLOWED_FORMATS.get(content_type) or _ALLOWED_EXTENSIONS.get(ext)
 
 
-def _generate_preview(data: bytes, fmt: str) -> bytes | None:
+def _checked_size(file: UploadFile) -> int:
+    """Size of the upload, checked before any of it is pulled into memory.
+
+    Starlette has already received the body — spooling it to a temp file past
+    1 MB — and recorded its length, so this reads a counter rather than the
+    file. Everything downstream streams, so an oversized upload is rejected
+    without ever becoming a bytes object here."""
+    size = file.size
+    if size is None:  # no Content-Length from the client
+        size = file.file.seek(0, os.SEEK_END)
+        file.file.seek(0)
+    if size > _MAX_BYTES:
+        raise HTTPException(status_code=413, detail="File exceeds 25 MB limit")
+    return size
+
+
+async def _render_preview(file: UploadFile, fmt: str) -> bytes | None:
+    """First page of a PDF as JPEG, or None for the other formats.
+
+    pymupdf needs the whole document at once, so this is the single place the
+    body is materialised — and only after the size check has passed."""
     if fmt != "pdf":
         return None
+    await file.seek(0)
+    return _generate_preview(await file.read())
+
+
+def _generate_preview(data: bytes) -> bytes | None:
     try:
         import pymupdf
 
@@ -57,19 +84,27 @@ def _content_type(fmt: str) -> str:
     return {"pdf": "application/pdf", "markdown": "text/markdown", "txt": "text/plain"}[fmt]
 
 
-@router.get("/", response_model=list[DocumentRead])
+@router.get("/", response_model=Page[DocumentRead])
 async def list_documents(
-    skip: int = 0,
-    limit: int = 50,
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=200),
     search: str | None = None,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
-) -> list[Document]:
+) -> Page[DocumentRead]:
     q = select(Document).where(Document.user_id == user.id)
     if search:
         q = q.where(Document.title.ilike(f"%{search}%"))
-    result = await session.execute(q.offset(skip).limit(limit))
-    return list(result.scalars().all())
+    total = await count_rows(session, q)
+    result = await session.execute(
+        q.order_by(Document.created_at.desc(), Document.id.asc()).offset(skip).limit(limit)
+    )
+    return Page[DocumentRead](
+        items=[DocumentRead.model_validate(d) for d in result.scalars().all()],
+        total=total,
+        skip=skip,
+        limit=limit,
+    )
 
 
 @router.post("/", response_model=DocumentRead, status_code=201)
@@ -81,9 +116,7 @@ async def upload_document(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> Document:
-    data = await file.read()
-    if len(data) > _MAX_BYTES:
-        raise HTTPException(status_code=413, detail="File exceeds 25 MB limit")
+    size = _checked_size(file)
 
     fmt = _detect_format(file.filename or "", file.content_type or "")
     if fmt is None:
@@ -92,10 +125,12 @@ async def upload_document(
     parsed_tags: list[str] = json.loads(tags) if tags else []
     doc_id = uuid4()
     key = f"{user.id}/{doc_id}"
-    preview_image = _generate_preview(data, fmt)
-    preview_key = f"{key}_preview" if preview_image else None
 
-    await put_object(key, data, _content_type(fmt))
+    await file.seek(0)
+    await put_object_stream(key, file.file, _content_type(fmt))
+
+    preview_image = await _render_preview(file, fmt)
+    preview_key = f"{key}_preview" if preview_image else None
     if preview_image and preview_key:
         await put_object(preview_key, preview_image, "image/jpeg")
 
@@ -106,7 +141,7 @@ async def upload_document(
         description=description,
         tags=parsed_tags,
         format=fmt,
-        size=len(data),
+        size=size,
         storage_key=key,
         preview_key=preview_key,
     )
@@ -184,18 +219,17 @@ async def replace_document_content(
     if doc is None:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    data = await file.read()
-    if len(data) > _MAX_BYTES:
-        raise HTTPException(status_code=413, detail="File exceeds 25 MB limit")
+    size = _checked_size(file)
 
     fmt = _detect_format(file.filename or "", file.content_type or "")
     if fmt is None:
         raise HTTPException(status_code=422, detail="Unsupported file type — use pdf, md, or txt")
 
     # Put under the same key — versioned bucket keeps the old version
-    await put_object(doc.storage_key, data, _content_type(fmt))
+    await file.seek(0)
+    await put_object_stream(doc.storage_key, file.file, _content_type(fmt))
 
-    preview_image = _generate_preview(data, fmt)
+    preview_image = await _render_preview(file, fmt)
     if preview_image:
         preview_key = f"{doc.storage_key}_preview"
         await put_object(preview_key, preview_image, "image/jpeg")
@@ -204,7 +238,7 @@ async def replace_document_content(
         doc.preview_key = None
 
     doc.format = fmt
-    doc.size = len(data)
+    doc.size = size
     await session.commit()
     await session.refresh(doc)
     return doc

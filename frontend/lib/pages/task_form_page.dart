@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/error_text.dart';
 import '../models/task.dart';
 import '../providers/tasks_provider.dart';
 
@@ -90,13 +91,22 @@ class _TaskFormPageState extends ConsumerState<TaskFormPage>
     };
 
     final repo = ref.read(tasksRepositoryProvider);
-    if (_isEdit) {
-      await repo.update(widget.task!.id, body);
-    } else {
-      await repo.create(body);
+    try {
+      if (_isEdit) {
+        await repo.update(widget.task!.id, body);
+      } else {
+        await repo.create(body);
+      }
+    } catch (e) {
+      if (mounted) {
+        showErrorSnackBar(context, e, prefix: 'Could not save task.');
+        setState(() => _saving = false);
+      }
+      return;
     }
 
     ref.invalidate(tasksProvider);
+    ref.invalidate(allTasksProvider);
     if (mounted) Navigator.pop(context);
   }
 

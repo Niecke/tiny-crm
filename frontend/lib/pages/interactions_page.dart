@@ -3,9 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/error_text.dart';
 import '../models/interaction.dart';
 import '../providers/interactions_provider.dart';
 import '../widgets/interaction_tile.dart';
+import '../widgets/pagination_bar.dart';
 import 'interaction_form_page.dart';
 
 /// Activity log: what is planned on the left, what already happened on the
@@ -30,24 +32,21 @@ class _InteractionsPageState extends ConsumerState<InteractionsPage> {
     super.dispose();
   }
 
-  InteractionsFilter _filter({required bool upcoming}) => (
-        search: _search,
-        contactId: null,
-        kind: _kind,
-        upcoming: upcoming,
-      );
-
   @override
   Widget build(BuildContext context) {
     final planned = _Panel(
       title: 'Planned',
       emptyText: 'Nothing planned.',
-      filter: _filter(upcoming: true),
+      search: _search,
+      kind: _kind,
+      upcoming: true,
     );
     final log = _Panel(
       title: 'Activity log',
       emptyText: 'No interactions logged yet.',
-      filter: _filter(upcoming: false),
+      search: _search,
+      kind: _kind,
+      upcoming: false,
     );
 
     return Column(
@@ -152,20 +151,48 @@ class _InteractionsPageState extends ConsumerState<InteractionsPage> {
   }
 }
 
-class _Panel extends ConsumerWidget {
+class _Panel extends ConsumerStatefulWidget {
   const _Panel({
     required this.title,
     required this.emptyText,
-    required this.filter,
+    required this.search,
+    required this.kind,
+    required this.upcoming,
   });
 
   final String title;
   final String emptyText;
-  final InteractionsFilter filter;
+  final String search;
+  final String? kind;
+  final bool upcoming;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(interactionsProvider(filter));
+  ConsumerState<_Panel> createState() => _PanelState();
+}
+
+class _PanelState extends ConsumerState<_Panel> {
+  int _skip = 0;
+
+  @override
+  void didUpdateWidget(_Panel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // A new query means the old offset is meaningless — back to page 1.
+    if (oldWidget.search != widget.search || oldWidget.kind != widget.kind) {
+      _skip = 0;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final async = ref.watch(
+      interactionsProvider((
+        search: widget.search,
+        contactId: null,
+        kind: widget.kind,
+        upcoming: widget.upcoming,
+        skip: _skip,
+      )),
+    );
 
     return Card(
       margin: EdgeInsets.zero,
@@ -176,7 +203,7 @@ class _Panel extends ConsumerWidget {
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                title,
+                widget.title,
                 style: Theme.of(context).textTheme.titleMedium,
               ),
             ),
@@ -187,20 +214,31 @@ class _Panel extends ConsumerWidget {
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(
                 child: SelectableText(
-                  'Error: $e',
+                  errorText(e),
                   style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
               ),
-              data: (items) => items.isEmpty
-                  ? Center(child: Text(emptyText))
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      itemCount: items.length,
-                      itemBuilder: (context, index) =>
-                          InteractionTile(interaction: items[index]),
+              data: (page) => page.items.isEmpty
+                  ? Center(child: Text(widget.emptyText))
+                  : Column(
+                      children: [
+                        Expanded(
+                          child: ListView.builder(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            itemCount: page.items.length,
+                            itemBuilder: (context, index) => InteractionTile(
+                              interaction: page.items[index],
+                            ),
+                          ),
+                        ),
+                        PaginationBar(
+                          page: page,
+                          onSkipChanged: (skip) => setState(() => _skip = skip),
+                        ),
+                      ],
                     ),
             ),
           ),

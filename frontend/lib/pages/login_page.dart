@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api.dart';
+import '../core/error_text.dart';
 import '../features/auth/auth_provider.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
@@ -42,16 +43,18 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           'password': _passwordCtrl.text,
         }),
       );
-      if (resp.statusCode == 200) {
-        final token = resp.data['access_token'] as String;
-        await ref.read(authProvider.notifier).setToken(token);
-      } else if (resp.statusCode == 400) {
-        setState(() => _error = 'Invalid credentials.');
-      } else {
-        setState(() => _error = 'Login failed (${resp.statusCode}).');
-      }
+      // ErrorInterceptor turns anything from 400 up into a DioException, so
+      // reaching this line means the login succeeded.
+      final token = resp.data['access_token'] as String;
+      await ref.read(authProvider.notifier).setToken(token);
     } on DioException catch (e) {
-      setState(() => _error = 'Login failed (${e.response?.statusCode}).');
+      setState(
+        // fastapi-users answers bad credentials with 400 LOGIN_BAD_CREDENTIALS;
+        // saying which half was wrong would help someone guessing.
+        () => _error = e.response?.statusCode == 400
+            ? 'Invalid credentials.'
+            : errorText(e),
+      );
     } finally {
       if (mounted) setState(() => _loading = false);
     }

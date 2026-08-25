@@ -160,8 +160,11 @@ class AppShell extends ConsumerWidget {
           IconButton(
             onPressed: () => {
               ref.invalidate(contactsProvider),
+              ref.invalidate(allContactsProvider),
               ref.invalidate(tasksProvider),
+              ref.invalidate(allTasksProvider),
               ref.invalidate(documentsProvider),
+              ref.invalidate(allDocumentsProvider),
               ref.invalidate(projectsProvider),
               ref.invalidate(interactionsProvider),
             },

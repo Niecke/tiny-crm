@@ -44,3 +44,29 @@ class AuthInterceptor extends Interceptor {
     handler.next(err);
   }
 }
+
+/// Turns error responses back into thrown [DioException]s.
+///
+/// `validateStatus` accepts every status so [AuthInterceptor] can see a 401 in
+/// `onResponse`. Without this, a 4xx/5xx body flows on as if it were a record
+/// and the repositories fail while parsing it — the type error that surfaced
+/// instead of the server's own message. Registered after [AuthInterceptor], so
+/// the logout on 401 still runs first.
+class ErrorInterceptor extends Interceptor {
+  @override
+  void onResponse(Response response, ResponseInterceptorHandler handler) {
+    final status = response.statusCode ?? 0;
+    if (status >= 400) {
+      handler.reject(
+        DioException(
+          requestOptions: response.requestOptions,
+          response: response,
+          type: DioExceptionType.badResponse,
+        ),
+        true,
+      );
+      return;
+    }
+    handler.next(response);
+  }
+}

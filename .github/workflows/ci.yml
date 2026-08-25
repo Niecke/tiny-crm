@@ -1,0 +1,224 @@
+name: CI
+
+# Pull requests into main run the whole pipeline: tests → build and push the
+# images → start those exact images and drive one real workflow through them.
+#
+# Only pull_request, deliberately: while a PR is open, every push to dev fires
+# `synchronize` on the same commit, so a push trigger would run everything
+# twice. Open the PR as a draft as soon as work starts and dev commits are
+# covered from the first push. workflow_dispatch runs the tests on demand.
+#
+# Branch protection on main should require: Backend tests, Frontend tests,
+# Build backend, Build frontend, Integration test.
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A new push to the same PR/branch makes the previous run irrelevant.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY_HOST: europe-west1-docker.pkg.dev
+  REGISTRY: europe-west1-docker.pkg.dev/niecke-it/tiny-crm
+
+jobs:
+  # The sha under test. For a pull_request event github.sha is the ephemeral
+  # merge commit, which no image should ever be tagged with — the promote
+  # workflow looks images up by the PR head sha after the merge.
+  meta:
+    name: Resolve build identity
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      commit: ${{ steps.id.outputs.commit }}
+      tag: ${{ steps.id.outputs.tag }}
+    steps:
+      - id: id
+        run: |
+          commit="${{ github.event.pull_request.head.sha || github.sha }}"
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+          echo "tag=ci-${commit:0:7}" >> "$GITHUB_OUTPUT"
+
+  backend-tests:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Sync locked dependencies
+        working-directory: backend
+        run: uv sync --frozen
+
+      - name: Lint
+        working-directory: backend
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+
+      - name: Test
+        working-directory: backend
+        run: uv run pytest -q
+
+  frontend-tests:
+    name: Frontend tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Same SDK digest the frontend image builds with (see frontend/Dockerfile),
+    # so the gate cannot pass on a different Flutter than the one that ships.
+    container:
+      image: ghcr.io/cirruslabs/flutter:stable@sha256:46691e311715845de03a3ba4753a475476936805b29431b1f00f1816981033f8
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Resolve dependencies
+        working-directory: frontend
+        run: flutter pub get
+
+      - name: Analyze
+        working-directory: frontend
+        run: flutter analyze
+
+      - name: Test
+        working-directory: frontend
+        # widget_test.dart is @TestOn('browser') and is skipped here; the unit
+        # tests run on the VM.
+        run: flutter test
+
+  build-backend:
+    name: Build backend
+    needs: [meta, backend-tests, frontend-tests]
+    # Fork PRs cannot read the WIF secrets, and a manual run has no PR head to
+    # tag images with — both fall back to running the tests only.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        id: auth
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+          token_format: access_token
+
+      - uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4
+        with:
+          registry: ${{ env.REGISTRY_HOST }}
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+
+      - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: ./backend
+          push: true
+          build-args: |
+            GIT_COMMIT=${{ needs.meta.outputs.commit }}
+          tags: ${{ env.REGISTRY }}/backend:${{ needs.meta.outputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  build-frontend:
+    name: Build frontend
+    needs: [meta, backend-tests, frontend-tests]
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        id: auth
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+          token_format: access_token
+
+      - uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4
+        with:
+          registry: ${{ env.REGISTRY_HOST }}
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+
+      - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: ./frontend
+          push: true
+          build-args: |
+            GIT_COMMIT=${{ needs.meta.outputs.commit }}
+          tags: ${{ env.REGISTRY }}/frontend:${{ needs.meta.outputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  integration:
+    name: Integration test
+    needs: [meta, build-backend, build-frontend]
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        id: auth
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+          token_format: access_token
+
+      - uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4
+        with:
+          registry: ${{ env.REGISTRY_HOST }}
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+
+      - name: Run the stack and drive it
+        env:
+          IMAGE_TAG: ${{ needs.meta.outputs.tag }}
+          EXPECTED_COMMIT: ${{ needs.meta.outputs.commit }}
+        run: ci/smoke.sh
+
+      # compose.ci.yml refuses to interpolate without these; the values are
+      # irrelevant for reading logs and tearing the stack down.
+      - name: Container logs
+        if: failure()
+        env:
+          IMAGE_TAG: ${{ needs.meta.outputs.tag }}
+          JWT_SECRET: unused
+          S3_ACCESS_KEY: unused
+          S3_SECRET_KEY: unused
+        run: docker compose -p tinycrm-ci -f compose.ci.yml logs --no-color --tail 200
+
+      - name: Tear down
+        if: always()
+        env:
+          IMAGE_TAG: ${{ needs.meta.outputs.tag }}
+          JWT_SECRET: unused
+          S3_ACCESS_KEY: unused
+          S3_SECRET_KEY: unused
+        run: docker compose -p tinycrm-ci -f compose.ci.yml down -v

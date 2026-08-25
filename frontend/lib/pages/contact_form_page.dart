@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/error_text.dart';
 import '../models/contact.dart';
 import '../providers/contacts_provider.dart';
 
@@ -69,14 +70,23 @@ class _ContactFormPageState extends ConsumerState<ContactFormPage> {
     };
 
     final repo = ref.read(contactsRepositoryProvider);
-    if (_isEdit) {
-      await repo.update(widget.contact!.id, body);
-    } else {
-      await repo.create(body);
+    try {
+      if (_isEdit) {
+        await repo.update(widget.contact!.id, body);
+      } else {
+        await repo.create(body);
+      }
+    } catch (e) {
+      if (mounted) {
+        showErrorSnackBar(context, e, prefix: 'Could not save contact.');
+        setState(() => _saving = false);
+      }
+      return;
     }
 
     // Invalidate here — every watcher of contactsProvider refetches automatically
     ref.invalidate(contactsProvider);
+    ref.invalidate(allContactsProvider);
 
     if (mounted) Navigator.pop(context);
   }

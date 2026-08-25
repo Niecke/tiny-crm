@@ -3,6 +3,7 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/date_time_text.dart';
+import '../core/error_text.dart';
 import '../models/contact.dart';
 import '../models/interaction.dart';
 import '../providers/contacts_provider.dart';
@@ -147,10 +148,18 @@ class _InteractionFormPageState extends ConsumerState<InteractionFormPage>
     };
 
     final repo = ref.read(interactionsRepositoryProvider);
-    if (_isEdit) {
-      await repo.update(widget.interaction!.id, body);
-    } else {
-      await repo.create(body);
+    try {
+      if (_isEdit) {
+        await repo.update(widget.interaction!.id, body);
+      } else {
+        await repo.create(body);
+      }
+    } catch (e) {
+      if (mounted) {
+        showErrorSnackBar(context, e, prefix: 'Could not save interaction.');
+        setState(() => _saving = false);
+      }
+      return;
     }
 
     ref.invalidate(interactionsProvider);
@@ -159,7 +168,7 @@ class _InteractionFormPageState extends ConsumerState<InteractionFormPage>
 
   @override
   Widget build(BuildContext context) {
-    final contactsAsync = ref.watch(contactsProvider(''));
+    final contactsAsync = ref.watch(allContactsProvider);
     final typed = parseWhen(_when.text);
     final planned = typed != null && typed.isAfter(DateTime.now());
 
@@ -362,7 +371,7 @@ class _ContactPicker extends StatelessWidget {
   Widget build(BuildContext context) {
     return contactsAsync.when(
       loading: () => const LinearProgressIndicator(),
-      error: (e, _) => Text('Error loading contacts: $e'),
+      error: (e, _) => Text('Could not load contacts. ${errorText(e)}'),
       data: (contacts) {
         final selected =
             contacts.where((c) => selectedIds.contains(c.id)).toList();

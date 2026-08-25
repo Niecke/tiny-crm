@@ -88,28 +88,38 @@ Priorities: **P0** not a CRM without it · **P1** daily friction · **P2** expec
       **Requires `FORWARDED_ALLOW_IPS`** on any deployment where Caddy fronts the API (set in `compose.full.yml`); without it uvicorn discards `X-Forwarded-For` and every user shares one bucket. That in turn requires the backend port not to be publicly reachable, or `X-Forwarded-For` can be forged.
       *Does not cover:* an attacker rotating source addresses — see T34.
 
-- [ ] **T05 · P1 · Stop lists truncating silently**
-      API defaults are 50 contacts / 200 tasks, interactions and projects per page; the Flutter repositories never send `skip` or `limit`. Past 50 contacts the dashboard just stops — no error, no "load more".
-      *Done when:* list endpoints return a total count, repositories page through it, and lists either paginate or infinite-scroll.
-      *Files:* `frontend/lib/repositories/*.dart`, every backend router.
+- [x] **T05 · P1 · Stop lists truncating silently**
+      API defaults were 50 contacts / 200 everything else, and the Flutter repositories never sent `skip` or `limit`, so past 50 contacts the dashboard just stopped.
+      *Done:* all five list endpoints return `Page[T]` (`items`, `total`, `skip`, `limit`) via `app/schemas/page.py` and `count_rows()` in `app/db.py`; `limit` is validated `1..200`. Every list also got a **stable sort with an `id` tiebreaker** — paging over a non-unique order lets rows repeat or vanish between pages, so this was load-bearing, not cosmetic. Frontend: `PagedResult<T>` (named to avoid the clash with Flutter's own `Page`), a `PaginationBar` footer showing "1–25 of 213" that hides itself when everything fits, and per-surface `skip` state that resets to 0 whenever the query changes.
+      *Pickers are separate:* contact/task/document pickers and id-to-name lookups need the whole set, so they use `listAll()` (walks pages at `limit=200`) behind `allContactsProvider` / `allTasksProvider` / `allDocumentsProvider` — paging those would have reintroduced the same silent truncation inside the pickers. These are invalidated alongside their paged counterparts.
 
-- [ ] **T06 · P1 · Stream document uploads**
-      `await file.read()` buffers the whole file before the size check, so the 25 MB cap is enforced after the memory is already spent. Downloads already stream.
-      *Files:* `backend/app/routers/documents.py`.
+- [x] **T06 · P1 · Stream document uploads**
+      `await file.read()` buffered the whole file before the size check, so the 25 MB cap was enforced after the memory was already spent.
+      *Done:* `_checked_size()` reads the length Starlette already recorded (`UploadFile.size`, falling back to a seek) and rejects with `413` before anything is read; the body then goes to S3 through `put_object_stream()` in `storage.py`, which hands the spooled file object to `upload_fileobj` — parts on the wire, multipart past 8 MB, never one blob in memory. PDF previews are the one exception and are documented as such: pymupdf needs the whole document, so `_render_preview()` materialises it — after the size check, so bounded by the cap.
+      *Not covered:* Starlette parses the multipart body before the handler runs, so an oversized upload is still spooled to a temp file (disk, not memory) before the 413. Rejecting on `Content-Length` needs a middleware, like `ratelimit.py` — separate task if the disk churn matters.
 
-- [ ] **T07 · P2 · Human-readable errors and consistent delete confirmation**
-      Error states render `'Error: $e'` — a raw Dio stack description. Contact deletes confirm; task and document deletes do not.
-      *Files:* `frontend/lib/pages/*.dart`.
+- [x] **T07 · P2 · Human-readable errors and consistent delete confirmation**
+      Error states rendered `'Error: $e'` — a raw Dio stack description — and deletes confirmed or not depending on the screen.
+      *Done:* `core/error_text.dart` maps a failure to one actionable sentence (transport vs. status, `Retry-After` for 429, and the server's own `detail` when there is one, including FastAPI's validation list) plus `showErrorSnackBar()` for in-place reporting; `widgets/confirm_dialog.dart` gives every delete the same `confirmDelete()` dialog — task and interaction deletes now ask, like contacts, projects and documents already did. Mutations that previously threw into the void (done-toggles, link edits, all four form saves, upload) now report and, on a form, stop the button spinning.
+      *Load-bearing detail:* `validateStatus` accepts every status so the 401 handler can see one, which meant error bodies flowed into the repositories and blew up as cast errors — that, not the HTTP status, was what reached the UI. New `ErrorInterceptor` in `api.dart` turns anything from 400 up back into a thrown `DioException`, so `errorText()` has something real to read.
+      *Tests:* `frontend/test/error_text_test.dart` (8 cases).
 
 ### B — Safety net (do before the model grows)
 
 - [ ] **T08 · P0 · Backend test suite**
       pytest, pytest-asyncio, httpx and mypy strict are configured; `backend/tests/` does not exist. Start with **cross-user isolation** — every endpoint reimplements the same `user_id` ownership check by hand, and one missed comparison leaks another tenant's data. Then auth-required, CRUD round-trip and validation per router, against a throwaway Postgres.
+      *Started:* `backend/tests/` now exists with 16 tests — unit tests for the insecure-defaults guard, the login throttle's sliding window and the upload size/format guards, plus one in-process API test for `/version` (`pythonpath = ["."]` in `pyproject.toml` makes `app` importable without installing it). The router coverage and cross-user isolation below are still outstanding.
       *Done when:* `uv run pytest` covers all six routers, isolation included.
 
-- [ ] **T09 · P0 · CI gate before the image build**
-      Both workflows go straight to `docker build`; nothing blocks a broken `main`.
-      *Done when:* a PR workflow runs `ruff check`, `ruff format --check`, `mypy`, `pytest`, `flutter analyze` and `flutter test`, and the build workflows depend on it.
+- [x] **T09 · P0 · CI gate before the image build**
+      Both workflows went straight to `docker build`; nothing blocked a broken `main`.
+      *Done:* `.github/workflows/ci.yml` replaces the two per-component build workflows. On a PR into `main`: **Backend tests** (`ruff check`, `ruff format --check`, `pytest`) and **Frontend tests** (`flutter analyze`, `flutter test`, in the same SDK digest the image builds with) must pass before **Build backend** / **Build frontend** push `ci-<short-head-sha>` to the registry, and **Integration test** then starts those exact images with Postgres and MinIO (`compose.ci.yml`, own project name) and drives `ci/smoke.sh` through login, a contact round-trip and a document round-trip. The only trigger is `pull_request`: while a PR is open every dev push already fires `synchronize` on the same commit, so a `push: dev` trigger would double every run — open the PR as a draft to get CI from the first commit.
+      `.github/workflows/promote.yml` runs on merge to `main` and only re-tags: it resolves the merged PR's head sha (GitHub API, merge-parent fallback), then `docker buildx imagetools create` copies that manifest to `<short-main-sha>` and `latest`. The digest that passed the integration test is the digest that deploys — nothing is rebuilt, so nothing can drift between test and release.
+      **Still to do in GitHub settings:** make `Backend tests`, `Frontend tests`, `Build backend`, `Build frontend` and `Integration test` required status checks on `main`, and stop allowing direct pushes — the promote workflow has no images to promote for a commit that never went through a PR.
+      *Note:* `mypy` is deliberately **not** in the gate yet — see T35.
+
+- [ ] **T35 · P1 · Get mypy green, then gate on it**
+      `uv run mypy app` reports 20 errors (aioboto3 stub mismatches in `storage.py`, untyped pymupdf calls in `documents.py`, two in `projects.py`), so it cannot be a required check without being red from day one. Fix or explicitly `# type: ignore` each, then add the step to the **Backend tests** job.
 
 - [ ] **T10 · P0 · Backups with a rehearsed restore**
       The nightly-backup plan died with the move from SQLite to Postgres. Needs scheduled `pg_dump`, offsite copies, MinIO bucket replication for documents.
@@ -215,7 +225,7 @@ Priorities: **P0** not a CRM without it · **P1** daily friction · **P2** expec
 Dependency- and leverage-ordered, not a strict ranking:
 
 1. **T03–T07** — close the remaining shipped issues. Days, not weeks.
-2. **T08, T09** — tests and a CI gate, before the model grows.
+2. **T08** — the rest of the test suite (the CI gate that runs it landed with T09).
 3. **T10** — backups. Unblocks nothing, which is exactly why it gets deferred forever.
 4. **T12 → T13** — Organizations, then Deals. Turns a contact book into a CRM.
 5. **T14 → T15** — link tasks, then build the timeline; it becomes the main screen.

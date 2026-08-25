@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/error_text.dart';
 import '../api.dart';
 
 class HealthPage extends StatefulWidget {
@@ -36,7 +37,7 @@ class _HealthPageState extends State<HealthPage> {
         builder: (context, snapshot) => switch (snapshot.connectionState) {
           ConnectionState.waiting => const CircularProgressIndicator(),
           _ when snapshot.hasError => SelectableText(
-              'Error: ${snapshot.error}',
+              errorText(snapshot.error!),
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
           _ => Column(

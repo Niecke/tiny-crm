@@ -46,3 +46,6 @@ plugins = ["pydantic.mypy"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+# The app runs from source (uv's package = false), so `app` is only importable
+# when the backend directory itself is on sys.path.
+pythonpath = ["."]

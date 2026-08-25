@@ -5,12 +5,15 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/error_text.dart';
 import '../models/contact.dart';
 import '../models/task.dart';
 import '../providers/contacts_provider.dart';
 import '../providers/interactions_provider.dart';
 import '../providers/tasks_provider.dart';
 import '../widgets/interaction_tile.dart';
+import '../widgets/pagination_bar.dart';
+import '../widgets/confirm_dialog.dart';
 import 'contact_detail_page.dart';
 import 'contact_form_page.dart';
 import 'interaction_form_page.dart';
@@ -91,17 +94,25 @@ class DashboardPage extends StatelessWidget {
 }
 
 /// Planned interactions — the next mails and meetings, soonest first.
-class _UpcomingPanel extends ConsumerWidget {
+class _UpcomingPanel extends ConsumerStatefulWidget {
   const _UpcomingPanel();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_UpcomingPanel> createState() => _UpcomingPanelState();
+}
+
+class _UpcomingPanelState extends ConsumerState<_UpcomingPanel> {
+  int _skip = 0;
+
+  @override
+  Widget build(BuildContext context) {
     final async = ref.watch(
       interactionsProvider((
         search: '',
         contactId: null,
         kind: null,
         upcoming: true,
+        skip: _skip,
       )),
     );
 
@@ -145,22 +156,32 @@ class _UpcomingPanel extends ConsumerWidget {
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(
                 child: SelectableText(
-                  'Error: $e',
+                  errorText(e),
                   style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
               ),
-              data: (items) => items.isEmpty
+              data: (page) => page.items.isEmpty
                   ? const Center(child: Text('Nothing planned.'))
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      itemCount: items.length,
-                      itemBuilder: (context, index) => InteractionTile(
-                        interaction: items[index],
-                        compact: true,
-                      ),
+                  : Column(
+                      children: [
+                        Expanded(
+                          child: ListView.builder(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            itemCount: page.items.length,
+                            itemBuilder: (context, index) => InteractionTile(
+                              interaction: page.items[index],
+                              compact: true,
+                            ),
+                          ),
+                        ),
+                        PaginationBar(
+                          page: page,
+                          onSkipChanged: (skip) => setState(() => _skip = skip),
+                        ),
+                      ],
                     ),
             ),
           ),
@@ -180,6 +201,7 @@ class _ContactsPanel extends ConsumerStatefulWidget {
 class _ContactsPanelState extends ConsumerState<_ContactsPanel> {
   final _searchController = TextEditingController();
   String _search = '';
+  int _skip = 0;
   Timer? _debounce;
 
   @override
@@ -191,7 +213,9 @@ class _ContactsPanelState extends ConsumerState<_ContactsPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final contactsAsync = ref.watch(contactsProvider(_search));
+    final contactsAsync = ref.watch(
+      contactsProvider((search: _search, skip: _skip)),
+    );
 
     return Card(
       margin: EdgeInsets.zero,
@@ -231,7 +255,10 @@ class _ContactsPanelState extends ConsumerState<_ContactsPanel> {
                         onPressed: () {
                           _debounce?.cancel();
                           _searchController.clear();
-                          setState(() => _search = '');
+                          setState(() {
+                            _search = '';
+                            _skip = 0;
+                          });
                         },
                       ),
                 isDense: true,
@@ -240,7 +267,11 @@ class _ContactsPanelState extends ConsumerState<_ContactsPanel> {
               onChanged: (v) {
                 _debounce?.cancel();
                 _debounce = Timer(const Duration(seconds: 1), () {
-                  setState(() => _search = v.trim());
+                  // Back to page 1: the old offset means nothing for a new query.
+                  setState(() {
+                    _search = v.trim();
+                    _skip = 0;
+                  });
                 });
               },
             ),
@@ -251,35 +282,47 @@ class _ContactsPanelState extends ConsumerState<_ContactsPanel> {
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(
                 child: SelectableText(
-                  'Error: $e',
+                  errorText(e),
                   style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
               ),
-              data: (contacts) => contacts.isEmpty
+              data: (page) => page.items.isEmpty
                   ? const Center(child: Text('No contacts yet.'))
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      itemCount: contacts.length,
-                      itemBuilder: (context, index) => _ContactTile(
-                        contact: contacts[index],
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                ContactDetailPage(contact: contacts[index]),
+                  : Column(
+                      children: [
+                        Expanded(
+                          child: ListView.builder(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            itemCount: page.items.length,
+                            itemBuilder: (context, index) => _ContactTile(
+                              contact: page.items[index],
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ContactDetailPage(
+                                    contact: page.items[index],
+                                  ),
+                                ),
+                              ),
+                              onEdit: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ContactFormPage(
+                                    contact: page.items[index],
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
                         ),
-                        onEdit: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                ContactFormPage(contact: contacts[index]),
-                          ),
+                        PaginationBar(
+                          page: page,
+                          onSkipChanged: (skip) => setState(() => _skip = skip),
                         ),
-                      ),
+                      ],
                     ),
             ),
           ),
@@ -300,6 +343,7 @@ class _TasksPanelState extends ConsumerState<_TasksPanel> {
   final _searchController = TextEditingController();
   String _search = '';
   bool _includeDone = false;
+  int _skip = 0;
   Timer? _debounce;
 
   @override
@@ -311,7 +355,7 @@ class _TasksPanelState extends ConsumerState<_TasksPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final filter = (search: _search, includeDone: _includeDone);
+    final filter = (search: _search, includeDone: _includeDone, skip: _skip);
     final tasksAsync = ref.watch(tasksProvider(filter));
 
     return Card(
@@ -327,8 +371,10 @@ class _TasksPanelState extends ConsumerState<_TasksPanel> {
                 Row(
                   children: [
                     IconButton(
-                      onPressed: () =>
-                          setState(() => _includeDone = !_includeDone),
+                      onPressed: () => setState(() {
+                        _includeDone = !_includeDone;
+                        _skip = 0;
+                      }),
                       icon: Icon(
                         _includeDone
                             ? Icons.check_circle
@@ -368,7 +414,10 @@ class _TasksPanelState extends ConsumerState<_TasksPanel> {
                         onPressed: () {
                           _debounce?.cancel();
                           _searchController.clear();
-                          setState(() => _search = '');
+                          setState(() {
+                            _search = '';
+                            _skip = 0;
+                          });
                         },
                       ),
                 isDense: true,
@@ -377,7 +426,11 @@ class _TasksPanelState extends ConsumerState<_TasksPanel> {
               onChanged: (v) {
                 _debounce?.cancel();
                 _debounce = Timer(const Duration(seconds: 1), () {
-                  setState(() => _search = v.trim());
+                  // Back to page 1: the old offset means nothing for a new query.
+                  setState(() {
+                    _search = v.trim();
+                    _skip = 0;
+                  });
                 });
               },
             ),
@@ -388,20 +441,30 @@ class _TasksPanelState extends ConsumerState<_TasksPanel> {
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(
                 child: SelectableText(
-                  'Error: $e',
+                  errorText(e),
                   style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
               ),
-              data: (tasks) => tasks.isEmpty
+              data: (page) => page.items.isEmpty
                   ? const Center(child: Text('No tasks yet.'))
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      itemCount: tasks.length,
-                      itemBuilder: (context, index) =>
-                          _TaskTile(task: tasks[index]),
+                  : Column(
+                      children: [
+                        Expanded(
+                          child: ListView.builder(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            itemCount: page.items.length,
+                            itemBuilder: (context, index) =>
+                                _TaskTile(task: page.items[index]),
+                          ),
+                        ),
+                        PaginationBar(
+                          page: page,
+                          onSkipChanged: (skip) => setState(() => _skip = skip),
+                        ),
+                      ],
                     ),
             ),
           ),
@@ -437,10 +500,18 @@ class _TaskTile extends ConsumerWidget {
           ),
           tooltip: task.done ? 'Mark undone' : 'Mark done',
           onPressed: () async {
-            await ref.read(tasksRepositoryProvider).update(task.id, {
-              'done': !task.done,
-            });
+            try {
+              await ref.read(tasksRepositoryProvider).update(task.id, {
+                'done': !task.done,
+              });
+            } catch (e) {
+              if (context.mounted) {
+                showErrorSnackBar(context, e, prefix: 'Could not update task.');
+              }
+              return;
+            }
             ref.invalidate(tasksProvider);
+            ref.invalidate(allTasksProvider);
           },
         ),
         title: Text(
@@ -491,8 +562,22 @@ class _TaskTile extends ConsumerWidget {
           icon: const Icon(Icons.delete_outline),
           tooltip: 'Delete',
           onPressed: () async {
-            await ref.read(tasksRepositoryProvider).delete(task.id);
+            final confirmed = await confirmDelete(
+              context,
+              title: 'Delete task?',
+              message: '"${task.title}" will be permanently deleted.',
+            );
+            if (!confirmed || !context.mounted) return;
+            try {
+              await ref.read(tasksRepositoryProvider).delete(task.id);
+            } catch (e) {
+              if (context.mounted) {
+                showErrorSnackBar(context, e, prefix: 'Delete failed.');
+              }
+              return;
+            }
             ref.invalidate(tasksProvider);
+            ref.invalidate(allTasksProvider);
           },
         ),
       ),

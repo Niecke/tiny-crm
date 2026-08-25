@@ -1,0 +1,78 @@
+# The stack CI runs against the images it just pushed. No `build:` anywhere —
+# this file can only start what the registry already has, so the integration
+# test always exercises the exact artefacts that would be promoted.
+#
+#   IMAGE_TAG=ci-abc1234 docker compose -p tinycrm-ci -f compose.ci.yml up -d
+#
+# The backend runs with ENVIRONMENT=production and real (throwaway) secrets, so
+# the run also proves check_secure_defaults() passes on a properly configured
+# instance instead of only ever being exercised in development mode.
+# Own project name: without it Compose derives one from the directory and this
+# stack adopts (and tears down) the containers of the local dev stack in
+# compose.full.yml.
+name: tinycrm-ci
+
+services:
+  db:
+    image: docker.io/library/postgres:18-alpine@sha256:1b1689b20d16a014a3d195653381cf2caa75a41a92d93b255a9d6ea29fd353aa
+    environment:
+      POSTGRES_USER: crm
+      POSTGRES_PASSWORD: crm
+      POSTGRES_DB: crm
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crm -d crm"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  minio:
+    image: docker.io/minio/minio:latest@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+    command: server /data --console-address :9001
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:?set S3_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:?set S3_SECRET_KEY}
+    healthcheck:
+      test: ["CMD-SHELL", "mc ready local || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  minio-init:
+    image: docker.io/minio/mc:latest@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: "no"
+    entrypoint: >
+      /bin/sh -c "
+        mc alias set local http://minio:9000 ${S3_ACCESS_KEY} ${S3_SECRET_KEY} &&
+        mc mb --ignore-existing local/tinycrm-documents &&
+        mc version enable local/tinycrm-documents
+      "
+
+  backend:
+    image: ${REGISTRY:-europe-west1-docker.pkg.dev/niecke-it/tiny-crm}/backend:${IMAGE_TAG:?set IMAGE_TAG}
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql+asyncpg://crm:crm@db:5432/crm
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
+      CORS_ORIGINS: '["http://localhost:8080"]'
+      FORWARDED_ALLOW_IPS: 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+    ports:
+      # Overridable so a developer can run this next to their own stack.
+      - "${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  frontend:
+    image: ${REGISTRY:-europe-west1-docker.pkg.dev/niecke-it/tiny-crm}/frontend:${IMAGE_TAG:?set IMAGE_TAG}
+    ports:
+      - "${FRONTEND_PORT:-8080}:8080"
+    depends_on:
+      - backend
