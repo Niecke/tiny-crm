@@ -2,16 +2,17 @@ name: CI
 
 # Pull requests into main run the whole pipeline: tests → build and push the
 # images → start those exact images and drive one real workflow through them.
-# Pushes to dev run the test jobs only, for fast feedback without touching the
-# registry.
+#
+# Only pull_request, deliberately: while a PR is open, every push to dev fires
+# `synchronize` on the same commit, so a push trigger would run everything
+# twice. Open the PR as a draft as soon as work starts and dev commits are
+# covered from the first push. workflow_dispatch runs the tests on demand.
 #
 # Branch protection on main should require: Backend tests, Frontend tests,
 # Build backend, Build frontend, Integration test.
 on:
   pull_request:
     branches: [main]
-  push:
-    branches: [dev]
   workflow_dispatch:
 
 permissions:
@@ -98,8 +99,9 @@ jobs:
   build-backend:
     name: Build backend
     needs: [meta, backend-tests, frontend-tests]
-    # Fork PRs cannot read the WIF secrets, so there is nothing to push to.
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    # Fork PRs cannot read the WIF secrets, and a manual run has no PR head to
+    # tag images with — both fall back to running the tests only.
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -136,7 +138,7 @@ jobs:
   build-frontend:
     name: Build frontend
     needs: [meta, backend-tests, frontend-tests]
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -173,7 +175,7 @@ jobs:
   integration:
     name: Integration test
     needs: [meta, build-backend, build-frontend]
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:

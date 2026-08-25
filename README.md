@@ -128,7 +128,11 @@ Work happens on `dev`; `main` is what ships. Two workflows:
    The backend runs with `ENVIRONMENT=production` and generated secrets, so the run also
    proves the production startup guard passes on a properly configured instance.
 
-Pushes to `dev` run the two test jobs only — no registry writes.
+Only `pull_request` triggers it. While a PR is open, every push to `dev` fires
+`synchronize` on the same commit, so adding a `push: dev` trigger would just run the whole
+pipeline twice per commit. Open the PR as a **draft** when work starts and dev commits are
+covered from the first push. `workflow_dispatch` runs the two test jobs on demand (a manual
+run has no PR head to tag images with, so it stops there).
 
 **`.github/workflows/promote.yml`** — on merge to `main`, resolves the merged PR's head sha
 and re-tags the already-tested images with `<short-main-sha>` and `latest` via
