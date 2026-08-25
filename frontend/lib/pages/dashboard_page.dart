@@ -3,13 +3,17 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../models/contact.dart';
 import '../models/task.dart';
 import '../providers/contacts_provider.dart';
+import '../providers/interactions_provider.dart';
 import '../providers/tasks_provider.dart';
+import '../widgets/interaction_tile.dart';
 import 'contact_detail_page.dart';
 import 'contact_form_page.dart';
+import 'interaction_form_page.dart';
 import 'task_form_page.dart';
 
 class DashboardPage extends StatelessWidget {
@@ -19,7 +23,9 @@ class DashboardPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (constraints.maxWidth >= 700) {
+        // Three columns only when there is room; below that the upcoming
+        // interactions ride along under the contacts list.
+        if (constraints.maxWidth >= 1100) {
           return const Padding(
             padding: EdgeInsets.all(16),
             child: Row(
@@ -28,29 +34,138 @@ class DashboardPage extends StatelessWidget {
                 SizedBox(width: 360, child: _ContactsPanel()),
                 SizedBox(width: 16),
                 Expanded(child: _TasksPanel()),
+                SizedBox(width: 16),
+                SizedBox(width: 360, child: _UpcomingPanel()),
+              ],
+            ),
+          );
+        }
+        if (constraints.maxWidth >= 700) {
+          return const Padding(
+            padding: EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 360,
+                  child: Column(
+                    children: [
+                      Expanded(flex: 3, child: _ContactsPanel()),
+                      SizedBox(height: 16),
+                      Expanded(flex: 2, child: _UpcomingPanel()),
+                    ],
+                  ),
+                ),
+                SizedBox(width: 16),
+                Expanded(child: _TasksPanel()),
               ],
             ),
           );
         }
         return DefaultTabController(
-          length: 2,
+          length: 3,
           child: Column(
             children: [
               Expanded(
                 child: TabBarView(
-                  children: const [_ContactsPanel(), _TasksPanel()],
+                  children: const [
+                    _ContactsPanel(),
+                    _TasksPanel(),
+                    _UpcomingPanel(),
+                  ],
                 ),
               ),
               const TabBar(
                 tabs: [
                   Tab(icon: Icon(Icons.people_outline), text: 'Contacts'),
                   Tab(icon: Icon(Icons.task_outlined), text: 'Tasks'),
+                  Tab(icon: Icon(Icons.event_outlined), text: 'Upcoming'),
                 ],
               ),
             ],
           ),
         );
       },
+    );
+  }
+}
+
+/// Planned interactions — the next mails and meetings, soonest first.
+class _UpcomingPanel extends ConsumerWidget {
+  const _UpcomingPanel();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(
+      interactionsProvider((
+        search: '',
+        contactId: null,
+        kind: null,
+        upcoming: true,
+      )),
+    );
+
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Upcoming',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                Row(
+                  children: [
+                    TextButton(
+                      onPressed: () => context.go('/interactions'),
+                      child: const Text('All'),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const InteractionFormPage(),
+                        ),
+                      ),
+                      icon: const Icon(Icons.add),
+                      tooltip: 'New Interaction',
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: async.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(
+                child: SelectableText(
+                  'Error: $e',
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ),
+              data: (items) => items.isEmpty
+                  ? const Center(child: Text('Nothing planned.'))
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      itemCount: items.length,
+                      itemBuilder: (context, index) => InteractionTile(
+                        interaction: items[index],
+                        compact: true,
+                      ),
+                    ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

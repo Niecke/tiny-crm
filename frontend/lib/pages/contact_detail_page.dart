@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/contact.dart';
 import '../providers/contacts_provider.dart';
+import '../providers/interactions_provider.dart';
+import '../widgets/interaction_tile.dart';
 import 'contact_form_page.dart';
+import 'interaction_form_page.dart';
 
 class ContactDetailPage extends ConsumerWidget {
   const ContactDetailPage({super.key, required this.contact});
@@ -72,6 +75,7 @@ class ContactDetailPage extends ConsumerWidget {
             _Field(label: 'Address', value: contact.address!),
           if (contact.notes != null)
             _Field(label: 'Notes', value: contact.notes!),
+          _InteractionsSection(contact: contact),
           if (contact.tags.isNotEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
@@ -116,6 +120,79 @@ class _Field extends StatelessWidget {
           Text(label, style: Theme.of(context).textTheme.labelLarge),
           const SizedBox(height: 2),
           SelectableText(value, style: Theme.of(context).textTheme.bodyLarge),
+          const Divider(),
+        ],
+      ),
+    );
+  }
+}
+
+
+/// Everything logged or planned with this contact, newest first.
+class _InteractionsSection extends ConsumerWidget {
+  const _InteractionsSection({required this.contact});
+
+  final Contact contact;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(
+      interactionsProvider((
+        search: '',
+        contactId: contact.id,
+        kind: null,
+        upcoming: null,
+      )),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                'Interactions',
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
+              const Spacer(),
+              TextButton.icon(
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Log'),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        InteractionFormPage(initialContactId: contact.id),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          async.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: LinearProgressIndicator(),
+            ),
+            error: (e, _) => Text(
+              'Error: $e',
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+            data: (items) => items.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      'Nothing logged yet.',
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  )
+                : Column(
+                    children: [
+                      for (final i in items) InteractionTile(interaction: i),
+                    ],
+                  ),
+          ),
           const Divider(),
         ],
       ),

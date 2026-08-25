@@ -7,11 +7,16 @@ Usage:
 
 import asyncio
 import sys
+from pathlib import Path
 
-from fastapi_users.password import PasswordHelper
+# Run directly (`python scripts/create_admin.py`) and Python puts this script's
+# directory on sys.path, not the backend root -- so `app` wouldn't import.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.auth.users import get_user_db
-from app.db import _session_factory
+from fastapi_users.password import PasswordHelper  # noqa: E402
+
+from app.auth.users import get_user_db  # noqa: E402
+from app.db import _session_factory  # noqa: E402
 
 
 async def create_admin(email: str, password: str) -> None:
