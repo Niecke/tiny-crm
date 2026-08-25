@@ -1,4 +1,4 @@
-FROM ghcr.io/cirruslabs/flutter:stable AS builder
+FROM ghcr.io/cirruslabs/flutter:stable@sha256:46691e311715845de03a3ba4753a475476936805b29431b1f00f1816981033f8 AS builder
 WORKDIR /app
 RUN flutter precache --web
 COPY pubspec.* ./
