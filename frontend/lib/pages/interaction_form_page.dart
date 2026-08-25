@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/date_time_text.dart';
 import '../models/contact.dart';
 import '../models/interaction.dart';
 import '../providers/contacts_provider.dart';
@@ -50,7 +51,7 @@ class _InteractionFormPageState extends ConsumerState<InteractionFormPage>
   late final TextEditingController _duration;
   late final TextEditingController _tags;
   late final TabController _notesTabController;
-  late DateTime _occurredAt;
+  late final TextEditingController _when;
   late String _kind;
   late bool _done;
   late List<String> _contactIds;
@@ -66,11 +67,12 @@ class _InteractionFormPageState extends ConsumerState<InteractionFormPage>
     _duration = TextEditingController(text: i?.durationMinutes?.toString());
     _tags = TextEditingController(text: i?.tags.join(', '));
     _notesTabController = TabController(length: 2, vsync: this);
-    _occurredAt = i?.occurredAt.toLocal() ?? DateTime.now();
+    final occurredAt = i?.occurredAt.toLocal() ?? DateTime.now();
+    _when = TextEditingController(text: formatWhen(occurredAt));
     _kind = i?.kind ?? 'note';
     // A new entry in the past is something that already happened; one in the
     // future is a plan, so it starts open.
-    _done = i?.done ?? !_occurredAt.isAfter(DateTime.now());
+    _done = i?.done ?? !occurredAt.isAfter(DateTime.now());
     _contactIds = [
       ...?i?.contactIds,
       if (widget.initialContactId != null &&
@@ -85,35 +87,38 @@ class _InteractionFormPageState extends ConsumerState<InteractionFormPage>
     _notes.dispose();
     _duration.dispose();
     _tags.dispose();
+    _when.dispose();
     _notesTabController.dispose();
     super.dispose();
   }
 
-  String _formatWhen(DateTime dt) {
-    String two(int v) => v.toString().padLeft(2, '0');
-    return '${dt.year}-${two(dt.month)}-${two(dt.day)} ${two(dt.hour)}:${two(dt.minute)}';
-  }
+  /// The typed text, or now when it is not (yet) a valid timestamp.
+  DateTime get _occurredAt => parseWhen(_when.text) ?? DateTime.now();
 
+  /// The pickers are optional — the field can just be typed into.
   Future<void> _pickWhen() async {
+    final current = _occurredAt;
     final date = await showDatePicker(
       context: context,
-      initialDate: _occurredAt,
-      firstDate: DateTime(_occurredAt.year - 5),
-      lastDate: DateTime(_occurredAt.year + 5),
+      initialDate: current,
+      firstDate: DateTime(current.year - 5),
+      lastDate: DateTime(current.year + 5),
     );
     if (date == null || !mounted) return;
     final time = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay.fromDateTime(_occurredAt),
+      initialTime: TimeOfDay.fromDateTime(current),
     );
     if (!mounted) return;
     setState(() {
-      _occurredAt = DateTime(
-        date.year,
-        date.month,
-        date.day,
-        time?.hour ?? _occurredAt.hour,
-        time?.minute ?? _occurredAt.minute,
+      _when.text = formatWhen(
+        DateTime(
+          date.year,
+          date.month,
+          date.day,
+          time?.hour ?? current.hour,
+          time?.minute ?? current.minute,
+        ),
       );
     });
   }
@@ -134,7 +139,7 @@ class _InteractionFormPageState extends ConsumerState<InteractionFormPage>
       'kind': _kind,
       'subject': _subject.text,
       'notes': _notes.text.isEmpty ? null : _notes.text,
-      'occurred_at': _occurredAt.toUtc().toIso8601String(),
+      'occurred_at': parseWhen(_when.text)!.toUtc().toIso8601String(),
       'duration_minutes': int.tryParse(_duration.text.trim()),
       'done': _done,
       'tags': tags,
@@ -155,7 +160,8 @@ class _InteractionFormPageState extends ConsumerState<InteractionFormPage>
   @override
   Widget build(BuildContext context) {
     final contactsAsync = ref.watch(contactsProvider(''));
-    final planned = _occurredAt.isAfter(DateTime.now());
+    final typed = parseWhen(_when.text);
+    final planned = typed != null && typed.isAfter(DateTime.now());
 
     return Scaffold(
       appBar: AppBar(
@@ -259,23 +265,25 @@ class _InteractionFormPageState extends ConsumerState<InteractionFormPage>
             ),
             Padding(
               padding: const EdgeInsets.only(bottom: 16),
-              child: InputDecorator(
+              child: TextFormField(
+                controller: _when,
                 decoration: InputDecoration(
                   labelText: 'When',
+                  hintText: whenPattern,
                   helperText: planned
                       ? 'In the future — this is a planned interaction'
                       : 'In the past — this goes into the activity log',
                   border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.event_outlined),
+                    tooltip: 'Pick from calendar',
+                    onPressed: _pickWhen,
+                  ),
                 ),
-                child: Row(
-                  children: [
-                    Expanded(child: Text(_formatWhen(_occurredAt))),
-                    TextButton(
-                      onPressed: _pickWhen,
-                      child: const Text('Pick'),
-                    ),
-                  ],
-                ),
+                // Keeps the planned/logged hint in sync while typing.
+                onChanged: (_) => setState(() {}),
+                validator: (v) =>
+                    parseWhen(v ?? '') == null ? 'Use $whenPattern' : null,
               ),
             ),
             Padding(

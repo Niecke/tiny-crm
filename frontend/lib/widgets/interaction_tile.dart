@@ -2,17 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/date_time_text.dart';
 import '../models/interaction.dart';
 import '../pages/interaction_form_page.dart';
 import '../providers/contacts_provider.dart';
 import '../providers/interactions_provider.dart';
-
-String formatWhen(DateTime dt) {
-  final local = dt.toLocal();
-  String two(int v) => v.toString().padLeft(2, '0');
-  return '${local.year}-${two(local.month)}-${two(local.day)} '
-      '${two(local.hour)}:${two(local.minute)}';
-}
 
 class InteractionTile extends ConsumerWidget {
   const InteractionTile({
