@@ -9,7 +9,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import auth_backend, fastapi_users
-from app.config import DEFAULT_JWT_SECRET, settings
+from app.config import Environment, settings
 from app.db import get_session
 from app.logging_config import configure_logging
 from app.routers import contacts, documents, interactions, projects, tasks, users
@@ -24,14 +24,37 @@ configure_logging()
 logger = logging.getLogger(__name__)
 
 
+class InsecureConfigurationError(RuntimeError):
+    """Raised at startup when a production instance still runs on dev defaults."""
+
+
+def check_secure_defaults() -> None:
+    """Warn about unsafe built-in defaults; refuse to start on them in production.
+
+    Raising here aborts uvicorn's startup, which exits with code 3 — so a
+    misconfigured production container fails immediately and visibly instead of
+    serving traffic with a known secret or a wildcard CORS policy.
+    """
+    problems = settings.insecure_defaults()
+    if not problems:
+        return
+
+    if settings.environment is Environment.production:
+        for problem in problems:
+            logger.error("Insecure configuration: %s", problem)
+        raise InsecureConfigurationError(
+            f"Refusing to start with ENVIRONMENT=production and "
+            f"{len(problems)} insecure default(s); see the errors above."
+        )
+
+    for problem in problems:
+        logger.warning("Insecure default (allowed outside production): %s", problem)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Runs some checks when booting the application"""
-    if settings.jwt_secret == DEFAULT_JWT_SECRET:
-        logger.warning(
-            "JWT_SECRET is still the built-in default — anyone who knows it can mint "
-            "valid tokens for this instance. Set JWT_SECRET in the environment."
-        )
+    check_secure_defaults()
     await check_storage()
     yield
 
