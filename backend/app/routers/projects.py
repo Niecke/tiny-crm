@@ -34,7 +34,7 @@ def _to_read(p: Project) -> ProjectRead:
 
 async def _load_scoped[T](
     session: AsyncSession, model: type[T], ids: list[UUID], user_id: UUID
-) -> list:
+) -> list[T]:
     """Fetch the given ids of `model` that belong to user_id. 404 on any miss."""
     if not ids:
         return []
@@ -43,7 +43,7 @@ async def _load_scoped[T](
     )
     found = list(result.scalars().all())
     if len(found) != len(set(ids)):
-        raise HTTPException(status_code=404, detail=f"Unknown {model.__name__} id in link list")  # type: ignore[attr-defined]
+        raise HTTPException(status_code=404, detail=f"Unknown {model.__name__} id in link list")
     return found
 
 

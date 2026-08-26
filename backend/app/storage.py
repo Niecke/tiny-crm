@@ -5,7 +5,7 @@ from collections.abc import AsyncIterator
 from typing import BinaryIO
 
 import aioboto3
-from botocore.config import Config
+from aiobotocore.config import AioConfig
 from botocore.exceptions import ClientError
 
 from app.config import settings
@@ -21,27 +21,28 @@ _session = aioboto3.Session(
 # botocore >=1.36 sends a CRC32 checksum with aws-chunked trailers on every
 # request by default. Non-AWS S3 (Hetzner/MinIO/Ceph) reject the new headers
 # and return SignatureDoesNotMatch, so only send checksums when required.
-_config = Config(
+# AioConfig rather than botocore's Config: it is the subclass aiobotocore
+# actually expects, and the one the client overloads are typed against.
+_config = AioConfig(
     request_checksum_calculation="when_required",
     response_checksum_validation="when_required",
 )
 
 
-def _client_kwargs() -> dict[str, object]:
-    kwargs: dict[str, object] = {"config": _config}
-    if settings.s3_endpoint_url:
-        kwargs["endpoint_url"] = settings.s3_endpoint_url
-    return kwargs
+# Every call below opens the client the same way. endpoint_url=None is what
+# "use AWS" means to botocore, so one spelling covers MinIO and real S3 — and
+# passing the arguments explicitly instead of splatting a dict is what keeps
+# the typed overloads in types-aioboto3 resolvable.
 
 
 async def check_storage() -> None:
     """Called once at startup. Verifies bucket exists and versioning is enabled;
     logs a warning if not."""
-    async with _session.client("s3", **_client_kwargs()) as s3:  # type: ignore[arg-type]
+    async with _session.client("s3", endpoint_url=settings.s3_endpoint_url, config=_config) as s3:
         try:
-            await s3.head_bucket(Bucket=settings.s3_bucket)  # type: ignore[attr-defined]
+            await s3.head_bucket(Bucket=settings.s3_bucket)
         except ClientError as exc:
-            code = exc.response["Error"]["Code"]  # type: ignore[attr-defined]
+            code = exc.response["Error"]["Code"]
             logger.error(
                 "S3 bucket '%s' is not accessible (code %s). Document uploads will fail.",
                 settings.s3_bucket,
@@ -49,7 +50,7 @@ async def check_storage() -> None:
             )
             return
         try:
-            resp = await s3.get_bucket_versioning(Bucket=settings.s3_bucket)  # type: ignore[attr-defined]
+            resp = await s3.get_bucket_versioning(Bucket=settings.s3_bucket)
             status = resp.get("Status", "")
             if status != "Enabled":
                 logger.warning(
@@ -67,7 +68,7 @@ async def check_storage() -> None:
 
 
 async def put_object(key: str, data: bytes, content_type: str) -> None:
-    async with _session.client("s3", **_client_kwargs()) as s3:  # type: ignore[arg-type]
+    async with _session.client("s3", endpoint_url=settings.s3_endpoint_url, config=_config) as s3:
         await s3.put_object(
             Bucket=settings.s3_bucket,
             Key=key,
@@ -83,8 +84,8 @@ async def put_object_stream(key: str, fileobj: BinaryIO, content_type: str) -> N
     8 MB, so the body never has to exist in memory as one blob the way
     put_object's `bytes` argument does. The caller keeps the file positioned at
     the start."""
-    async with _session.client("s3", **_client_kwargs()) as s3:  # type: ignore[arg-type]
-        await s3.upload_fileobj(  # type: ignore[attr-defined]
+    async with _session.client("s3", endpoint_url=settings.s3_endpoint_url, config=_config) as s3:
+        await s3.upload_fileobj(
             fileobj,
             settings.s3_bucket,
             key,
@@ -93,12 +94,12 @@ async def put_object_stream(key: str, fileobj: BinaryIO, content_type: str) -> N
 
 
 async def get_object_stream(key: str) -> AsyncIterator[bytes]:
-    async with _session.client("s3", **_client_kwargs()) as s3:  # type: ignore[arg-type]
+    async with _session.client("s3", endpoint_url=settings.s3_endpoint_url, config=_config) as s3:
         response = await s3.get_object(Bucket=settings.s3_bucket, Key=key)
         async for chunk in response["Body"]:
             yield chunk
 
 
 async def delete_object(key: str) -> None:
-    async with _session.client("s3", **_client_kwargs()) as s3:  # type: ignore[arg-type]
+    async with _session.client("s3", endpoint_url=settings.s3_endpoint_url, config=_config) as s3:
         await s3.delete_object(Bucket=settings.s3_bucket, Key=key)

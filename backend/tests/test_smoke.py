@@ -6,7 +6,7 @@ routing or settings break. The full stack is covered by ci/smoke.sh, which
 drives the built containers.
 """
 
-from httpx import ASGITransport, AsyncClient
+from httpx2 import ASGITransport, AsyncClient
 
 from app.main import app
 from app.version import BUILD_TIMESTAMP, GIT_COMMIT
