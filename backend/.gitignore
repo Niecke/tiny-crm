@@ -8,3 +8,7 @@ __pycache__/
 .env
 # Generated during the Docker build (see Dockerfile / app/version.py)
 build_timestamp.txt
+# Test reports (CI uploads them as artifacts)
+junit.xml
+coverage.xml
+.coverage

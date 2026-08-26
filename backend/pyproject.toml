@@ -23,6 +23,7 @@ dev = [
     "pytest-asyncio>=0.25",
     "httpx>=0.28",   # TestClient for FastAPI tests
     "types-aioboto3[s3]>=13.0",
+    "pytest-cov>=7.1.0",
 ]
 
 [tool.uv]
@@ -49,3 +50,16 @@ asyncio_mode = "auto"
 # The app runs from source (uv's package = false), so `app` is only importable
 # when the backend directory itself is on sys.path.
 pythonpath = ["."]
+
+[tool.coverage.run]
+source = ["app"]
+branch = true
+omit = [
+    # Import-time wiring with nothing to assert on.
+    "app/version.py",
+    "app/logging_config.py",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true

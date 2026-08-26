@@ -106,10 +106,12 @@ Priorities: **P0** not a CRM without it · **P1** daily friction · **P2** expec
 
 ### B — Safety net (do before the model grows)
 
-- [ ] **T08 · P0 · Backend test suite**
-      pytest, pytest-asyncio, httpx and mypy strict are configured; `backend/tests/` does not exist. Start with **cross-user isolation** — every endpoint reimplements the same `user_id` ownership check by hand, and one missed comparison leaks another tenant's data. Then auth-required, CRUD round-trip and validation per router, against a throwaway Postgres.
-      *Started:* `backend/tests/` now exists with 16 tests — unit tests for the insecure-defaults guard, the login throttle's sliding window and the upload size/format guards, plus one in-process API test for `/version` (`pythonpath = ["."]` in `pyproject.toml` makes `app` importable without installing it). The router coverage and cross-user isolation below are still outstanding.
-      *Done when:* `uv run pytest` covers all six routers, isolation included.
+- [x] **T08 · P0 · Backend test suite**
+      pytest, pytest-asyncio, httpx and mypy strict were configured; `backend/tests/` did not exist. Every endpoint reimplements the same `user_id` ownership check by hand, and one missed comparison leaks another tenant's data.
+      *Done:* 80 tests, ~17s, 88% line coverage. `tests/conftest.py` creates a scratch Postgres database per session (`TEST_DATABASE_URL`, default the local compose server), rebuilds the tables from the models before each test, overrides `get_session`, and hands out two accounts — Alice and Bob — whose tokens are minted directly from the JWT strategy so password hashing stays out of the hot path.
+      **Cross-user isolation is table-driven** (`tests/test_cross_user_isolation.py`): contacts, tasks, projects, interactions and documents each get read / change / delete / list / anonymous checks from Bob's side, plus owner-only checks on document content and preview. Adding a router means adding one row to `RESOURCES`. Per-router files cover CRUD round-trips, filters (done, upcoming, search, kind) and validation; `test_auth.py` and `test_users.py` cover login and the password-change flow; the earlier unit tests remain.
+      *Deliberate scope:* the schema comes from `Base.metadata` rather than Alembic (`alembic check` already proves they agree, and `ci/smoke.sh` runs the real migrations in a container), and S3 is faked in memory for the document tests (the real MinIO round-trip is also in `ci/smoke.sh`).
+      *Reporting:* both suites emit machine-readable results in CI; `ci/pr_report.py` renders them into the job summary and a single, updated PR comment with pass/fail counts, failing test names and line coverage.
 
 - [x] **T09 · P0 · CI gate before the image build**
       Both workflows went straight to `docker build`; nothing blocked a broken `main`.

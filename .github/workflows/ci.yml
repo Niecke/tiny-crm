@@ -49,6 +49,23 @@ jobs:
     name: Backend tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # The suite runs against a real Postgres — the models use text[], ilike and
+    # timestamptz, so SQLite would not exercise them honestly. Each run creates
+    # and drops its own scratch database on this server.
+    services:
+      postgres:
+        image: postgres:18-alpine@sha256:1b1689b20d16a014a3d195653381cf2caa75a41a92d93b255a9d6ea29fd353aa
+        env:
+          POSTGRES_USER: crm
+          POSTGRES_PASSWORD: crm
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U crm"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
@@ -69,7 +86,24 @@ jobs:
 
       - name: Test
         working-directory: backend
-        run: uv run pytest -q
+        env:
+          TEST_DATABASE_URL: postgresql+asyncpg://crm:crm@localhost:5432/postgres
+        run: |
+          uv run pytest -q \
+            --junitxml=junit.xml \
+            --cov=app --cov-report=term --cov-report=xml:coverage.xml
+
+      - name: Upload reports
+        # The report job needs these precisely when the tests failed.
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: backend-reports
+          path: |
+            backend/junit.xml
+            backend/coverage.xml
+          if-no-files-found: warn
+          retention-days: 7
 
   frontend-tests:
     name: Frontend tests
@@ -94,7 +128,70 @@ jobs:
         working-directory: frontend
         # widget_test.dart is @TestOn('browser') and is skipped here; the unit
         # tests run on the VM.
-        run: flutter test
+        run: flutter test --coverage --file-reporter=json:test-results.json
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: frontend-reports
+          path: |
+            frontend/test-results.json
+            frontend/coverage/lcov.info
+          if-no-files-found: warn
+          retention-days: 7
+
+  report:
+    name: Test report
+    needs: [backend-tests, frontend-tests]
+    # Runs even when a suite failed — that is when the summary is worth reading.
+    if: always() && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      # A suite that died before writing a report leaves nothing to download;
+      # the summary says so rather than the job failing here.
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        continue-on-error: true
+        with:
+          path: reports
+          merge-multiple: true
+
+      - name: Render the summary
+        run: |
+          mkdir -p reports
+          python3 ci/pr_report.py \
+            --backend-junit reports/junit.xml \
+            --backend-coverage reports/coverage.xml \
+            --frontend-report reports/test-results.json \
+            --frontend-coverage reports/coverage/lcov.info \
+            > comment.md
+          cat comment.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment on the pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          # Marker keeps one comment per PR: find it, edit it, or post the first.
+          printf '\n<!-- tinycrm-test-report -->\n' >> comment.md
+          comment_id=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" \
+            --jq '[.[] | select(.body | contains("<!-- tinycrm-test-report -->"))] | last | .id // empty')
+          if [ -n "$comment_id" ]; then
+            gh api --method PATCH "repos/${{ github.repository }}/issues/comments/$comment_id" \
+              -F body=@comment.md > /dev/null
+            echo "Updated comment $comment_id"
+          else
+            gh api --method POST "repos/${{ github.repository }}/issues/$PR/comments" \
+              -F body=@comment.md > /dev/null
+            echo "Posted a new comment"
+          fi
 
   build-backend:
     name: Build backend
