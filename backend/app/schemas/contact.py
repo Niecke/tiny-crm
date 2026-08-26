@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 class ContactCreate(BaseModel):
     name: str
-    company: str | None = None
+    organization_id: UUID | None = None
     email: str | None = None
     phone: str | None = None
     address: str | None = None
@@ -17,7 +17,7 @@ class ContactCreate(BaseModel):
 # PATCH uses the same fields but all optional — only sent fields are updated
 class ContactUpdate(BaseModel):
     name: str | None = None
-    company: str | None = None
+    organization_id: UUID | None = None
     email: str | None = None
     phone: str | None = None
     address: str | None = None
@@ -28,6 +28,10 @@ class ContactUpdate(BaseModel):
 # ContactRead is what the API returns — includes server-generated fields
 class ContactRead(ContactCreate):
     id: UUID
+    # Read-only mirror of the linked organization's name, so a contact list can
+    # show the company without a second request. Writes go through
+    # organization_id.
+    organization_name: str | None = None
     created_at: datetime
     updated_at: datetime
 

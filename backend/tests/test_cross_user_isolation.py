@@ -1,6 +1,6 @@
 """Every router re-implements the same `user_id` ownership check by hand, so
-one missed comparison leaks another tenant's data. These tests walk all five
-owned resources through the same script: Alice creates a row, Bob must not be
+one missed comparison leaks another tenant's data. These tests walk every
+owned resource through the same script: Alice creates a row, Bob must not be
 able to read, change, delete or even see it, and an anonymous caller gets 401.
 
 New router? Add it to RESOURCES and it is covered.
@@ -78,6 +78,12 @@ RESOURCES = [
         "contacts",
         "/contacts/",
         _json_creator("/contacts/", {"name": "Ada Lovelace"}),
+        {"name": "Renamed by Bob"},
+    ),
+    Resource(
+        "organizations",
+        "/organizations/",
+        _json_creator("/organizations/", {"name": "Alice's company"}),
         {"name": "Renamed by Bob"},
     ),
     Resource(

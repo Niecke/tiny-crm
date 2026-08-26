@@ -8,10 +8,27 @@ from app.auth import current_active_user
 from app.auth.users import User
 from app.db import count_rows, get_session
 from app.models.contact import Contact
+from app.models.organization import Organization
 from app.schemas.contact import ContactCreate, ContactRead, ContactUpdate
 from app.schemas.page import Page
 
 router = APIRouter(prefix="/contacts", tags=["contacts"])
+
+
+async def _check_organization(
+    session: AsyncSession, organization_id: UUID | None, user: User
+) -> None:
+    """Refuse an organization_id that is missing or belongs to someone else.
+
+    Without this the FK would accept any existing id, quietly filing a contact
+    under another tenant's company — and leaking that company's name back on
+    every read.
+    """
+    if organization_id is None:
+        return
+    organization = await session.get(Organization, organization_id)
+    if organization is None or organization.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Organization not found")
 
 
 @router.get("/", response_model=Page[ContactRead])
@@ -19,12 +36,16 @@ async def list_contacts(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
     search: str | None = Query(default=None),
+    organization_id: UUID | None = Query(default=None),
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> Page[ContactRead]:
     q = select(Contact).where(Contact.user_id == user.id)
     if search:
         q = q.where(Contact.name.ilike(f"%{search}%"))
+    # "Everyone at ACME" — the question free-text company could never answer.
+    if organization_id is not None:
+        q = q.where(Contact.organization_id == organization_id)
     total = await count_rows(session, q)
     # Paging without a total order lets rows repeat or vanish between pages,
     # so every list sorts by something unique-enough plus id as a tiebreaker.
@@ -57,6 +78,7 @@ async def create_contact(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> Contact:
+    await _check_organization(session, body.organization_id, user)
     contact = Contact(**body.model_dump(), user_id=user.id)
     session.add(contact)
     await session.commit()
@@ -74,8 +96,11 @@ async def update_contact(
     contact = await session.get(Contact, contact_id)
     if contact is None or contact.user_id != user.id:
         raise HTTPException(status_code=404, detail="Contact not found")
+    updates = body.model_dump(exclude_unset=True)
+    if "organization_id" in updates:
+        await _check_organization(session, updates["organization_id"], user)
     # exclude_unset=True — only update fields the caller actually sent
-    for field, value in body.model_dump(exclude_unset=True).items():
+    for field, value in updates.items():
         setattr(contact, field, value)
     await session.commit()
     await session.refresh(contact)
