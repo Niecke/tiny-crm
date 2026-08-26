@@ -21,7 +21,7 @@ from typing import Any
 
 import pytest
 from fastapi_users.password import PasswordHelper
-from httpx import ASGITransport, AsyncClient
+from httpx2 import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app import ratelimit

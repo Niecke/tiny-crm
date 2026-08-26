@@ -21,7 +21,10 @@ dev = [
     "mypy>=1.15",
     "pytest>=8",
     "pytest-asyncio>=0.25",
-    "httpx>=0.28",   # TestClient for FastAPI tests
+    # Async client the tests drive the ASGI app with. httpx2 is Pydantic's
+    # maintained continuation of httpx, which has gone quiet; same API, so the
+    # only change was the import name.
+    "httpx2>=2.12.0",
     "types-aioboto3[s3]>=13.0",
     "pytest-cov>=7.1.0",
 ]
@@ -44,6 +47,9 @@ select = ["E", "F", "I", "UP"]
 [tool.mypy]
 strict = true
 plugins = ["pydantic.mypy"]
+# pymupdf ships py.typed but leaves its functions unannotated. Calling them is
+# not a hole worth an ignore comment per call — the results are still checked.
+untyped_calls_exclude = ["pymupdf"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

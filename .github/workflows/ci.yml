@@ -84,6 +84,12 @@ jobs:
           uv run ruff check .
           uv run ruff format --check .
 
+      - name: Type-check
+        working-directory: backend
+        # Tests included: they are the code most likely to drift from the app's
+        # own types, and mypy strict catches that for free.
+        run: uv run mypy app tests
+
       - name: Test
         working-directory: backend
         env:

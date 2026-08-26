@@ -12,7 +12,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, BinaryIO
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 
 from app.routers import documents
 from tests.conftest import Account, create_resource

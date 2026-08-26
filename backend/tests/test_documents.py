@@ -8,7 +8,7 @@ from collections.abc import AsyncIterator, Iterator
 from typing import BinaryIO
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 
 from app.routers import documents
 from tests.conftest import Account

@@ -1,6 +1,6 @@
 """Projects: CRUD plus the link lists that fan out to other tables."""
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 
 from tests.conftest import Account, create_resource
 

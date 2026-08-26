@@ -1,6 +1,6 @@
 """The account endpoints: profile and the custom password change."""
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 
 from tests.conftest import Account
 

@@ -1,6 +1,6 @@
 """The login endpoint and /users/me, exercised through the real password flow."""
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 
 from tests.conftest import Account
 

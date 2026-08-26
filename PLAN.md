@@ -120,11 +120,17 @@ Priorities: **P0** not a CRM without it · **P1** daily friction · **P2** expec
       **Still to do in GitHub settings:** make `Backend tests`, `Frontend tests`, `Build backend`, `Build frontend` and `Integration test` required status checks on `main`, and stop allowing direct pushes — the promote workflow has no images to promote for a commit that never went through a PR.
       *Note:* `mypy` is deliberately **not** in the gate yet — see T35.
 
-- [ ] **T35 · P1 · Get mypy green, then gate on it**
-      `uv run mypy app` reports 20 errors (aioboto3 stub mismatches in `storage.py`, untyped pymupdf calls in `documents.py`, two in `projects.py`), so it cannot be a required check without being red from day one. Fix or explicitly `# type: ignore` each, then add the step to the **Backend tests** job.
+- [x] **T35 · P1 · Get mypy green, then gate on it**
+      `uv run mypy app` reported 20 errors, so it could not be a required check without being red from day one.
+      *Done:* `uv run mypy app tests` is clean (45 files) and runs as a **Type-check** step in the **Backend tests** job. The test client also moved from `httpx` to **`httpx2`** (Pydantic's maintained continuation — httpx itself has gone quiet); the API is unchanged, so it was an import rename, and `httpcore` dropped out of the lock with it. Almost all of it was one root cause: `storage.py` splatted `**_client_kwargs()` into `session.client()`, which defeats the typed overloads in types-aioboto3, and the resulting `# type: ignore[arg-type]` comments were themselves wrong (the real code is `call-overload`), which cascaded into eight *unused-ignore* errors that hid a real mismatch — the config object was botocore's `Config` where aiobotocore expects `AioConfig`. Spelling the arguments out and using `AioConfig` removed all 16 errors in that file with no ignore comments left. `projects.py` needed `_load_scoped` to return `list[T]` rather than bare `list`; pymupdf's unannotated calls are covered by `untyped_calls_exclude = ["pymupdf"]` in `pyproject.toml` (results are still type-checked, only the calls are exempt) plus one typed local for the JPEG bytes. `tests/__init__.py` makes the suite a package so mypy stops seeing `conftest` twice.
 
 - [ ] **T10 · P0 · Backups with a rehearsed restore**
-      The nightly-backup plan died with the move from SQLite to Postgres. Needs scheduled `pg_dump`, offsite copies, MinIO bucket replication for documents.
+      The nightly-backup plan died with the move from SQLite to Postgres.
+      *In place* (infrastructure repo, `scripts/niecke-it/`): `tiny-crm-backup.sh` runs hourly from cron on the VM and uploads a pair of timestamped objects — a gzipped `pg_dump` of the whole `crm` database and a tarball of the documents bucket — to `gs://niecke-it-tiny-crm-backups` (14-day lifecycle delete, terraform `tiny-crm-backups.tf`). `BACKUP.md` documents what it writes, how to check it is still running, and the gaps; `RESTORE.md` walks a backup back into the local compose stack, including the MinIO key mapping.
+      *Missing before this can be ticked:*
+      1. **The restore has never actually been run.** Do it once into a clean stack, then record the date and anything surprising in `RESTORE.md`.
+      2. **No alerting.** A failing cron job is invisible — the log lives on the VM and nobody reads it. Needs a dead-man's-switch ping on success plus an alert on silence (the SCC Slack webhook already exists).
+      3. **Backups live in the project they protect.** At minimum a bucket retention policy so nothing can delete them early; better, a copy outside the `niecke-it` project.
       *Done when:* a restore into an empty database has actually been performed once and the steps are written down here.
 
 - [ ] **T11 · P1 · Deployment in the repository**

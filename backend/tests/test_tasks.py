@@ -1,6 +1,6 @@
 """Tasks: CRUD, the done filter and due-date handling."""
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 
 from tests.conftest import Account, create_resource
 

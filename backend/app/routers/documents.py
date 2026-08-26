@@ -74,7 +74,9 @@ def _generate_preview(data: bytes) -> bytes | None:
         if not doc.page_count:
             return None
         pix = doc[0].get_pixmap(matrix=pymupdf.Matrix(1.5, 1.5))
-        return pix.tobytes("jpeg")
+        # pymupdf is unannotated, so this would otherwise be an implicit Any.
+        jpeg: bytes = pix.tobytes("jpeg")
+        return jpeg
     except Exception:
         logger.exception("Failed to generate PDF preview")
         return None

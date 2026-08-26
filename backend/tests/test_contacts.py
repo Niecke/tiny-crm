@@ -1,6 +1,6 @@
 """Contacts: full CRUD round-trip, list paging and input validation."""
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 
 from tests.conftest import Account, create_resource
 

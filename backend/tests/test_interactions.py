@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime, timedelta
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 
 from tests.conftest import Account, create_resource
 
