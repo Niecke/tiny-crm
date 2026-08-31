@@ -87,6 +87,12 @@ RESOURCES = [
         {"name": "Renamed by Bob"},
     ),
     Resource(
+        "deals",
+        "/deals/",
+        _json_creator("/deals/", {"title": "Alice's deal", "fixed_value": "5000.00"}),
+        {"title": "Renamed by Bob"},
+    ),
+    Resource(
         "tasks",
         "/tasks/",
         _json_creator("/tasks/", {"title": "Alice's task"}),

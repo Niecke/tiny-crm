@@ -150,10 +150,21 @@ Priorities: **P0** not a CRM without it · **P1** daily friction · **P2** expec
       *UI:* `/organizations` list beside detail (contacts at the company, add-someone-here), and the contact form's free-text Company field is now a picker with a "new organization" shortcut.
       *Blocks:* T13.
 
-- [ ] **T13 · P0 · Deals and a pipeline**
+- [x] **T13 · P0 · Deals and a pipeline**
       The biggest hole. Nowhere to record that a conversation became an opportunity, what it is worth, when it might close, or whether it was won.
-      *Scope:* `Deal` (title, value, currency, stage enum, expected_close_date, probability, won/lost + lost reason), FKs to contact and organization, a stage-change endpoint, CRUD UI. Kanban board can follow a week later.
+      *Done:* `Deal` with its own `/deals` CRUD router plus `POST /deals/{id}/stage`, nullable FKs to contact *and* organization — both validated against the caller's own rows, like T12 — and `contact_name` / `organization_name` denormalised onto reads so a list row shows who the deal is with without a request per row. Filters: `?search` on title, `?stage=` for one exact column, `?status=` for the coarse question, `?contact_id=`, `?organization_id=`. Sorted by expected close date ascending with **NULLs last** — an undated deal is not urgent — and `id` as the paging tiebreaker.
+      **Value is not one number**, as specified: `value_type` (`fixed` / `rate_based` / `retainer`), `fixed_value` for the first, `rate` + `rate_unit` for the others, and `estimated_volume` + `volume_unit` where **null volume = genuinely open-ended**. The router refuses a row that is priced two ways at once — a contract sum *and* a day rate cannot both be summed into a pipeline without silently picking one — and refuses a quantity with no unit, since "60" is not an estimate. Switching `value_type` on a PATCH drops the other shape's fields, because that is a deliberate re-pricing rather than a contradiction.
+      `expected_value` is a **stored Postgres generated column**, not an application field, so it cannot drift from what it derives from and T28 can `SUM` it directly. It is **NULL, never 0**, when no total exists. Verified in SQL: five deals across all shapes give `sum = 84,500.00, count(*) FILTER (WHERE expected_value IS NULL) = 2` — the "€48k across 4 deals, plus 2 open-ended" shape the plan demands, with no open-ended deal contributing a zero. The UI carries the same rule: an open-ended deal's list row reads `800.00 EUR/day · open-ended` rather than blank, so a real deal at a known rate never looks like an unpriced one.
+      **Units are never converted.** A day rate against a volume estimated in months derives nothing rather than inventing a days-per-month factor — that factor would be the same silent lie the single `value` column was. The form says so in place, and defaults the volume unit to the rate unit so the mismatch is deliberate rather than accidental.
+      **Won ≠ finished**, so the stage enum runs `lead → qualified → proposal → negotiation → won → running → completed`, plus `lost`. `closed_at` records when the deal was *decided*: winning stamps it, starting and finishing the work leave it alone, and flipping between won and lost re-stamps it because that is a new decision. `?status=active` — the screen's default — is everything not finished, which deliberately includes won and running, so a long engagement never leaves the board the day the work starts.
+      *Load-bearing detail:* a stage is not a label. Arriving in a decided stage stamps `closed_at`, pins `probability` to 100 or 0 so a weighted pipeline stops forecasting money already banked or already gone, and decides whether a lost reason may exist. All of it lives in one `_apply_stage()`, which **the stage endpoint and `PATCH` both route through** — two code paths applying different rules would make a deal's history depend on which button was pressed. A `lost_reason` the caller *sends* with any stage but `lost` is a 422; one already stored on a deal being won or reopened is cleared, not rejected.
+      *Money is `Numeric`, never a float*, and Pydantic serialises it as a JSON string — so the Dart side keeps every amount a string end to end (`core/money_text.dart`) rather than parsing it into a double that cannot hold 0.10.
+      *Migration `4b7e2d91c6fa`* creates the table and the generated column; nothing to backfill, since there was nowhere a deal could previously have been recorded. `SET NULL` on both FKs — deleting a customer must never delete the record of what was sold to them. Verified up, down and up again against a scratch database with rows in the table, and `alembic check` reports no drift from the models.
+      *Tests:* `backend/tests/test_deals.py` (38 cases: CRUD, all three value shapes and their derived totals, open-ended and mismatched units, the contradiction refusals, every stage transition and its side effects, the PATCH/stage-endpoint equivalence, all four status filters, NULLs-last ordering, cross-tenant refusal on both FKs), deals added to the table-driven cross-user isolation suite, `frontend/test/deal_test.dart` (33 cases incl. the money formatter and unknown stages/units falling back rather than throwing). `ci/smoke.sh` round-trips a fixed deal, asserts an open-ended one has no total, and walks won → running checking the close date holds.
+      *UI:* `/deals` list beside detail, scoped by "On my plate" (the default) / "Still competing" / "Won" / "Finished" / one exact stage; the detail moves a deal with a row of stage chips calling the stage endpoint, prompting for an optional reason on a loss. The form shows only the fields belonging to the chosen pricing shape, so it cannot compose a request the API will refuse.
+      *Deliberately deferred:* no aggregate endpoint — the pipeline total and its open-ended count are T28, and the generated column is what makes that one query. Kanban board can follow.
       *Depends on:* T12.
+      *Extended by:* T38 — public tenders are deals with extra fields, not a second entity.
 
 - [ ] **T14 · P0 · Link tasks to contacts, deals and interactions**
       Tasks attach only to projects. A CRM follow-up is always about someone — "call Maria back on Thursday".
@@ -166,9 +177,51 @@ Priorities: **P0** not a CRM without it · **P1** daily friction · **P2** expec
 
 - [ ] **T16 · P1 · Attach documents and interactions to any record**
       Documents link to projects only; a signed contract belongs to a deal, an NDA to a contact. Interactions cannot attach to a project or deal at all.
+      *Also unblocks:* T38 — a tender is mostly a pile of PDFs.
 
 - [ ] **T17 · P1 · Contact fields a business actually files**
       Missing: job title, second email/phone, website, lifecycle status (lead / prospect / customer / former), source (referral, inbound, event), preferred language, birthday. Split `address` into street / postcode / city / country so it can feed letters, invoices and vCards.
+      *Same migration, domain-specific half* — a solo contractor's address book is also a partner list, so these ride along rather than becoming a second `ALTER TABLE`:
+      · `relation_type` (customer / partner / subcontracting target / contracting authority) — orthogonal to `lifecycle_status` above: type is *what this party is to me*, status is *how far along we are*. Keep both; collapsing them loses "partner we have not approached yet".
+      · `known_day_rate` + `rate_currency` — the freelance rate as heard, not a quote.
+      · `works_with_freelancers` (bool, nullable = unknown) — the single field that decides whether an approach is worth making at all. Nullable matters: "no" and "never asked" are different answers.
+      *Filterable from day one*, or the fields are decoration — see T30.
+
+- [ ] **T36 · P0 · Contact channel compliance — may I write to this person at all?**
+      Nothing in the model records whether an *unsolicited* electronic approach to a given contact is lawful. Austria's §174 TKG 2021 bans unsolicited email and calls for direct marketing without prior consent, and it covers **legal entities too** — `office@firma.at` is not a free target — with a public-register (ECG list) check on top. The fine is real, and the mistake is invisible: nothing in a normal CRM stops you, and you only find out afterwards.
+      *Scope:* on `Contact` (and `Organization`, which is where a switchboard address lives):
+      · `first_contact_basis` enum — `postal_or_in_person_only` (default, the safe assumption) / `public_tender` (they invited offers) / `consent_given` / `existing_relationship` (§174(4): address obtained during a sale, own similar goods, opt-out was offered).
+      · `consent_since` (date, nullable) and `consent_source` (short text — where it came from, because "we have consent" without provenance is not a defence).
+      · Optional `do_not_contact` hard flag that overrides everything.
+      *Done when:* the value is visible **at the point of action, not buried in a detail tab** — the compose/`mailto:` affordance (T21) is disabled with the reason shown when the basis is `postal_or_in_person_only`, and the contact list shows the state as a chip. A field nobody sees at the moment of writing prevents nothing.
+      *Deliberately not automated:* no ECG-list lookup, no legal advice in the app. This records a judgement the operator made; it does not make it.
+      *Why it earns P0 for this app:* it is the one feature a general-purpose CRM does not have, and the failure mode it prevents is a fine plus a burned first impression with exactly the partner you wanted.
+      *Related:* T21 (the send path it gates), T33 (GDPR mechanics — adjacent, not the same thing: T33 is about data subjects' rights, this is about permission to send).
+
+- [ ] **T37 · P2 · Direction on interactions**
+      `Interaction` records kind, subject, notes and time, but not who started it — so "I wrote three times and heard nothing" and "they keep asking" look identical in the log, and no follow-up rule can be built on it.
+      *Scope:* `direction` enum (`outbound` / `inbound` / `internal`, default `outbound` for the existing rows — every logged touchpoint so far was one the operator made), shown as an arrow in the timeline, filterable.
+      *Cheap:* one nullable column, one migration, no new entity. The rest of the activity log already exists.
+      *Feeds:* T15 (timeline), T28 (dashboard: "contacts awaiting a reply").
+
+- [ ] **T38 · P1 · Public tenders as a deal flavour**
+      Vergabe opportunities (`ausschreibung`) do not fit the plain deal shape: they have a hard deadline, a procedure type, and a go/no-go that depends on whether the operator can bid alone.
+      *Scope — extra columns on `Deal` (T13), not a parallel entity:* `deal_kind` (`direct` / `tender`), `contracting_authority` (FK to organization — reuse T12, do not re-type the buyer), `cpv_type` (service / supply / labour leasing), `procedure`, `submission_deadline`, `sme_suitable`, `consortium_allowed` (ARGE), `multi_role`, and the decision pair `fit` (`solo` / `consortium_only` / `no`) + `fit_reason` (one sentence, required when `fit` is set — a verdict without a reason is unusable three months later).
+      *Rationale for folding into `Deal`:* a tender is an opportunity with a deadline and a bid/no-bid gate. A second entity would duplicate the pipeline, the contact links, the document links and the whole UI, and then need merging when a tender turns into an actual engagement. `deal_kind` plus a conditional form section costs one column.
+      *Links:* contacts (who is on it) via T13's FKs, the PDFs via T16 (documents on any record). `submission_deadline` must reach T20's reminder job — a missed tender deadline is the single most expensive thing this app can fail to do.
+      *Depends on:* T13, T16.
+
+- [ ] **T39 · P1 · Recurring tasks**
+      `Task.due_date` exists; recurrence does not, so "check the ORF winners' job pages monthly" and "follow up with EBCONT in two weeks" have to be retyped after every tick — which means they stop happening.
+      *Scope:* `recurrence_rule` (start with a small fixed set — daily / weekly / monthly / yearly + interval; RRULE only if that proves too thin) and `recurrence_until`. On completing a recurring task, **create the next instance rather than mutating the current one**, so the history of "did I actually check in March?" survives.
+      *Watch:* an overdue recurring task must not spawn a backlog of missed instances — next due date is computed from the completion, not from the missed slot.
+      *Pairs with:* T20 (a reminder that never leaves the browser makes recurrence pointless).
+
+- [ ] **T40 · P2 · Job-watch list**
+      For companies worth watching without an active conversation: are they hiring for roles that imply the work the operator does?
+      *Scope:* on `Organization` — `careers_url`, `jobs_checked_at`, `relevant_role_seen` (bool) plus a short note. Three columns, no module, no scraper.
+      *Done when:* an "unchecked longest" list exists, and marking one checked is one tap. Combined with T39 that is the whole feature: a recurring task points at the list.
+      *Explicitly not:* crawling careers pages. That is a different project with a different failure mode.
 
 - [ ] **T18 · P0 · One search across everything**
       Search is per-panel and matches exactly one column each — a contact is unfindable by email, phone or note text. Postgres full-text (`tsvector` + GIN, or `pg_trgm` for fuzzy names), not the FTS5 the original plan assumed.
@@ -180,10 +233,12 @@ Priorities: **P0** not a CRM without it · **P1** daily friction · **P2** expec
 
 - [ ] **T20 · P1 · Reminders that leave the browser**
       Overdue tasks and planned meetings are only visible if the app is open, which makes the "Upcoming" panel passive. Needs a scheduled job plus an outbound mail sender: due-today digest, overdue nudge, meeting reminder.
+      *Also carries:* tender submission deadlines (T38) and recurring-task instances (T39) — both are worthless without a nudge that leaves the browser.
       *Shares infrastructure with:* T21, T23.
 
 - [ ] **T21 · P1 · Log an email without syncing mailboxes**
       Full IMAP sync stays out of scope. The 80%: `mailto:` links from a contact, a "log this email" form, and a BCC-to-inbox address that files a message as an interaction.
+      *Gated by:* T36 — the `mailto:` affordance is where channel compliance has to bite, or the field is decoration.
 
 - [ ] **T22 · P1 · Calendar view and `.ics` feed**
       Interactions already carry `occurred_at` and `duration_minutes`, so a month/week view is mostly presentation. A read-only iCalendar feed gets planned meetings into the calendar the operator already uses, at a fraction of the cost of real sync.
@@ -216,6 +271,7 @@ Priorities: **P0** not a CRM without it · **P1** daily friction · **P2** expec
 
 - [ ] **T28 · P2 · Numbers on the dashboard**
       The dashboard lists records but reports nothing. A small strip: open pipeline value by stage, deals won this quarter, interactions logged this week, contacts untouched for 90 days, overdue count.
+      *Open-ended deals count separately* (T13): sum what has an `expected_value`, then show "+ n open-ended" beside it. Never fold them in as zero.
 
 - [ ] **T29 · P2 · Change history**
       Only `updated_at` is kept, and concurrent edits silently last-write-win. An append-only audit table gives "who changed this and when" and supports optimistic-concurrency checks on PATCH.
@@ -243,8 +299,10 @@ Dependency- and leverage-ordered, not a strict ranking:
 3. **T10** — backups. Unblocks nothing, which is exactly why it gets deferred forever.
 4. **T12 → T13** — Organizations, then Deals. Turns a contact book into a CRM.
 5. **T14 → T15** — link tasks, then build the timeline; it becomes the main screen.
-6. **T18, T19** — search and import/export, once the model has settled.
-7. **T23, T20, T22** — password reset, reminders, calendar feed. All three need outbound mail; build the sender once.
+6. **T17 + T36** — one migration on `contacts`: the business fields and the channel-compliance fields together. T36 is cheap, prevents an expensive mistake, and has no dependencies — do not let it sit behind the pipeline work.
+7. **T18, T19** — search and import/export, once the model has settled.
+8. **T23, T20, T22** — password reset, reminders, calendar feed. All three need outbound mail; build the sender once. T39 (recurring tasks) lands with T20.
+9. **T38** — tender fields, after T13 and T16 exist. T37 and T40 are one-migration jobs; slot them into any spare afternoon.
 
 Everything else is opportunistic.
 

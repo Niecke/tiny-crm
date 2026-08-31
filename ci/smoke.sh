@@ -104,6 +104,54 @@ linked=$(curl -fsS -X PATCH "$API/contacts/$contact_id" "${auth[@]}" \
 at_org=$(curl -fsS "$API/contacts/?organization_id=$org_id" "${auth[@]}" | json "['total']")
 [ "$at_org" = "1" ] || fail "expected 1 contact at the organization, got $at_org"
 
+step "a deal round-trips and the stage endpoint closes it"
+deal_id=$(curl -fsS -X POST "$API/deals/" "${auth[@]}" \
+  -H 'Content-Type: application/json' \
+  -d "{\"title\":\"CI Smoke deal\",\"fixed_value\":\"1234.56\",\"stage\":\"proposal\",\"contact_id\":\"$contact_id\",\"organization_id\":\"$org_id\"}" \
+  | json "['id']")
+[ -n "$deal_id" ] || fail "deal was not created"
+# Numeric(14, 2) all the way to Postgres and back — never a float. expected_value
+# is a generated column, so this also proves the database computed it.
+deal=$(curl -fsS "$API/deals/$deal_id" "${auth[@]}")
+[ "$(echo "$deal" | json "['fixed_value']")" = "1234.56" ] \
+  || fail "deal value came back as '$(echo "$deal" | json "['fixed_value']")'"
+[ "$(echo "$deal" | json "['expected_value']")" = "1234.56" ] \
+  || fail "expected_value was not generated"
+
+step "an open-ended engagement has no total rather than a zero"
+# The case a single value column could not express: a real deal at a known day
+# rate with no agreed end. Counting it as 0 is how a pipeline reads as empty.
+open_ended=$(curl -fsS -X POST "$API/deals/" "${auth[@]}" \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"CI Smoke retainer","value_type":"rate_based","rate":"800.00","rate_unit":"day"}')
+open_ended_id=$(echo "$open_ended" | json "['id']")
+[ "$(echo "$open_ended" | json "['expected_value']")" = "None" ] \
+  || fail "an open-ended deal must have no expected_value"
+[ "$(echo "$open_ended" | json "['is_open_ended']")" = "True" ] \
+  || fail "an open-ended deal should say so"
+
+step "winning stamps the close, and the work stays on the board"
+won=$(curl -fsS -X POST "$API/deals/$deal_id/stage" "${auth[@]}" \
+  -H 'Content-Type: application/json' -d '{"stage":"won"}')
+[ "$(echo "$won" | json "['stage']")" = "won" ] || fail "deal did not move to won"
+# Winning stamps the close date and pins the probability — the whole reason the
+# stage endpoint exists rather than a bare PATCH.
+[ "$(echo "$won" | json "['probability']")" = "100" ] || fail "a won deal should be 100%"
+[ "$(echo "$won" | json "['closed_at']")" != "None" ] || fail "a won deal should have closed_at"
+closed_at=$(echo "$won" | json "['closed_at']")
+# Starting the work does not move the date the deal was decided on.
+running=$(curl -fsS -X POST "$API/deals/$deal_id/stage" "${auth[@]}" \
+  -H 'Content-Type: application/json' -d '{"stage":"running"}')
+[ "$(echo "$running" | json "['closed_at']")" = "$closed_at" ] \
+  || fail "starting the work moved the close date"
+[ "$(echo "$running" | json "['is_active']")" = "True" ] \
+  || fail "a running engagement must stay on the board"
+
+still_competing=$(curl -fsS "$API/deals/?status=open" "${auth[@]}" | json "['total']")
+[ "$still_competing" = "1" ] || fail "expected 1 deal still competing, got $still_competing"
+on_my_plate=$(curl -fsS "$API/deals/?status=active" "${auth[@]}" | json "['total']")
+[ "$on_my_plate" = "2" ] || fail "expected 2 deals on the plate, got $on_my_plate"
+
 step "a document round-trips through MinIO"
 printf 'tinyCRM integration test\n' > /tmp/ci-smoke.txt
 document_id=$(curl -fsS -X POST "$API/documents/" "${auth[@]}" \
@@ -115,6 +163,8 @@ diff -q /tmp/ci-smoke.txt /tmp/ci-smoke-download.txt > /dev/null \
 
 step "cleanup"
 curl -fsS -X DELETE "$API/documents/$document_id" "${auth[@]}"
+curl -fsS -X DELETE "$API/deals/$deal_id" "${auth[@]}"
+curl -fsS -X DELETE "$API/deals/$open_ended_id" "${auth[@]}"
 curl -fsS -X DELETE "$API/contacts/$contact_id" "${auth[@]}"
 curl -fsS -X DELETE "$API/organizations/$org_id" "${auth[@]}"
 
