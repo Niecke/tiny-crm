@@ -43,7 +43,7 @@ A small CRM for self-employment, built as a learning project for FastAPI and Flu
 | Contact | name, email, phone, address *(single string)*, tags, notes | → organization (FK), ← interactions (M2M), ← projects (M2M) | CRUD, `?search` on name, `?organization_id` |
 | Organization | name, domain, email, phone, address, industry, notes | ← contacts (FK) | CRUD, `?search` on name or domain, `contact_count` on read |
 | Interaction | kind (call/meeting/email/note/other), subject, notes, occurred_at, duration_minutes, done, tags | M2M contacts | CRUD, filters: search, contact_id, kind, upcoming |
-| Task | title, description (markdown), due_date, priority 0–2, done, tags | ← projects (M2M) only | CRUD, `?search`, `?include_done` |
+| Task | title, description (markdown), due_date, priority 0–2, done, tags, recurrence (rule / interval / until / parent) | ← projects (M2M) only, ← previous instance of a series | CRUD, `?search`, `?include_done` |
 | Project | name, description, start_date, end_date | M2M contacts, tasks, documents | CRUD, `?search` on name |
 | Document | title, description, format (pdf/md/txt), size, storage_key, preview_key, tags | ← projects (M2M) | CRUD + upload, replace-content, download, JPEG preview |
 | User | fastapi-users base + name, password_changed_at | owns everything | `/users/me`, `/users/me/password`, JWT login/logout |
@@ -211,10 +211,13 @@ Priorities: **P0** not a CRM without it · **P1** daily friction · **P2** expec
       *Links:* contacts (who is on it) via T13's FKs, the PDFs via T16 (documents on any record). `submission_deadline` must reach T20's reminder job — a missed tender deadline is the single most expensive thing this app can fail to do.
       *Depends on:* T13, T16.
 
-- [ ] **T39 · P1 · Recurring tasks**
-      `Task.due_date` exists; recurrence does not, so "check the ORF winners' job pages monthly" and "follow up with EBCONT in two weeks" have to be retyped after every tick — which means they stop happening.
-      *Scope:* `recurrence_rule` (start with a small fixed set — daily / weekly / monthly / yearly + interval; RRULE only if that proves too thin) and `recurrence_until`. On completing a recurring task, **create the next instance rather than mutating the current one**, so the history of "did I actually check in March?" survives.
-      *Watch:* an overdue recurring task must not spawn a backlog of missed instances — next due date is computed from the completion, not from the missed slot.
+- [x] **T39 · P1 · Recurring tasks**
+      `Task.due_date` existed; recurrence did not, so "check the ORF winners' job pages monthly" and "follow up with EBCONT in two weeks" had to be retyped after every tick — which means they stop happening.
+      *Done:* `recurrence_rule` (`daily` / `weekly` / `monthly` / `yearly`), `recurrence_interval`, `recurrence_until` and `recurrence_parent_id` on `tasks`; the arithmetic lives in `app/recurrence.py` with its own unit tests. Deliberately **not RRULE** — four cadences plus an interval are a closed set the UI renders as a dropdown, and the column can grow into an RRULE string later without changing how completion works.
+      **Completing a recurring task creates the next instance and leaves the current one done**, so "did I actually check in March?" stays answerable; `recurrence_parent_id` chains the instances (`ON DELETE SET NULL`, so deleting one completed instance does not take the series with it) and doubles as the guard that ticking a task done, undone and done again cannot fork the series. The successor inherits description, priority, tags, the recurrence settings and the task's project links.
+      *Next due date is computed from the completion, not the missed slot:* finishing early or on time keeps the cadence (due on the 1st, ticked off on the 28th → due the 1st again), finishing late re-anchors on the completion (a monthly check-in last due in March, done in June, is next due in July), so an overdue task yields exactly one instance instead of a backlog. Month steps clamp to the end of shorter months (31 Jan + 1 month = 28/29 Feb) and the user's time of day is preserved. `recurrence_until` is inclusive; past it the series simply stops.
+      *Validation* is on the merged state, so a PATCH cannot leave a rule without a due date to repeat from, and an end date before the due date is refused. The PATCH response carries `next_occurrence` — the UI reports the new due date only when the server actually created one, rather than guessing that a repeat happened.
+      *Still open:* the reminder half. A recurrence that only surfaces in an open browser tab is still passive — see T20.
       *Pairs with:* T20 (a reminder that never leaves the browser makes recurrence pointless).
 
 - [ ] **T40 · P2 · Job-watch list**
@@ -301,7 +304,7 @@ Dependency- and leverage-ordered, not a strict ranking:
 5. **T14 → T15** — link tasks, then build the timeline; it becomes the main screen.
 6. **T17 + T36** — one migration on `contacts`: the business fields and the channel-compliance fields together. T36 is cheap, prevents an expensive mistake, and has no dependencies — do not let it sit behind the pipeline work.
 7. **T18, T19** — search and import/export, once the model has settled.
-8. **T23, T20, T22** — password reset, reminders, calendar feed. All three need outbound mail; build the sender once. T39 (recurring tasks) lands with T20.
+8. **T23, T20, T22** — password reset, reminders, calendar feed. All three need outbound mail; build the sender once. T39 (recurring tasks) shipped ahead of T20; its instances stay silent until that reminder job exists.
 9. **T38** — tender fields, after T13 and T16 exist. T37 and T40 are one-migration jobs; slot them into any spare afternoon.
 
 Everything else is opportunistic.

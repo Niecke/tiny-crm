@@ -5,6 +5,7 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/date_time_text.dart';
 import '../core/error_text.dart';
 import '../models/contact.dart';
 import '../models/task.dart';
@@ -500,8 +501,9 @@ class _TaskTile extends ConsumerWidget {
           ),
           tooltip: task.done ? 'Mark undone' : 'Mark done',
           onPressed: () async {
+            final Task updated;
             try {
-              await ref.read(tasksRepositoryProvider).update(task.id, {
+              updated = await ref.read(tasksRepositoryProvider).update(task.id, {
                 'done': !task.done,
               });
             } catch (e) {
@@ -509,6 +511,19 @@ class _TaskTile extends ConsumerWidget {
                 showErrorSnackBar(context, e, prefix: 'Could not update task.');
               }
               return;
+            }
+            // Completing a repeating task leaves this one as history and creates
+            // the next instance — say so, and say when, because the server
+            // decides whether the series still has one left in it.
+            final next = updated.nextOccurrence;
+            if (next?.dueDate != null && context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Repeated: next one due ${formatDay(next!.dueDate!)}.',
+                  ),
+                ),
+              );
             }
             ref.invalidate(tasksProvider);
             ref.invalidate(allTasksProvider);
@@ -537,8 +552,21 @@ class _TaskTile extends ConsumerWidget {
             ],
             if (task.dueDate != null)
               Text(
-                'Due ${_formatDue(task.dueDate!)}',
+                'Due ${formatDay(task.dueDate!)}',
                 style: TextStyle(color: titleColor),
+              ),
+            if (task.recurrenceLabel != null)
+              Row(
+                children: [
+                  const Icon(Icons.repeat, size: 14, color: Colors.grey),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      task.recurrenceLabel!,
+                      style: const TextStyle(color: Colors.grey),
+                    ),
+                  ),
+                ],
               ),
             Text(
               'Priority: ${_priorityLabels[task.priority.clamp(0, 2)]}',
@@ -582,14 +610,6 @@ class _TaskTile extends ConsumerWidget {
         ),
       ),
     );
-  }
-
-  String _formatDue(DateTime dt) {
-    final local = dt.toLocal();
-    final y = local.year.toString().padLeft(4, '0');
-    final m = local.month.toString().padLeft(2, '0');
-    final d = local.day.toString().padLeft(2, '0');
-    return '$y-$m-$d';
   }
 }
 

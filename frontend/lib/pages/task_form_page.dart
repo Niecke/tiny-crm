@@ -2,9 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/date_time_text.dart';
 import '../core/error_text.dart';
 import '../models/task.dart';
 import '../providers/tasks_provider.dart';
+
+const _recurrenceLabels = {
+  'daily': 'Daily',
+  'weekly': 'Weekly',
+  'monthly': 'Monthly',
+  'yearly': 'Yearly',
+};
 
 class TaskFormPage extends ConsumerStatefulWidget {
   const TaskFormPage({super.key, this.task});
@@ -23,9 +31,12 @@ class _TaskFormPageState extends ConsumerState<TaskFormPage>
   late final TextEditingController _title;
   late final TextEditingController _description;
   late final TextEditingController _tags;
+  late final TextEditingController _recurrenceInterval;
   late final TabController _descTabController;
   DateTime? _dueDate;
   int _priority = 0;
+  String? _recurrenceRule;
+  DateTime? _recurrenceUntil;
 
   bool get _isEdit => widget.task != null;
 
@@ -36,9 +47,14 @@ class _TaskFormPageState extends ConsumerState<TaskFormPage>
     _title = TextEditingController(text: t?.title);
     _description = TextEditingController(text: t?.description);
     _tags = TextEditingController(text: t?.tags.join(', '));
+    _recurrenceInterval = TextEditingController(
+      text: (t?.recurrenceInterval ?? 1).toString(),
+    );
     _descTabController = TabController(length: 2, vsync: this);
     _dueDate = t?.dueDate;
     _priority = t?.priority ?? 0;
+    _recurrenceRule = t?.recurrenceRule;
+    _recurrenceUntil = t?.recurrenceUntil;
   }
 
   @override
@@ -46,36 +62,58 @@ class _TaskFormPageState extends ConsumerState<TaskFormPage>
     _title.dispose();
     _description.dispose();
     _tags.dispose();
+    _recurrenceInterval.dispose();
     _descTabController.dispose();
     super.dispose();
   }
 
-  String _formatDate(DateTime dt) {
-    final local = dt.toLocal();
-    final y = local.year.toString().padLeft(4, '0');
-    final m = local.month.toString().padLeft(2, '0');
-    final d = local.day.toString().padLeft(2, '0');
-    return '$y-$m-$d';
-  }
-
-  Future<void> _pickDueDate() async {
+  Future<DateTime?> _pickDay(DateTime? current) async {
     final now = DateTime.now();
-    final initial = _dueDate ?? now;
     final date = await showDatePicker(
       context: context,
-      initialDate: initial,
+      initialDate: current ?? now,
       firstDate: DateTime(now.year - 1),
       lastDate: DateTime(now.year + 5),
     );
-    if (date == null || !mounted) return;
-    // End-of-day so the task stays "today" until midnight.
-    setState(() {
-      _dueDate = DateTime(date.year, date.month, date.day, 23, 59);
-    });
+    // End-of-day so a task stays "today" until midnight.
+    return date == null
+        ? null
+        : DateTime(date.year, date.month, date.day, 23, 59);
+  }
+
+  Future<void> _pickDueDate() async {
+    final picked = await _pickDay(_dueDate);
+    if (picked == null || !mounted) return;
+    setState(() => _dueDate = picked);
+  }
+
+  Future<void> _pickRecurrenceUntil() async {
+    final picked = await _pickDay(_recurrenceUntil ?? _dueDate);
+    if (picked == null || !mounted) return;
+    setState(() => _recurrenceUntil = picked);
+  }
+
+  /// The noun the interval counts: "Every 2 [weeks]".
+  String get _recurrenceUnitLabel => recurrenceUnits[_recurrenceRule] ?? '';
+
+  void _complain(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+    // The server enforces both of these too; catching them here keeps the user
+    // from losing a form to a round trip.
+    if (_recurrenceRule != null && _dueDate == null) {
+      _complain('A repeating task needs a due date to repeat from.');
+      return;
+    }
+    if (_recurrenceUntil != null &&
+        _dueDate != null &&
+        _recurrenceUntil!.isBefore(_dueDate!)) {
+      _complain('The repeat end date is before the due date.');
+      return;
+    }
     setState(() => _saving = true);
 
     final tags = _tags.text.isEmpty
@@ -88,6 +126,13 @@ class _TaskFormPageState extends ConsumerState<TaskFormPage>
       'due_date': _dueDate?.toUtc().toIso8601String(),
       'priority': _priority,
       'tags': tags,
+      // Sent even when null: on a PATCH that is how a repeat gets turned off.
+      'recurrence_rule': _recurrenceRule,
+      'recurrence_interval':
+          _recurrenceRule == null ? 1 : int.parse(_recurrenceInterval.text),
+      'recurrence_until': _recurrenceRule == null
+          ? null
+          : _recurrenceUntil?.toUtc().toIso8601String(),
     };
 
     final repo = ref.read(tasksRepositoryProvider);
@@ -196,7 +241,7 @@ class _TaskFormPageState extends ConsumerState<TaskFormPage>
                   children: [
                     Expanded(
                       child: Text(
-                        _dueDate == null ? 'No due date' : _formatDate(_dueDate!),
+                        _dueDate == null ? 'No due date' : formatDay(_dueDate!),
                       ),
                     ),
                     if (_dueDate != null)
@@ -212,6 +257,84 @@ class _TaskFormPageState extends ConsumerState<TaskFormPage>
                 ),
               ),
             ),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: DropdownButtonFormField<String?>(
+                initialValue: _recurrenceRule,
+                decoration: const InputDecoration(
+                  labelText: 'Repeats',
+                  helperText: 'Completing a repeating task creates the next one.',
+                  border: OutlineInputBorder(),
+                ),
+                items: [
+                  const DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text('Does not repeat'),
+                  ),
+                  for (final rule in recurrenceRules)
+                    DropdownMenuItem<String?>(
+                      value: rule,
+                      child: Text(_recurrenceLabels[rule]!),
+                    ),
+                ],
+                onChanged: (v) => setState(() {
+                  _recurrenceRule = v;
+                  // An end date without a rule means nothing; drop it with the rule.
+                  if (v == null) _recurrenceUntil = null;
+                }),
+              ),
+            ),
+            if (_recurrenceRule != null) ...[
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: TextFormField(
+                  controller: _recurrenceInterval,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Every',
+                    suffixText: _recurrenceUnitLabel,
+                    border: const OutlineInputBorder(),
+                  ),
+                  validator: (v) {
+                    final n = int.tryParse((v ?? '').trim());
+                    if (n == null || n < 1 || n > 366) {
+                      return 'Enter a whole number between 1 and 366';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: InputDecorator(
+                  decoration: const InputDecoration(
+                    labelText: 'Repeat until',
+                    border: OutlineInputBorder(),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _recurrenceUntil == null
+                              ? 'No end date'
+                              : formatDay(_recurrenceUntil!),
+                        ),
+                      ),
+                      if (_recurrenceUntil != null)
+                        IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () =>
+                              setState(() => _recurrenceUntil = null),
+                        ),
+                      TextButton(
+                        onPressed: _pickRecurrenceUntil,
+                        child: const Text('Pick'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
             Padding(
               padding: const EdgeInsets.only(bottom: 16),
               child: DropdownButtonFormField<int>(
