@@ -2,7 +2,8 @@ class Contact {
   const Contact({
     required this.id,
     required this.name,
-    this.company,
+    this.organizationId,
+    this.organizationName,
     this.email,
     this.phone,
     this.address,
@@ -12,7 +13,14 @@ class Contact {
 
   final String id;
   final String name;
-  final String? company;
+
+  /// The company this contact belongs to, or null for someone unaffiliated.
+  final String? organizationId;
+
+  /// Read-only: the API sends the linked company's name alongside its id, so a
+  /// list can show it without a second request. Writes go through
+  /// [organizationId].
+  final String? organizationName;
   final String? email;
   final String? phone;
   final String? address;
@@ -22,7 +30,8 @@ class Contact {
   factory Contact.fromJson(Map<String, dynamic> json) => Contact(
         id: json['id'] as String,
         name: json['name'] as String,
-        company: json['company'] as String?,
+        organizationId: json['organization_id'] as String?,
+        organizationName: json['organization_name'] as String?,
         email: json['email'] as String?,
         phone: json['phone'] as String?,
         address: json['address'] as String?,

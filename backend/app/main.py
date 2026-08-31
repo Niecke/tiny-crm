@@ -13,7 +13,15 @@ from app.config import Environment, settings
 from app.db import get_session
 from app.logging_config import configure_logging
 from app.ratelimit import count_failed_logins, enforce_login_rate_limit
-from app.routers import contacts, documents, interactions, projects, tasks, users
+from app.routers import (
+    contacts,
+    documents,
+    interactions,
+    organizations,
+    projects,
+    tasks,
+    users,
+)
 from app.schemas.user import UserRead, UserUpdate
 from app.storage import check_storage
 from app.version import BUILD_TIMESTAMP, GIT_COMMIT
@@ -78,6 +86,7 @@ app.add_middleware(
 app.middleware("http")(count_failed_logins)
 
 app.include_router(contacts.router)
+app.include_router(organizations.router)
 app.include_router(tasks.router)
 app.include_router(documents.router)
 app.include_router(projects.router)

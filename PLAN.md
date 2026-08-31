@@ -40,7 +40,8 @@ A small CRM for self-employment, built as a learning project for FastAPI and Flu
 
 | Entity | Fields | Links | API |
 |---|---|---|---|
-| Contact | name, company *(free text)*, email, phone, address *(single string)*, tags, notes | ← interactions (M2M), ← projects (M2M) | CRUD, `?search` on name |
+| Contact | name, email, phone, address *(single string)*, tags, notes | → organization (FK), ← interactions (M2M), ← projects (M2M) | CRUD, `?search` on name, `?organization_id` |
+| Organization | name, domain, email, phone, address, industry, notes | ← contacts (FK) | CRUD, `?search` on name or domain, `contact_count` on read |
 | Interaction | kind (call/meeting/email/note/other), subject, notes, occurred_at, duration_minutes, done, tags | M2M contacts | CRUD, filters: search, contact_id, kind, upcoming |
 | Task | title, description (markdown), due_date, priority 0–2, done, tags | ← projects (M2M) only | CRUD, `?search`, `?include_done` |
 | Project | name, description, start_date, end_date | M2M contacts, tasks, documents | CRUD, `?search` on name |
@@ -139,9 +140,14 @@ Priorities: **P0** not a CRM without it · **P1** daily friction · **P2** expec
 
 ### C — Make it a CRM
 
-- [ ] **T12 · P0 · Organizations as a first-class entity**
-      `Contact.company` is free text, so "everyone at ACME", "all deals with ACME" and "which invoice address" are unanswerable, and two spellings make two companies.
-      *Scope:* `Organization` (name, domain, address, industry, notes), `Contact.organization_id`, one-off backfill migration from the existing strings, list/detail UI.
+- [x] **T12 · P0 · Organizations as a first-class entity**
+      `Contact.company` was free text, so "everyone at ACME", "all deals with ACME" and "which invoice address" were unanswerable, and two spellings made two companies.
+      *Done:* `Organization` (name, domain, **email, phone**, address, industry, notes) with its own `/organizations` CRUD router, `?search` over name *or* domain — an email signature often gives the domain and nothing else — and a `contact_count` per row, computed as one correlated subquery on the list query rather than a request per row. `Contact.company` is gone, replaced by `Contact.organization_id`; reads also carry `organization_name`, denormalised so a contact list shows the company without a second request, and `/contacts/?organization_id=` answers "everyone at ACME".
+      **email and phone are the company's, not a person's** — `info@`, `office@` and the switchboard had nowhere to live before, and filing them on whichever contact happened to be first is how a CRM loses them.
+      *Migration `3f9a1c47b2d8`* backfills one organization per distinct company string **per user**, matching case-insensitively and ignoring surrounding whitespace, so "ACME", "acme " and " Acme" collapse into one company instead of three; contacts whose company was blank stay unlinked. The downgrade writes the organization name back into a restored `company` column before dropping the table, so the step is reversible. Verified both ways against a scratch database, and `alembic check` agrees with the models.
+      *Load-bearing detail:* the FK alone would accept any existing id, filing a contact under **another tenant's** company and leaking that company's name back on every read — so both create and update validate `organization_id` against the caller's own rows and 404 otherwise. `ON DELETE SET NULL`, not CASCADE: deleting a company must never delete the people who worked there.
+      *Tests:* `backend/tests/test_organizations.py` (13 cases: CRUD, paging, search by name and domain, the contact link and its counts, cross-tenant refusal, delete-keeps-contacts), organizations added to the table-driven cross-user isolation suite, plus `frontend/test/organization_test.dart` for the model parsing. `ci/smoke.sh` files its smoke contact under a smoke organization.
+      *UI:* `/organizations` list beside detail (contacts at the company, add-someone-here), and the contact form's free-text Company field is now a picker with a "new organization" shortcut.
       *Blocks:* T13.
 
 - [ ] **T13 · P0 · Deals and a pipeline**
