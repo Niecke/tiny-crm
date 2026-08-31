@@ -92,6 +92,18 @@ contact_id=$(curl -fsS -X POST "$API/contacts/" "${auth[@]}" \
 total=$(curl -fsS "$API/contacts/?search=CI%20Smoke" "${auth[@]}" | json "['total']")
 [ "$total" = "1" ] || fail "expected 1 contact from search, got $total"
 
+step "an organization round-trips and a contact files under it"
+org_id=$(curl -fsS -X POST "$API/organizations/" "${auth[@]}" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"CI Smoke Corp","domain":"ci.example","email":"office@ci.example"}' | json "['id']")
+[ -n "$org_id" ] || fail "organization was not created"
+linked=$(curl -fsS -X PATCH "$API/contacts/$contact_id" "${auth[@]}" \
+  -H 'Content-Type: application/json' \
+  -d "{\"organization_id\":\"$org_id\"}" | json "['organization_name']")
+[ "$linked" = "CI Smoke Corp" ] || fail "contact did not link to the organization, got '$linked'"
+at_org=$(curl -fsS "$API/contacts/?organization_id=$org_id" "${auth[@]}" | json "['total']")
+[ "$at_org" = "1" ] || fail "expected 1 contact at the organization, got $at_org"
+
 step "a document round-trips through MinIO"
 printf 'tinyCRM integration test\n' > /tmp/ci-smoke.txt
 document_id=$(curl -fsS -X POST "$API/documents/" "${auth[@]}" \
@@ -104,5 +116,6 @@ diff -q /tmp/ci-smoke.txt /tmp/ci-smoke-download.txt > /dev/null \
 step "cleanup"
 curl -fsS -X DELETE "$API/documents/$document_id" "${auth[@]}"
 curl -fsS -X DELETE "$API/contacts/$contact_id" "${auth[@]}"
+curl -fsS -X DELETE "$API/organizations/$org_id" "${auth[@]}"
 
 printf '\nAll integration checks passed for %s (commit %s)\n' "$IMAGE_TAG" "$backend_version"

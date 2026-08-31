@@ -214,7 +214,7 @@ class _ContactsPanelState extends ConsumerState<_ContactsPanel> {
   @override
   Widget build(BuildContext context) {
     final contactsAsync = ref.watch(
-      contactsProvider((search: _search, skip: _skip)),
+      contactsProvider((search: _search, organizationId: null, skip: _skip)),
     );
 
     return Card(
@@ -614,7 +614,7 @@ class _ContactTile extends StatelessWidget {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (contact.company != null) Text(contact.company!),
+            if (contact.organizationName != null) Text(contact.organizationName!),
             if (contact.email != null)
               Text(contact.email!, style: const TextStyle(color: Colors.grey)),
             if (contact.tags.isNotEmpty)

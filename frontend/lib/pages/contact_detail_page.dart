@@ -63,8 +63,8 @@ class ContactDetailPage extends ConsumerWidget {
         padding: const EdgeInsets.all(24),
         children: [
           _Field(label: 'Name', value: contact.name),
-          if (contact.company != null)
-            _Field(label: 'Company', value: contact.company!),
+          if (contact.organizationName != null)
+            _Field(label: 'Organization', value: contact.organizationName!),
           if (contact.email != null)
             _Field(label: 'Email', value: contact.email!),
           if (contact.phone != null)

@@ -10,8 +10,10 @@ class ContactsRepository {
 
   final Dio _dio;
 
+  /// [organizationId] narrows the list to everyone at one company.
   Future<PagedResult<Contact>> list({
     String? search,
+    String? organizationId,
     int skip = 0,
     int limit = kPageSize,
   }) async {
@@ -19,6 +21,7 @@ class ContactsRepository {
       '/contacts/',
       queryParameters: <String, dynamic>{
         if (search != null && search.isNotEmpty) 'search': search,
+        'organization_id': ?organizationId,
         'skip': skip,
         'limit': limit,
       },

@@ -11,6 +11,7 @@ from alembic import context
 from app.db import Base
 from app.config import settings  # noqa: F401
 from app.logging_config import configure_logging
+from app.models import organization as _organization  # noqa: F401
 from app.models import contact as _contact  # noqa: F401
 from app.models import document as _doc  # noqa: F401
 from app.models import task as _task  # noqa: F401

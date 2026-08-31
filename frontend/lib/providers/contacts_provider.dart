@@ -11,16 +11,17 @@ final contactsRepositoryProvider = Provider<ContactsRepository>((ref) {
   return ContactsRepository(dio);
 });
 
-typedef ContactsFilter = ({String search, int skip});
+typedef ContactsFilter = ({String search, String? organizationId, int skip});
 
-/// Keyed by search text and page offset — records compare by value, so two
-/// widgets asking for the same page share one request. Callers must reset
-/// `skip` to 0 whenever `search` changes, or page 3 of the old query is
-/// requested for the new one.
+/// Keyed by search text, organization and page offset — records compare by
+/// value, so two widgets asking for the same page share one request. Callers
+/// must reset `skip` to 0 whenever the query changes, or page 3 of the old
+/// query is requested for the new one.
 final contactsProvider =
     FutureProvider.family<PagedResult<Contact>, ContactsFilter>((ref, filter) {
   return ref.read(contactsRepositoryProvider).list(
         search: filter.search.isEmpty ? null : filter.search,
+        organizationId: filter.organizationId,
         skip: filter.skip,
       );
 });

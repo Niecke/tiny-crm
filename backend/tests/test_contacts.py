@@ -10,7 +10,7 @@ async def test_a_contact_survives_a_full_round_trip(client: AsyncClient, alice: 
         client,
         alice,
         "/contacts/",
-        {"name": "Ada Lovelace", "company": "Analytical Engines", "tags": ["vip"]},
+        {"name": "Ada Lovelace", "email": "ada@example.com", "tags": ["vip"]},
     )
 
     fetched = await client.get(f"/contacts/{created['id']}", headers=alice.headers)
@@ -20,11 +20,11 @@ async def test_a_contact_survives_a_full_round_trip(client: AsyncClient, alice: 
 
     patched = await client.patch(
         f"/contacts/{created['id']}",
-        json={"company": "Somerset & Co"},
+        json={"email": "ada@somerset.example"},
         headers=alice.headers,
     )
     assert patched.status_code == 200
-    assert patched.json()["company"] == "Somerset & Co"
+    assert patched.json()["email"] == "ada@somerset.example"
     assert patched.json()["name"] == "Ada Lovelace"
 
     deleted = await client.delete(f"/contacts/{created['id']}", headers=alice.headers)
@@ -60,7 +60,9 @@ async def test_search_filters_by_name(client: AsyncClient, alice: Account) -> No
 
 
 async def test_a_contact_without_a_name_is_rejected(client: AsyncClient, alice: Account) -> None:
-    response = await client.post("/contacts/", json={"company": "ACME"}, headers=alice.headers)
+    response = await client.post(
+        "/contacts/", json={"email": "nameless@example.com"}, headers=alice.headers
+    )
 
     assert response.status_code == 422
 
