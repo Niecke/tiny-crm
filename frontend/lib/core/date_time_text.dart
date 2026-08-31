@@ -33,3 +33,11 @@ DateTime? parseWhen(String text) {
   if (parsed.month != month || parsed.day != day) return null;
   return parsed;
 }
+
+/// Just the day, `YYYY-MM-DD`, for fields the UI never shows a time for.
+String formatDay(DateTime dt) {
+  final local = dt.toLocal();
+  String two(int v) => v.toString().padLeft(2, '0');
+  return '${local.year.toString().padLeft(4, '0')}-'
+      '${two(local.month)}-${two(local.day)}';
+}
