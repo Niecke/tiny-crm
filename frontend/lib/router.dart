@@ -5,12 +5,14 @@ import 'package:go_router/go_router.dart';
 
 import 'features/auth/auth_provider.dart';
 import 'providers/contacts_provider.dart';
+import 'providers/deals_provider.dart';
 import 'providers/documents_provider.dart';
 import 'providers/interactions_provider.dart';
 import 'providers/organizations_provider.dart';
 import 'providers/projects_provider.dart';
 import 'pages/change_password_page.dart';
 import 'pages/dashboard_page.dart';
+import 'pages/deals_page.dart';
 import 'pages/documents_page.dart';
 import 'pages/health_page.dart';
 import 'pages/interactions_page.dart';
@@ -59,6 +61,10 @@ GoRouter _buildRouter(Ref ref) {
           GoRoute(
             path: '/organizations',
             builder: (context, state) => const OrganizationsPage(),
+          ),
+          GoRoute(
+            path: '/deals',
+            builder: (context, state) => const DealsPage(),
           ),
           GoRoute(
             path: '/projects',
@@ -129,6 +135,7 @@ class AppShell extends ConsumerWidget {
           if (isWide)
             for (final (label, path) in [
               ('Dashboard', '/'),
+              ('Deals', '/deals'),
               ('Organizations', '/organizations'),
               ('Projects', '/projects'),
               ('Documents', '/documents'),
@@ -156,6 +163,7 @@ class AppShell extends ConsumerWidget {
               tooltip: 'Navigate',
               onSelected: context.go,
               itemBuilder: (_) => const [
+                PopupMenuItem(value: '/deals', child: Text('Deals')),
                 PopupMenuItem(
                   value: '/organizations',
                   child: Text('Organizations'),
@@ -174,6 +182,7 @@ class AppShell extends ConsumerWidget {
               ref.invalidate(allContactsProvider),
               ref.invalidate(organizationsProvider),
               ref.invalidate(allOrganizationsProvider),
+              ref.invalidate(dealsProvider),
               ref.invalidate(tasksProvider),
               ref.invalidate(allTasksProvider),
               ref.invalidate(documentsProvider),
