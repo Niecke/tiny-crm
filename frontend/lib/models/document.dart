@@ -8,6 +8,10 @@ class Document {
     required this.size,
     required this.storageKey,
     required this.hasPreview,
+    this.contactIds = const [],
+    this.organizationIds = const [],
+    this.dealIds = const [],
+    this.projectIds = const [],
     required this.createdAt,
     required this.updatedAt,
   });
@@ -20,6 +24,22 @@ class Document {
   final int size;
   final String storageKey;
   final bool hasPreview;
+
+  // What the document is filed against. A signed contract belongs to a deal,
+  // an NDA to the person *and* the company — so these are lists, and the same
+  // file can sit under several records without being uploaded twice.
+  final List<String> contactIds;
+  final List<String> organizationIds;
+  final List<String> dealIds;
+  final List<String> projectIds;
+
+  /// How many records this document is filed against, all kinds together.
+  int get linkCount =>
+      contactIds.length +
+      organizationIds.length +
+      dealIds.length +
+      projectIds.length;
+
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -32,6 +52,11 @@ class Document {
         size: json['size'] as int,
         storageKey: json['storage_key'] as String,
         hasPreview: json['has_preview'] as bool? ?? false,
+        contactIds: (json['contact_ids'] as List<dynamic>?)?.cast<String>() ?? [],
+        organizationIds:
+            (json['organization_ids'] as List<dynamic>?)?.cast<String>() ?? [],
+        dealIds: (json['deal_ids'] as List<dynamic>?)?.cast<String>() ?? [],
+        projectIds: (json['project_ids'] as List<dynamic>?)?.cast<String>() ?? [],
         createdAt: DateTime.parse(json['created_at'] as String),
         updatedAt: DateTime.parse(json['updated_at'] as String),
       );

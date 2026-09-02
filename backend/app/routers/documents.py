@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+from typing import cast
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile
@@ -13,7 +14,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import current_active_user
 from app.auth.users import User
 from app.db import count_rows, get_session
-from app.models.document import Document
+from app.links import filter_by_link, load_scoped
+from app.models.contact import Contact
+from app.models.deal import Deal
+from app.models.document import (
+    Document,
+    document_contacts,
+    document_deals,
+    document_organizations,
+)
+from app.models.organization import Organization
+from app.models.project import Project, project_documents
 from app.schemas.document import DocumentRead, DocumentUpdate
 from app.schemas.page import Page
 from app.storage import delete_object, get_object_stream, put_object, put_object_stream
@@ -21,6 +32,28 @@ from app.storage import delete_object, get_object_stream, put_object, put_object
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/documents", tags=["documents"])
+
+# Everything a document can be filed against: the API field, the relationship
+# it fills, the model its ids are checked against, and the join table plus its
+# column for the list filter.
+LINKS = (
+    ("contact_ids", "contacts", Contact, document_contacts, "contact_id"),
+    ("organization_ids", "organizations", Organization, document_organizations, "organization_id"),
+    ("deal_ids", "deals", Deal, document_deals, "deal_id"),
+    ("project_ids", "projects", Project, project_documents, "project_id"),
+)
+
+
+async def _apply_links(
+    session: AsyncSession, doc: Document, values: dict[str, object], user_id: UUID
+) -> None:
+    """Replace whichever link lists the caller sent, leaving the rest alone."""
+    for field, attribute, model, _table, _column in LINKS:
+        if field not in values:
+            continue
+        ids = cast(list[UUID], values[field])
+        setattr(doc, attribute, await load_scoped(session, model, ids, user_id))
+
 
 _MAX_BYTES = 25 * 1024 * 1024  # 25 MB
 
@@ -91,12 +124,23 @@ async def list_documents(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
     search: str | None = None,
+    # "Everything filed against this record" — the question a document that
+    # could only belong to a project could not answer.
+    contact_id: UUID | None = Query(default=None),
+    organization_id: UUID | None = Query(default=None),
+    deal_id: UUID | None = Query(default=None),
+    project_id: UUID | None = Query(default=None),
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> Page[DocumentRead]:
     q = select(Document).where(Document.user_id == user.id)
     if search:
         q = q.where(Document.title.ilike(f"%{search}%"))
+    for target_id, (_field, _attr, _model, table, column) in zip(
+        (contact_id, organization_id, deal_id, project_id), LINKS, strict=True
+    ):
+        if target_id is not None:
+            q = filter_by_link(q, table, "document_id", column, target_id)
     total = await count_rows(session, q)
     result = await session.execute(
         q.order_by(Document.created_at.desc(), Document.id.asc()).offset(skip).limit(limit)
@@ -115,6 +159,13 @@ async def upload_document(
     title: str = Form(...),
     description: str | None = Form(default=None),
     tags: str = Form(default="[]"),
+    # JSON arrays in form fields, like `tags` — multipart has no native list
+    # type, and attaching at upload time is the whole point: a contract is
+    # filed against its deal as it arrives, not in a second step.
+    contact_ids: str = Form(default="[]"),
+    organization_ids: str = Form(default="[]"),
+    deal_ids: str = Form(default="[]"),
+    project_ids: str = Form(default="[]"),
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> Document:
@@ -125,6 +176,27 @@ async def upload_document(
         raise HTTPException(status_code=422, detail="Unsupported file type — use pdf, md, or txt")
 
     parsed_tags: list[str] = json.loads(tags) if tags else []
+    try:
+        links = {
+            field: [UUID(i) for i in json.loads(raw or "[]")]
+            for field, raw in (
+                ("contact_ids", contact_ids),
+                ("organization_ids", organization_ids),
+                ("deal_ids", deal_ids),
+                ("project_ids", project_ids),
+            )
+        }
+    except (ValueError, TypeError) as error:
+        raise HTTPException(status_code=422, detail=f"Malformed link list: {error}") from error
+
+    # Resolved *before* anything reaches S3: a bad or someone else's id has to
+    # fail while the only cost is a rejected request, not after the object is
+    # already in the bucket with no row to ever delete it.
+    linked = {
+        attribute: await load_scoped(session, model, links[field], user.id)
+        for field, attribute, model, _table, _column in LINKS
+    }
+
     doc_id = uuid4()
     key = f"{user.id}/{doc_id}"
 
@@ -146,6 +218,7 @@ async def upload_document(
         size=size,
         storage_key=key,
         preview_key=preview_key,
+        **linked,
     )
     session.add(doc)
     await session.commit()
@@ -259,8 +332,12 @@ async def update_document(
     doc = result.scalar_one_or_none()
     if doc is None:
         raise HTTPException(status_code=404, detail="Document not found")
-    for field, value in body.model_dump(exclude_unset=True).items():
-        setattr(doc, field, value)
+    updates = body.model_dump(exclude_unset=True)
+    await _apply_links(session, doc, updates, user.id)
+    for field, value in updates.items():
+        # The link lists are handled above; setattr would assign raw ids.
+        if not field.endswith("_ids"):
+            setattr(doc, field, value)
     await session.commit()
     await session.refresh(doc)
     return doc

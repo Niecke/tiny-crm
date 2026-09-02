@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import current_active_user
 from app.auth.users import User
 from app.db import count_rows, get_session
+from app.links import load_scoped
 from app.models.contact import Contact
 from app.models.document import Document
 from app.models.project import Project
@@ -32,19 +33,9 @@ def _to_read(p: Project) -> ProjectRead:
     )
 
 
-async def _load_scoped[T](
-    session: AsyncSession, model: type[T], ids: list[UUID], user_id: UUID
-) -> list[T]:
-    """Fetch the given ids of `model` that belong to user_id. 404 on any miss."""
-    if not ids:
-        return []
-    result = await session.execute(
-        select(model).where(model.id.in_(ids), model.user_id == user_id)  # type: ignore[attr-defined]
-    )
-    found = list(result.scalars().all())
-    if len(found) != len(set(ids)):
-        raise HTTPException(status_code=404, detail=f"Unknown {model.__name__} id in link list")
-    return found
+# Shared with the document and interaction routers, which now resolve link
+# lists the same way — see app/links.py.
+_load_scoped = load_scoped
 
 
 @router.get("/", response_model=Page[ProjectRead])

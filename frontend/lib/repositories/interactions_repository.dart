@@ -13,6 +13,9 @@ class InteractionsRepository {
   Future<PagedResult<Interaction>> list({
     String? search,
     String? contactId,
+    String? organizationId,
+    String? dealId,
+    String? projectId,
     String? kind,
     bool? upcoming,
     int skip = 0,
@@ -23,6 +26,9 @@ class InteractionsRepository {
       queryParameters: <String, dynamic>{
         if (search != null && search.isNotEmpty) 'search': search,
         'contact_id': ?contactId,
+        'organization_id': ?organizationId,
+        'deal_id': ?dealId,
+        'project_id': ?projectId,
         'kind': ?kind,
         'upcoming': ?upcoming,
         'skip': skip,

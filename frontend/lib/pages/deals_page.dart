@@ -8,6 +8,8 @@ import '../core/error_text.dart';
 import '../models/deal.dart';
 import '../models/paged_result.dart';
 import '../providers/deals_provider.dart';
+import '../widgets/attached_documents_section.dart';
+import '../widgets/attached_interactions_section.dart';
 import '../widgets/confirm_dialog.dart';
 import '../widgets/linked_tasks_section.dart';
 import '../widgets/pagination_bar.dart';
@@ -411,6 +413,9 @@ class _DealDetail extends ConsumerWidget {
           const SizedBox(height: 8),
           // What still has to happen to move this deal along.
           LinkedTasksSection(dealId: d.id),
+          // Every call about this deal, and the paperwork behind it.
+          AttachedInteractionsSection(dealId: d.id),
+          AttachedDocumentsSection(dealId: d.id),
         ],
       ),
     );

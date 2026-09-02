@@ -29,3 +29,24 @@ final interactionsProvider =
         skip: filter.skip,
       );
 });
+
+/// Interactions attached to one record — "every call about this deal".
+///
+/// Separate family from [interactionsProvider] so a detail screen's paging
+/// cannot collide with the activity screen's own search state.
+typedef AttachedInteractionsFilter = ({
+  String? organizationId,
+  String? dealId,
+  String? projectId,
+  int skip,
+});
+
+final attachedInteractionsProvider =
+    FutureProvider.family<PagedResult<Interaction>, AttachedInteractionsFilter>((ref, filter) {
+  return ref.read(interactionsRepositoryProvider).list(
+        organizationId: filter.organizationId,
+        dealId: filter.dealId,
+        projectId: filter.projectId,
+        skip: filter.skip,
+      );
+});

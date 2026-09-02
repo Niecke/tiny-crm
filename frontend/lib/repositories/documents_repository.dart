@@ -11,8 +11,13 @@ class DocumentsRepository {
 
   final Dio _dio;
 
+  /// The link filters answer "everything filed against this record".
   Future<PagedResult<Document>> list({
     String? search,
+    String? contactId,
+    String? organizationId,
+    String? dealId,
+    String? projectId,
     int skip = 0,
     int limit = kPageSize,
   }) async {
@@ -20,6 +25,10 @@ class DocumentsRepository {
       '/documents/',
       queryParameters: <String, dynamic>{
         if (search != null && search.isNotEmpty) 'search': search,
+        'contact_id': ?contactId,
+        'organization_id': ?organizationId,
+        'deal_id': ?dealId,
+        'project_id': ?projectId,
         'skip': skip,
         'limit': limit,
       },
@@ -51,12 +60,22 @@ class DocumentsRepository {
     required String title,
     String? description,
     List<String> tags = const [],
+    List<String> contactIds = const [],
+    List<String> organizationIds = const [],
+    List<String> dealIds = const [],
+    List<String> projectIds = const [],
   }) async {
     final formData = FormData.fromMap({
       'file': MultipartFile.fromBytes(bytes, filename: filename),
       'title': title,
       if (description != null && description.isNotEmpty) 'description': description,
+      // JSON arrays in form fields — multipart has no native list type, and the
+      // API parses these the same way it parses `tags`.
       'tags': jsonEncode(tags),
+      'contact_ids': jsonEncode(contactIds),
+      'organization_ids': jsonEncode(organizationIds),
+      'deal_ids': jsonEncode(dealIds),
+      'project_ids': jsonEncode(projectIds),
     });
     final res = await _dio.post<Map<String, dynamic>>('/documents/', data: formData);
     return Document.fromJson(res.data!);

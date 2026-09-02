@@ -9,8 +9,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import current_active_user
 from app.auth.users import User
 from app.db import count_rows, get_session
+from app.links import filter_by_link, load_scoped
 from app.models.contact import Contact
-from app.models.interaction import Interaction, interaction_contacts
+from app.models.deal import Deal
+from app.models.interaction import (
+    Interaction,
+    interaction_contacts,
+    interaction_deals,
+    interaction_organizations,
+    interaction_projects,
+)
+from app.models.organization import Organization
+from app.models.project import Project
 from app.schemas.interaction import (
     InteractionCreate,
     InteractionKind,
@@ -21,34 +31,32 @@ from app.schemas.page import Page
 
 router = APIRouter(prefix="/interactions", tags=["interactions"])
 
+# Everything an interaction can be about: the API field, the relationship it
+# fills, the model its ids are checked against, and the join table plus its
+# column for the list filter.
+LINKS = (
+    ("contact_ids", "contacts", Contact, interaction_contacts, "contact_id"),
+    (
+        "organization_ids",
+        "organizations",
+        Organization,
+        interaction_organizations,
+        "organization_id",
+    ),
+    ("deal_ids", "deals", Deal, interaction_deals, "deal_id"),
+    ("project_ids", "projects", Project, interaction_projects, "project_id"),
+)
 
-def _to_read(i: Interaction) -> InteractionRead:
-    return InteractionRead(
-        id=i.id,
-        kind=cast(InteractionKind, i.kind),
-        subject=i.subject,
-        notes=i.notes,
-        occurred_at=i.occurred_at,
-        duration_minutes=i.duration_minutes,
-        done=i.done,
-        tags=i.tags,
-        contact_ids=[c.id for c in i.contacts],
-        created_at=i.created_at,
-        updated_at=i.updated_at,
-    )
 
-
-async def _load_contacts(session: AsyncSession, ids: list[UUID], user_id: UUID) -> list[Contact]:
-    """Fetch the given contact ids belonging to user_id. 404 on any miss."""
-    if not ids:
-        return []
-    result = await session.execute(
-        select(Contact).where(Contact.id.in_(ids), Contact.user_id == user_id)
-    )
-    found = list(result.scalars().all())
-    if len(found) != len(set(ids)):
-        raise HTTPException(status_code=404, detail="Unknown Contact id in link list")
-    return found
+async def _apply_links(
+    session: AsyncSession, interaction: Interaction, values: dict[str, object], user_id: UUID
+) -> None:
+    """Replace whichever link lists the caller sent, leaving the rest alone."""
+    for field, attribute, model, _table, _column in LINKS:
+        if field not in values:
+            continue
+        ids = cast(list[UUID], values[field])
+        setattr(interaction, attribute, await load_scoped(session, model, ids, user_id))
 
 
 @router.get("/", response_model=Page[InteractionRead])
@@ -57,6 +65,11 @@ async def list_interactions(
     limit: int = Query(default=50, ge=1, le=200),
     search: str | None = None,
     contact_id: UUID | None = None,
+    # "Every call about this deal" — with contacts as the only link, there was
+    # no way to ask.
+    organization_id: UUID | None = None,
+    deal_id: UUID | None = None,
+    project_id: UUID | None = None,
     kind: InteractionKind | None = None,
     upcoming: bool | None = None,
     session: AsyncSession = Depends(get_session),
@@ -72,11 +85,11 @@ async def list_interactions(
         query = query.where(Interaction.subject.ilike(f"%{search}%"))
     if kind:
         query = query.where(Interaction.kind == kind)
-    if contact_id:
-        query = query.join(
-            interaction_contacts,
-            interaction_contacts.c.interaction_id == Interaction.id,
-        ).where(interaction_contacts.c.contact_id == contact_id)
+    for target_id, (_field, _attr, _model, table, column) in zip(
+        (contact_id, organization_id, deal_id, project_id), LINKS, strict=True
+    ):
+        if target_id is not None:
+            query = filter_by_link(query, table, "interaction_id", column, target_id)
     now = datetime.now(UTC)
     if upcoming is True:
         query = query.where(Interaction.occurred_at >= now)
@@ -95,7 +108,7 @@ async def list_interactions(
 
     result = await session.execute(query.offset(skip).limit(limit))
     return Page[InteractionRead](
-        items=[_to_read(i) for i in result.scalars().all()],
+        items=[InteractionRead.model_validate(i) for i in result.scalars().all()],
         total=total,
         skip=skip,
         limit=limit,
@@ -111,7 +124,7 @@ async def get_interaction(
     interaction = await session.get(Interaction, interaction_id)
     if interaction is None or interaction.user_id != user.id:
         raise HTTPException(status_code=404, detail="Interaction not found")
-    return _to_read(interaction)
+    return InteractionRead.model_validate(interaction)
 
 
 @router.post("/", response_model=InteractionRead, status_code=201)
@@ -120,13 +133,13 @@ async def create_interaction(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> InteractionRead:
-    data = body.model_dump(exclude={"contact_ids"})
-    interaction = Interaction(**data, user_id=user.id)
-    interaction.contacts = await _load_contacts(session, body.contact_ids, user.id)
+    link_fields = {field for field, *_ in LINKS}
+    interaction = Interaction(**body.model_dump(exclude=link_fields), user_id=user.id)
+    await _apply_links(session, interaction, body.model_dump(), user.id)
     session.add(interaction)
     await session.commit()
     await session.refresh(interaction)
-    return _to_read(interaction)
+    return InteractionRead.model_validate(interaction)
 
 
 @router.patch("/{interaction_id}", response_model=InteractionRead)
@@ -139,14 +152,15 @@ async def update_interaction(
     interaction = await session.get(Interaction, interaction_id)
     if interaction is None or interaction.user_id != user.id:
         raise HTTPException(status_code=404, detail="Interaction not found")
-    for field, value in body.model_dump(exclude_unset=True).items():
-        if field == "contact_ids":
-            interaction.contacts = await _load_contacts(session, value, user.id)
-        else:
+    updates = body.model_dump(exclude_unset=True)
+    await _apply_links(session, interaction, updates, user.id)
+    for field, value in updates.items():
+        # The link lists are handled above; setattr would assign raw ids.
+        if not field.endswith("_ids"):
             setattr(interaction, field, value)
     await session.commit()
     await session.refresh(interaction)
-    return _to_read(interaction)
+    return InteractionRead.model_validate(interaction)
 
 
 @router.delete("/{interaction_id}", status_code=204)

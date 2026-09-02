@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/web_download.dart';
 import '../core/error_text.dart';
 import '../models/document.dart';
+import '../widgets/attachment_pickers.dart';
 import '../widgets/confirm_dialog.dart';
 import '../providers/documents_provider.dart';
 import '../widgets/document_viewer.dart';
@@ -117,7 +118,9 @@ class _DocumentsPageState extends ConsumerState<DocumentsPage> {
                                           doc: doc,
                                           onChanged: () {
                                             ref.invalidate(documentsProvider);
-                                            ref.invalidate(allDocumentsProvider);
+                                            ref.invalidate(
+                                              allDocumentsProvider,
+                                            );
                                           },
                                         ),
                                       ),
@@ -143,13 +146,12 @@ class _DocumentsPageState extends ConsumerState<DocumentsPage> {
   void _showUploadDialog(BuildContext context) {
     showDialog<void>(
       context: context,
-      builder: (_) =>
-          _UploadDialog(
-            onUploaded: () {
-              ref.invalidate(documentsProvider);
-              ref.invalidate(allDocumentsProvider);
-            },
-          ),
+      builder: (_) => _UploadDialog(
+        onUploaded: () {
+          ref.invalidate(documentsProvider);
+          ref.invalidate(allDocumentsProvider);
+        },
+      ),
     );
   }
 }
@@ -170,6 +172,7 @@ class _UploadDialogState extends ConsumerState<_UploadDialog> {
   final _tagsCtrl = TextEditingController();
   Uint8List? _bytes;
   String? _filename;
+  AttachmentLinks _links = emptyAttachmentLinks;
   bool _saving = false;
 
   @override
@@ -191,9 +194,7 @@ class _UploadDialogState extends ConsumerState<_UploadDialog> {
       bytes = await file.readAsBytes();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Could not read that file.')),
         );
       }
@@ -228,6 +229,11 @@ class _UploadDialogState extends ConsumerState<_UploadDialog> {
             title: _titleCtrl.text,
             description: _descCtrl.text.isEmpty ? null : _descCtrl.text,
             tags: tags,
+            // Filed against its records as it arrives, not in a second step.
+            contactIds: _links.contactIds,
+            organizationIds: _links.organizationIds,
+            dealIds: _links.dealIds,
+            projectIds: _links.projectIds,
           );
       widget.onUploaded();
       if (mounted) Navigator.pop(context);
@@ -242,47 +248,56 @@ class _UploadDialogState extends ConsumerState<_UploadDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Upload Document'),
+      // Four link pickers make this taller than a short window; scroll rather
+      // than overflow.
       content: SizedBox(
         width: 480,
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              OutlinedButton.icon(
-                onPressed: _pickFile,
-                icon: const Icon(Icons.attach_file),
-                label: Text(_filename ?? 'Choose file (pdf, md, txt)'),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _titleCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Title',
-                  border: OutlineInputBorder(),
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _pickFile,
+                  icon: const Icon(Icons.attach_file),
+                  label: Text(_filename ?? 'Choose file (pdf, md, txt)'),
                 ),
-                validator: (v) =>
-                    (v == null || v.isEmpty) ? 'Title is required' : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _descCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Description',
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _titleCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Title',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (v) =>
+                      (v == null || v.isEmpty) ? 'Title is required' : null,
                 ),
-                maxLines: 2,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _tagsCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Tags',
-                  hintText: 'invoice, 2025, client-a',
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _descCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Description',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 2,
                 ),
-              ),
-            ],
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _tagsCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Tags',
+                    hintText: 'invoice, 2025, client-a',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                AttachmentPickers(
+                  value: _links,
+                  onChanged: (v) => setState(() => _links = v),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -321,6 +336,7 @@ class _EditMetadataDialogState extends ConsumerState<_EditMetadataDialog> {
   late final TextEditingController _titleCtrl;
   late final TextEditingController _descCtrl;
   late final TextEditingController _tagsCtrl;
+  late AttachmentLinks _links;
   bool _saving = false;
 
   @override
@@ -329,6 +345,12 @@ class _EditMetadataDialogState extends ConsumerState<_EditMetadataDialog> {
     _titleCtrl = TextEditingController(text: widget.doc.title);
     _descCtrl = TextEditingController(text: widget.doc.description);
     _tagsCtrl = TextEditingController(text: widget.doc.tags.join(', '));
+    _links = (
+      contactIds: widget.doc.contactIds,
+      organizationIds: widget.doc.organizationIds,
+      dealIds: widget.doc.dealIds,
+      projectIds: widget.doc.projectIds,
+    );
   }
 
   @override
@@ -349,13 +371,20 @@ class _EditMetadataDialogState extends ConsumerState<_EditMetadataDialog> {
               .where((t) => t.isNotEmpty)
               .toList();
     try {
-      await ref
-          .read(documentsRepositoryProvider)
-          .updateMetadata(widget.doc.id, {
-            'title': _titleCtrl.text,
-            'description': _descCtrl.text.isEmpty ? null : _descCtrl.text,
-            'tags': tags,
-          });
+      await ref.read(documentsRepositoryProvider).updateMetadata(
+        widget.doc.id,
+        {
+          'title': _titleCtrl.text,
+          'description': _descCtrl.text.isEmpty ? null : _descCtrl.text,
+          'tags': tags,
+          // Whole lists: the API replaces what was there, so an emptied
+          // picker detaches rather than leaving the old link in place.
+          'contact_ids': _links.contactIds,
+          'organization_ids': _links.organizationIds,
+          'deal_ids': _links.dealIds,
+          'project_ids': _links.projectIds,
+        },
+      );
       widget.onSaved();
       if (mounted) Navigator.pop(context);
     } finally {
@@ -369,35 +398,42 @@ class _EditMetadataDialogState extends ConsumerState<_EditMetadataDialog> {
       title: const Text('Edit Metadata'),
       content: SizedBox(
         width: 480,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextFormField(
-              controller: _titleCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Title',
-                border: OutlineInputBorder(),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: _titleCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Title',
+                  border: OutlineInputBorder(),
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _descCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Description',
-                border: OutlineInputBorder(),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _descCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Description',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 2,
               ),
-              maxLines: 2,
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _tagsCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Tags',
-                hintText: 'invoice, 2025, client-a',
-                border: OutlineInputBorder(),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _tagsCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Tags',
+                  hintText: 'invoice, 2025, client-a',
+                  border: OutlineInputBorder(),
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 12),
+              AttachmentPickers(
+                value: _links,
+                onChanged: (v) => setState(() => _links = v),
+              ),
+            ],
+          ),
         ),
       ),
       actions: [

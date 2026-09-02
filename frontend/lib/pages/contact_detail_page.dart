@@ -5,6 +5,7 @@ import '../core/error_text.dart';
 import '../models/contact.dart';
 import '../providers/contacts_provider.dart';
 import '../providers/interactions_provider.dart';
+import '../widgets/attached_documents_section.dart';
 import '../widgets/confirm_dialog.dart';
 import '../widgets/interaction_tile.dart';
 import '../widgets/linked_tasks_section.dart';
@@ -80,6 +81,12 @@ class ContactDetailPage extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(vertical: 8),
           ),
           _InteractionsSection(contact: contact),
+          // The NDA, the signed offer — paperwork that is about this person
+          // rather than about a project.
+          AttachedDocumentsSection(
+            contactId: contact.id,
+            padding: const EdgeInsets.symmetric(vertical: 8),
+          ),
           if (contact.tags.isNotEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),

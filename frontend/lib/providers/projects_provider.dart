@@ -18,3 +18,9 @@ final projectsProvider =
         skip: filter.skip,
       );
 });
+
+/// Every project, for the attach pickers. Unpaged on purpose —
+/// see ProjectsRepository.listAll.
+final allProjectsProvider = FutureProvider<List<Project>>((ref) {
+  return ref.read(projectsRepositoryProvider).listAll();
+});

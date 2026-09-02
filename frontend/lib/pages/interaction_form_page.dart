@@ -4,10 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/date_time_text.dart';
 import '../core/error_text.dart';
-import '../models/contact.dart';
 import '../models/interaction.dart';
-import '../providers/contacts_provider.dart';
 import '../providers/interactions_provider.dart';
+import '../widgets/attachment_pickers.dart';
 
 const kindLabels = {
   'call': 'Call',
@@ -30,12 +29,19 @@ class InteractionFormPage extends ConsumerStatefulWidget {
     super.key,
     this.interaction,
     this.initialContactId,
+    this.initialOrganizationId,
+    this.initialDealId,
+    this.initialProjectId,
   });
 
   final Interaction? interaction;
 
-  /// Pre-links a contact when logging straight from the contact detail page.
+  /// Pre-links the record the form was opened from — logging straight from a
+  /// contact, an organization, a deal or a project detail page.
   final String? initialContactId;
+  final String? initialOrganizationId;
+  final String? initialDealId;
+  final String? initialProjectId;
 
   @override
   ConsumerState<InteractionFormPage> createState() =>
@@ -55,7 +61,7 @@ class _InteractionFormPageState extends ConsumerState<InteractionFormPage>
   late final TextEditingController _when;
   late String _kind;
   late bool _done;
-  late List<String> _contactIds;
+  late AttachmentLinks _links;
 
   bool get _isEdit => widget.interaction != null;
 
@@ -74,12 +80,13 @@ class _InteractionFormPageState extends ConsumerState<InteractionFormPage>
     // A new entry in the past is something that already happened; one in the
     // future is a plan, so it starts open.
     _done = i?.done ?? !occurredAt.isAfter(DateTime.now());
-    _contactIds = [
-      ...?i?.contactIds,
-      if (widget.initialContactId != null &&
-          !(i?.contactIds.contains(widget.initialContactId) ?? false))
-        widget.initialContactId!,
-    ];
+    _links = (
+      contactIds: withInitial(i?.contactIds, widget.initialContactId),
+      organizationIds:
+          withInitial(i?.organizationIds, widget.initialOrganizationId),
+      dealIds: withInitial(i?.dealIds, widget.initialDealId),
+      projectIds: withInitial(i?.projectIds, widget.initialProjectId),
+    );
   }
 
   @override
@@ -144,7 +151,12 @@ class _InteractionFormPageState extends ConsumerState<InteractionFormPage>
       'duration_minutes': int.tryParse(_duration.text.trim()),
       'done': _done,
       'tags': tags,
-      'contact_ids': _contactIds,
+      // Whole lists: the API replaces what was there, so an emptied picker
+      // detaches rather than silently leaving the old link in place.
+      'contact_ids': _links.contactIds,
+      'organization_ids': _links.organizationIds,
+      'deal_ids': _links.dealIds,
+      'project_ids': _links.projectIds,
     };
 
     final repo = ref.read(interactionsRepositoryProvider);
@@ -163,12 +175,13 @@ class _InteractionFormPageState extends ConsumerState<InteractionFormPage>
     }
 
     ref.invalidate(interactionsProvider);
+    // The detail screens list interactions attached to their own record.
+    ref.invalidate(attachedInteractionsProvider);
     if (mounted) Navigator.pop(context);
   }
 
   @override
   Widget build(BuildContext context) {
-    final contactsAsync = ref.watch(allContactsProvider);
     final typed = parseWhen(_when.text);
     final planned = typed != null && typed.isAfter(DateTime.now());
 
@@ -324,13 +337,11 @@ class _InteractionFormPageState extends ConsumerState<InteractionFormPage>
                 contentPadding: EdgeInsets.zero,
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: _ContactPicker(
-                contactsAsync: contactsAsync,
-                selectedIds: _contactIds,
-                onChanged: (ids) => setState(() => _contactIds = ids),
-              ),
+            // What it was about. Contacts used to be the only answer, so
+            // "every call about this deal" could not be asked.
+            AttachmentPickers(
+              value: _links,
+              onChanged: (v) => setState(() => _links = v),
             ),
             Padding(
               padding: const EdgeInsets.only(bottom: 16),
@@ -352,90 +363,6 @@ class _InteractionFormPageState extends ConsumerState<InteractionFormPage>
           ],
         ),
       ),
-    );
-  }
-}
-
-class _ContactPicker extends StatelessWidget {
-  const _ContactPicker({
-    required this.contactsAsync,
-    required this.selectedIds,
-    required this.onChanged,
-  });
-
-  final AsyncValue<List<Contact>> contactsAsync;
-  final List<String> selectedIds;
-  final ValueChanged<List<String>> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return contactsAsync.when(
-      loading: () => const LinearProgressIndicator(),
-      error: (e, _) => Text('Could not load contacts. ${errorText(e)}'),
-      data: (contacts) {
-        final selected =
-            contacts.where((c) => selectedIds.contains(c.id)).toList();
-        final available =
-            contacts.where((c) => !selectedIds.contains(c.id)).toList();
-
-        return InputDecorator(
-          decoration: const InputDecoration(
-            labelText: 'Contacts',
-            border: OutlineInputBorder(),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (selected.isEmpty)
-                const Text(
-                  'No contact linked yet.',
-                  style: TextStyle(color: Colors.grey),
-                )
-              else
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 4,
-                  children: [
-                    for (final c in selected)
-                      InputChip(
-                        label: Text(c.name),
-                        deleteIcon: const Icon(Icons.close, size: 16),
-                        onDeleted: () => onChanged(
-                          selectedIds.where((id) => id != c.id).toList(),
-                        ),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                  ],
-                ),
-              if (available.isNotEmpty)
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton.icon(
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('Link contact'),
-                    onPressed: () async {
-                      final picked = await showDialog<Contact>(
-                        context: context,
-                        builder: (ctx) => SimpleDialog(
-                          title: const Text('Link contact'),
-                          children: [
-                            for (final c in available)
-                              SimpleDialogOption(
-                                onPressed: () => Navigator.pop(ctx, c),
-                                child: Text(c.name),
-                              ),
-                          ],
-                        ),
-                      );
-                      if (picked == null) return;
-                      onChanged([...selectedIds, picked.id]);
-                    },
-                  ),
-                ),
-            ],
-          ),
-        );
-      },
     );
   }
 }
