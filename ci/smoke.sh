@@ -152,6 +152,31 @@ still_competing=$(curl -fsS "$API/deals/?status=open" "${auth[@]}" | json "['tot
 on_my_plate=$(curl -fsS "$API/deals/?status=active" "${auth[@]}" | json "['total']")
 [ "$on_my_plate" = "2" ] || fail "expected 2 deals on the plate, got $on_my_plate"
 
+step "a task records who and what it is about"
+task_id=$(curl -fsS -X POST "$API/tasks/" "${auth[@]}" \
+  -H 'Content-Type: application/json' \
+  -d "{\"title\":\"Call CI Smoke back\",\"contact_id\":\"$contact_id\",\"deal_id\":\"$deal_id\"}" \
+  | json "['id']")
+[ -n "$task_id" ] || fail "task was not created"
+task=$(curl -fsS "$API/tasks/$task_id" "${auth[@]}")
+# The linked names come back denormalised, so a list row needs no extra request.
+[ "$(echo "$task" | json "['contact_name']")" = "CI Smoke" ] \
+  || fail "task did not read back its contact name"
+[ "$(echo "$task" | json "['deal_title']")" = "CI Smoke deal" ] \
+  || fail "task did not read back its deal title"
+# "What do I owe this person?" — the question tasks-on-projects could not answer.
+owed=$(curl -fsS "$API/tasks/?contact_id=$contact_id" "${auth[@]}" | json "['total']")
+[ "$owed" = "1" ] || fail "expected 1 task for the contact, got $owed"
+
+step "deleting the contact keeps the task, unattached"
+# SET NULL: work the operator committed to must not vanish with the record.
+curl -fsS -X DELETE "$API/contacts/$contact_id" "${auth[@]}"
+orphan=$(curl -fsS "$API/tasks/$task_id" "${auth[@]}")
+[ "$(echo "$orphan" | json "['contact_id']")" = "None" ] \
+  || fail "the task should have been detached from the deleted contact"
+[ "$(echo "$orphan" | json "['title']")" = "Call CI Smoke back" ] \
+  || fail "the task itself should have survived the contact delete"
+
 step "a document round-trips through MinIO"
 printf 'tinyCRM integration test\n' > /tmp/ci-smoke.txt
 document_id=$(curl -fsS -X POST "$API/documents/" "${auth[@]}" \
@@ -163,9 +188,10 @@ diff -q /tmp/ci-smoke.txt /tmp/ci-smoke-download.txt > /dev/null \
 
 step "cleanup"
 curl -fsS -X DELETE "$API/documents/$document_id" "${auth[@]}"
+curl -fsS -X DELETE "$API/tasks/$task_id" "${auth[@]}"
 curl -fsS -X DELETE "$API/deals/$deal_id" "${auth[@]}"
 curl -fsS -X DELETE "$API/deals/$open_ended_id" "${auth[@]}"
-curl -fsS -X DELETE "$API/contacts/$contact_id" "${auth[@]}"
+# The contact is already gone — it was deleted to prove the task survives it.
 curl -fsS -X DELETE "$API/organizations/$org_id" "${auth[@]}"
 
 printf '\nAll integration checks passed for %s (commit %s)\n' "$IMAGE_TAG" "$backend_version"

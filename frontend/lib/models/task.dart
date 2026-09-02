@@ -25,6 +25,12 @@ class Task {
     this.recurrenceInterval = 1,
     this.recurrenceUntil,
     this.recurrenceParentId,
+    this.contactId,
+    this.contactName,
+    this.dealId,
+    this.dealTitle,
+    this.interactionId,
+    this.interactionSubject,
     this.nextOccurrence,
   });
 
@@ -45,6 +51,29 @@ class Task {
 
   /// The instance this one was created from, so a series can be walked back.
   final String? recurrenceParentId;
+
+  // What the task is about. All three independent, all optional — a plain
+  // to-do links to nothing. The names come denormalised from the API so a list
+  // row needs no request per task.
+  final String? contactId;
+  final String? contactName;
+  final String? dealId;
+  final String? dealTitle;
+
+  /// The touchpoint this task came out of — "send the deck we talked about".
+  final String? interactionId;
+  final String? interactionSubject;
+
+  /// True when the task points at anything at all.
+  bool get isLinked =>
+      contactId != null || dealId != null || interactionId != null;
+
+  /// "Maria · ACME work", or null for an unattached to-do. What a list row
+  /// shows under the title so a follow-up says who it is about.
+  String? get linkSummary {
+    final parts = [?contactName, ?dealTitle, ?interactionSubject];
+    return parts.isEmpty ? null : parts.join(' · ');
+  }
 
   /// Only set on the response to the completion that created it — the server
   /// says whether a next instance actually happened, since the series may have
@@ -86,6 +115,12 @@ class Task {
             ? null
             : DateTime.parse(json['recurrence_until'] as String),
         recurrenceParentId: json['recurrence_parent_id'] as String?,
+        contactId: json['contact_id'] as String?,
+        contactName: json['contact_name'] as String?,
+        dealId: json['deal_id'] as String?,
+        dealTitle: json['deal_title'] as String?,
+        interactionId: json['interaction_id'] as String?,
+        interactionSubject: json['interaction_subject'] as String?,
         nextOccurrence: json['next_occurrence'] == null
             ? null
             : Task.fromJson(json['next_occurrence'] as Map<String, dynamic>),

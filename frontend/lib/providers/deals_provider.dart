@@ -26,3 +26,9 @@ final dealsProvider = FutureProvider.family<PagedResult<Deal>, DealsFilter>((ref
         skip: filter.skip,
       );
 });
+
+/// Every deal, for the picker on the task form. Unpaged on purpose —
+/// see DealsRepository.listAll.
+final allDealsProvider = FutureProvider<List<Deal>>((ref) {
+  return ref.read(dealsRepositoryProvider).listAll();
+});
