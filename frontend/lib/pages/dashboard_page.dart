@@ -568,6 +568,22 @@ class _TaskTile extends ConsumerWidget {
                   ),
                 ],
               ),
+            // Who or what the follow-up is about — the whole point of a task
+            // in a CRM rather than a to-do list.
+            if (task.linkSummary != null)
+              Row(
+                children: [
+                  const Icon(Icons.link, size: 14, color: Colors.grey),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      task.linkSummary!,
+                      style: const TextStyle(color: Colors.grey),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
             Text(
               'Priority: ${_priorityLabels[task.priority.clamp(0, 2)]}',
               style: const TextStyle(color: Colors.grey),

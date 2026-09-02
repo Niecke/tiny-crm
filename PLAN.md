@@ -43,7 +43,7 @@ A small CRM for self-employment, built as a learning project for FastAPI and Flu
 | Contact | name, email, phone, address *(single string)*, tags, notes | → organization (FK), ← interactions (M2M), ← projects (M2M) | CRUD, `?search` on name, `?organization_id` |
 | Organization | name, domain, email, phone, address, industry, notes | ← contacts (FK) | CRUD, `?search` on name or domain, `contact_count` on read |
 | Interaction | kind (call/meeting/email/note/other), subject, notes, occurred_at, duration_minutes, done, tags | M2M contacts | CRUD, filters: search, contact_id, kind, upcoming |
-| Task | title, description (markdown), due_date, priority 0–2, done, tags, recurrence (rule / interval / until / parent) | ← projects (M2M) only, ← previous instance of a series | CRUD, `?search`, `?include_done` |
+| Task | title, description (markdown), due_date, priority 0–2, done, tags, recurrence (rule / interval / until / parent) | → contact, deal, interaction (nullable FKs), ← projects (M2M), ← previous instance of a series | CRUD, `?search`, `?include_done`, `?contact_id`, `?deal_id`, `?interaction_id` |
 | Project | name, description, start_date, end_date | M2M contacts, tasks, documents | CRUD, `?search` on name |
 | Document | title, description, format (pdf/md/txt), size, storage_key, preview_key, tags | ← projects (M2M) | CRUD + upload, replace-content, download, JPEG preview |
 | User | fastapi-users base + name, password_changed_at | owns everything | `/users/me`, `/users/me/password`, JWT login/logout |
@@ -57,7 +57,7 @@ Screens: `/` dashboard (Contacts / Tasks / Upcoming, responsive → tabs under 7
 - Phase 0 Setup — **done**
 - Phase 1 Contacts CRUD — **done** (API paginates; the UI never sends `skip`)
 - Phase 2 Auth — **done**
-- Phase 3 Interactions & Tasks — **partial**: interactions link to contacts, tasks do not; no nested `/contacts/{id}/interactions` routes (query params instead)
+- Phase 3 Interactions & Tasks — **done**: interactions link to contacts, tasks link to contacts, deals and interactions (T14); no nested `/contacts/{id}/interactions` routes (query params instead)
 - Phase 4 Deals & pipeline — **missing**
 - Phase 5 Search & import/export — **missing** (search is single-column `ILIKE` per entity)
 - Phase 6 Hardening & CI/CD — **partial**: images build and push; no lint/test job, no deploy job, no backup job
@@ -166,10 +166,16 @@ Priorities: **P0** not a CRM without it · **P1** daily friction · **P2** expec
       *Depends on:* T12.
       *Extended by:* T38 — public tenders are deals with extra fields, not a second entity.
 
-- [ ] **T14 · P0 · Link tasks to contacts, deals and interactions**
+- [x] **T14 · P0 · Link tasks to contacts, deals and interactions**
       Tasks attach only to projects. A CRM follow-up is always about someone — "call Maria back on Thursday".
-      *Scope:* nullable FKs on `Task`, create-task-from-contact in the UI.
-      *Blocks:* T15.
+      *Done:* three independent nullable FKs on `Task` — `contact_id`, `deal_id`, `interaction_id` — with `contact_name` / `deal_title` / `interaction_subject` denormalised onto reads so a task list says what each one is about without a request per row. All three optional and orthogonal: a task about a tender with no named contact is normal, so is a birthday reminder with no deal, and a plain to-do links to nothing. List filters `?contact_id=`, `?deal_id=`, `?interaction_id=` answer "what do I owe this record?" — the question tasks-on-projects could not.
+      *Load-bearing detail:* each id is **validated against the caller's own rows**, not just the FK. The FK alone would accept any existing id, and since reads carry the linked record's *name* back out, an unvalidated link is a cross-tenant data leak rather than just untidy data. Same check `contacts.py` runs on `organization_id`. On PATCH only links the caller actually sent are checked, so clearing one to null always works and an untouched link is neither re-validated nor dropped.
+      **`SET NULL` on all three**, like every other link in the app: deleting the person, the deal or the call must not silently drop work the operator committed to. The task survives, unattached. Verified at the database level, not just through the API.
+      **A repeating task carries its links onto the next instance.** `_spawn_next_occurrence` copies them alongside the recurrence fields, or "check in with Maria monthly" would quietly detach itself from Maria the first time it was completed — the bug that would have made T39 and T14 silently incompatible.
+      *Migration `i9j0k1l2m3n4`* adds the three columns, their indexes and their FKs; nothing to backfill. Verified up, down and up again against a scratch database with a linked row in the table, and `alembic check` reports no drift from the models.
+      *Tests:* `backend/tests/test_task_links.py` (15 cases: the round trip and its denormalised names, independence of the three, add/clear, an untouched link surviving an unrelated PATCH, unknown and cross-tenant targets refused on both create and patch, the three filters, `include_done` still applying to them, parametrised delete-keeps-the-task for all three, and the recurrence hand-off), plus `frontend/test/task_links_test.dart` (5 cases). `ci/smoke.sh` creates a linked task, filters by contact, then deletes the contact and asserts the task survived detached.
+      *UI:* a reusable `LinkedTasksSection` — open follow-ups plus an "Add" that pre-fills the link — on **contact detail** (the named deliverable) and on **deal detail**. The task form gets contact and deal pickers over the full unpaged lists (new `allDealsProvider`). The interaction link is deliberately *not* a picker: you do not choose one out of a dropdown of near-identical rows called "Call", so it is set by a **"Follow up" button on an interaction tile** — which carries the interaction *and* the person it was with — and shown on the form as a clearable read-only row. The dashboard task tile now shows what each task is about.
+      *Blocks:* T15 — the timeline now has tasks it can merge in.
 
 - [ ] **T15 · P1 · Unified timeline on contact detail**
       Contact detail shows interactions only. Merge interactions, tasks, deals, documents and field changes into one reverse-chronological history — the view that answers "where are we with this person?". Becomes the app's main screen.

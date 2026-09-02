@@ -8,9 +8,14 @@ class TasksRepository {
 
   final Dio _dio;
 
+  /// [contactId], [dealId] and [interactionId] answer "what do I owe this
+  /// record?" — the question tasks-on-projects could not.
   Future<PagedResult<Task>> list({
     String? search,
     bool includeDone = false,
+    String? contactId,
+    String? dealId,
+    String? interactionId,
     int skip = 0,
     int limit = kPageSize,
   }) async {
@@ -19,6 +24,9 @@ class TasksRepository {
       queryParameters: <String, dynamic>{
         if (search != null && search.isNotEmpty) 'search': search,
         if (includeDone) 'include_done': true,
+        'contact_id': ?contactId,
+        'deal_id': ?dealId,
+        'interaction_id': ?interactionId,
         'skip': skip,
         'limit': limit,
       },

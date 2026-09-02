@@ -7,6 +7,7 @@ import '../providers/contacts_provider.dart';
 import '../providers/interactions_provider.dart';
 import '../widgets/confirm_dialog.dart';
 import '../widgets/interaction_tile.dart';
+import '../widgets/linked_tasks_section.dart';
 import '../widgets/pagination_bar.dart';
 import 'contact_form_page.dart';
 import 'interaction_form_page.dart';
@@ -73,6 +74,11 @@ class ContactDetailPage extends ConsumerWidget {
             _Field(label: 'Address', value: contact.address!),
           if (contact.notes != null)
             _Field(label: 'Notes', value: contact.notes!),
+          // What I owe this person, above what has already happened with them.
+          LinkedTasksSection(
+            contactId: contact.id,
+            padding: const EdgeInsets.symmetric(vertical: 8),
+          ),
           _InteractionsSection(contact: contact),
           if (contact.tags.isNotEmpty)
             Padding(
