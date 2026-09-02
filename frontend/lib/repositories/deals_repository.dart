@@ -35,6 +35,23 @@ class DealsRepository {
     return PagedResult.fromJson(res.data!, Deal.fromJson);
   }
 
+  /// Every deal, following pagination to the end.
+  ///
+  /// For the picker on the task form, where showing only the first page would
+  /// hide deals the user knows exist. See ContactsRepository.listAll.
+  Future<List<Deal>> listAll() async {
+    final first = await list(limit: 200);
+    final all = <Deal>[...first.items];
+    while (all.length < first.total) {
+      final next = await list(skip: all.length, limit: 200);
+      // Guard against a total that shrank mid-walk (a concurrent delete),
+      // which would otherwise spin forever.
+      if (next.items.isEmpty) break;
+      all.addAll(next.items);
+    }
+    return all;
+  }
+
   Future<Deal> create(Map<String, dynamic> data) async {
     final res = await _dio.post<Map<String, dynamic>>('/deals/', data: data);
     return Deal.fromJson(res.data!);

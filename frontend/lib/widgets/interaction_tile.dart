@@ -7,6 +7,7 @@ import '../core/error_text.dart';
 import '../models/contact.dart';
 import '../models/interaction.dart';
 import '../pages/interaction_form_page.dart';
+import '../pages/task_form_page.dart';
 import '../providers/contacts_provider.dart';
 import '../providers/interactions_provider.dart';
 import 'confirm_dialog.dart';
@@ -99,6 +100,21 @@ class InteractionTile extends ConsumerWidget {
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            IconButton(
+              icon: const Icon(Icons.add_task),
+              tooltip: 'Follow up',
+              // Carries the interaction *and* the person it was with, so the
+              // new task is attached to both without any picking.
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => TaskFormPage(
+                    initialInteraction: interaction,
+                    initialContactId: interaction.contactIds.firstOrNull,
+                  ),
+                ),
+              ),
+            ),
             IconButton(
               icon: Icon(
                 interaction.done

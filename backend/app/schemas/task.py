@@ -29,7 +29,20 @@ def validate_recurrence(
         raise ValueError("recurrence_until must not be before the due date")
 
 
-class TaskCreate(BaseModel):
+class TaskLinks(BaseModel):
+    """What a task is about. All independent, all optional.
+
+    A follow-up is normally about a person, sometimes about the deal it moves
+    forward, and often about the specific call it came out of — so the three
+    are separate fields rather than one polymorphic target.
+    """
+
+    contact_id: UUID | None = None
+    deal_id: UUID | None = None
+    interaction_id: UUID | None = None
+
+
+class TaskCreate(TaskLinks):
     title: str
     description: str | None = None
     due_date: datetime | None = None
@@ -50,7 +63,7 @@ class TaskCreate(BaseModel):
         return self
 
 
-class TaskUpdate(BaseModel):
+class TaskUpdate(TaskLinks):
     title: str | None = None
     description: str | None = None
     due_date: datetime | None = None
@@ -67,6 +80,11 @@ class TaskRead(TaskCreate):
     # The instance this one was spawned from, walking the series back through
     # its history. NULL for the first task of a series and for one-offs.
     recurrence_parent_id: UUID | None = None
+    # Denormalised so a task list can say what each one is about without a
+    # request per row — same reasoning as ContactRead.organization_name.
+    contact_name: str | None = None
+    deal_title: str | None = None
+    interaction_subject: str | None = None
     created: datetime
     updated: datetime
 

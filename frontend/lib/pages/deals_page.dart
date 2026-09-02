@@ -9,6 +9,7 @@ import '../models/deal.dart';
 import '../models/paged_result.dart';
 import '../providers/deals_provider.dart';
 import '../widgets/confirm_dialog.dart';
+import '../widgets/linked_tasks_section.dart';
 import '../widgets/pagination_bar.dart';
 import 'deal_form_page.dart';
 
@@ -407,6 +408,9 @@ class _DealDetail extends ConsumerWidget {
           if (d.probability != null) _Field(label: 'Probability', value: '${d.probability}%'),
           if (d.lostReason != null) _Field(label: 'Lost because', value: d.lostReason!),
           if (d.notes != null) _Field(label: 'Notes', value: d.notes!),
+          const SizedBox(height: 8),
+          // What still has to happen to move this deal along.
+          LinkedTasksSection(dealId: d.id),
         ],
       ),
     );

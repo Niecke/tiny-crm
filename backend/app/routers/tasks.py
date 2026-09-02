@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from typing import cast
+from typing import Any, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -9,6 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import current_active_user
 from app.auth.users import User
 from app.db import count_rows, get_session
+from app.models.contact import Contact
+from app.models.deal import Deal
+from app.models.interaction import Interaction
 from app.models.project import project_tasks
 from app.models.task import Task
 from app.recurrence import RECURRENCE_RULES, RecurrenceRule, next_due_date
@@ -22,6 +25,41 @@ from app.schemas.task import (
 )
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
+
+# The three things a task can be about. All user-scoped, which is the only
+# property this module needs from them.
+LinkTarget = Contact | Deal | Interaction
+
+# Where each link's id is checked. The label is what the 404 says, so it names
+# the field the caller sent.
+LINK_TARGETS: tuple[tuple[str, type[LinkTarget], str], ...] = (
+    ("contact_id", Contact, "Contact"),
+    ("deal_id", Deal, "Deal"),
+    ("interaction_id", Interaction, "Interaction"),
+)
+
+
+async def _check_links(session: AsyncSession, values: dict[str, Any], user: User) -> None:
+    """Refuse a link to a record that is missing or belongs to someone else.
+
+    The FKs alone would accept any existing id, attaching a task to another
+    tenant's contact — and leaking that contact's name back on every read, since
+    reads carry the linked record's name. Same check contacts.py runs on
+    organization_id, for the same reason.
+
+    `values` is whatever the caller actually sent, so a PATCH that never
+    mentions a link does not re-validate it.
+    """
+    for field, model, label in LINK_TARGETS:
+        target_id = values.get(field)
+        if target_id is None:
+            continue
+        # cast because mypy joins the three model types back to their common
+        # Base, which has no user_id. The lookup is keyed by `model` itself, so
+        # the row really is one of LinkTarget.
+        target = cast(LinkTarget | None, await session.get(model, target_id))
+        if target is None or target.user_id != user.id:
+            raise HTTPException(status_code=404, detail=f"{label} not found")
 
 
 async def _spawn_next_occurrence(session: AsyncSession, task: Task) -> Task | None:
@@ -63,6 +101,12 @@ async def _spawn_next_occurrence(session: AsyncSession, task: Task) -> Task | No
         recurrence_interval=task.recurrence_interval,
         recurrence_until=task.recurrence_until,
         recurrence_parent_id=task.id,
+        # A repeating task keeps being about the same thing: "check in with
+        # Maria monthly" must stay attached to Maria, or the series quietly
+        # detaches itself on the first completion.
+        contact_id=task.contact_id,
+        deal_id=task.deal_id,
+        interaction_id=task.interaction_id,
     )
     session.add(successor)
     # The link rows below reference the new id, so the row has to exist first.
@@ -92,6 +136,11 @@ async def list_tasks(
     limit: int = Query(default=50, ge=1, le=200),
     search: str | None = None,
     include_done: bool = False,
+    # "What do I owe this person?" — the question tasks-on-projects could not
+    # answer, and what the contact and deal detail screens are built on.
+    contact_id: UUID | None = Query(default=None),
+    deal_id: UUID | None = Query(default=None),
+    interaction_id: UUID | None = Query(default=None),
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> Page[TaskRead]:
@@ -100,6 +149,12 @@ async def list_tasks(
         query = query.where(Task.done.is_(False))
     if search:
         query = query.where(Task.title.ilike(f"%{search}%"))
+    if contact_id is not None:
+        query = query.where(Task.contact_id == contact_id)
+    if deal_id is not None:
+        query = query.where(Task.deal_id == deal_id)
+    if interaction_id is not None:
+        query = query.where(Task.interaction_id == interaction_id)
     total = await count_rows(session, query)
     # NULLS LAST so tasks without a due date sink to the bottom; client renders
     # overdue (due_date < now) red, and ascending order naturally floats them up.
@@ -134,6 +189,7 @@ async def create_task(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> Task:
+    await _check_links(session, body.model_dump(), user)
     task = Task(**body.model_dump(), user_id=user.id)
     session.add(task)
     await session.commit()
@@ -153,6 +209,9 @@ async def update_task(
         raise HTTPException(status_code=404, detail="Task not found")
 
     updates = body.model_dump(exclude_unset=True)
+    # Only links the caller actually sent are checked; clearing one to null is
+    # always allowed, and one already on the row is not re-validated.
+    await _check_links(session, updates, user)
     # The recurrence fields have to hold together across the merge, not just
     # within the patch: clearing the due date of a repeating task, or adding a
     # rule to a task that has none, both leave nothing to repeat from.
