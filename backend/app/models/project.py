@@ -45,4 +45,9 @@ class Project(Base):
 
     contacts: Mapped[list[Contact]] = relationship(secondary=project_contacts, lazy="selectin")
     tasks: Mapped[list[Task]] = relationship(secondary=project_tasks, lazy="selectin")
-    documents: Mapped[list[Document]] = relationship(secondary=project_documents, lazy="selectin")
+    # back_populates because documents can now be attached from their own side
+    # too — without it SQLAlchemy would treat the two as independent mappings
+    # of the same table and let them overwrite each other.
+    documents: Mapped[list[Document]] = relationship(
+        secondary=project_documents, back_populates="projects", lazy="selectin"
+    )

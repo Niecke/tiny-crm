@@ -23,3 +23,27 @@ final documentsProvider =
 final allDocumentsProvider = FutureProvider<List<Document>>((ref) {
   return ref.read(documentsRepositoryProvider).listAll();
 });
+
+/// Documents filed against one record — what a contact, organization, deal or
+/// project detail screen lists.
+///
+/// Separate family from [documentsProvider] so the documents screen's own
+/// search and paging state cannot collide with a detail screen's.
+typedef AttachedDocumentsFilter = ({
+  String? contactId,
+  String? organizationId,
+  String? dealId,
+  String? projectId,
+  int skip,
+});
+
+final attachedDocumentsProvider =
+    FutureProvider.family<PagedResult<Document>, AttachedDocumentsFilter>((ref, filter) {
+  return ref.read(documentsRepositoryProvider).list(
+        contactId: filter.contactId,
+        organizationId: filter.organizationId,
+        dealId: filter.dealId,
+        projectId: filter.projectId,
+        skip: filter.skip,
+      );
+});

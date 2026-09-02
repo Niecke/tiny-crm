@@ -8,6 +8,8 @@ import '../models/organization.dart';
 import '../models/paged_result.dart';
 import '../providers/contacts_provider.dart';
 import '../providers/organizations_provider.dart';
+import '../widgets/attached_documents_section.dart';
+import '../widgets/attached_interactions_section.dart';
 import '../widgets/confirm_dialog.dart';
 import '../widgets/pagination_bar.dart';
 import 'contact_detail_page.dart';
@@ -321,6 +323,11 @@ class _OrganizationDetail extends ConsumerWidget {
           if (o.notes != null) _Field(label: 'Notes', value: o.notes!),
           const SizedBox(height: 8),
           _OrganizationContacts(organization: o),
+          const SizedBox(height: 8),
+          // The switchboard call, the company NDA — things about the company
+          // rather than about any one person there.
+          AttachedInteractionsSection(organizationId: o.id),
+          AttachedDocumentsSection(organizationId: o.id),
         ],
       ),
     );

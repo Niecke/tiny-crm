@@ -177,19 +177,52 @@ orphan=$(curl -fsS "$API/tasks/$task_id" "${auth[@]}")
 [ "$(echo "$orphan" | json "['title']")" = "Call CI Smoke back" ] \
   || fail "the task itself should have survived the contact delete"
 
-step "a document round-trips through MinIO"
+step "a document round-trips through MinIO, filed against its deal"
 printf 'tinyCRM integration test\n' > /tmp/ci-smoke.txt
-document_id=$(curl -fsS -X POST "$API/documents/" "${auth[@]}" \
-  -F "title=CI Smoke" -F "tags=[]" -F "file=@/tmp/ci-smoke.txt" | json "['id']")
+document=$(curl -fsS -X POST "$API/documents/" "${auth[@]}" \
+  -F "title=CI Smoke" -F "tags=[]" -F "deal_ids=[\"$deal_id\"]" \
+  -F "organization_ids=[\"$org_id\"]" -F "file=@/tmp/ci-smoke.txt")
+document_id=$(echo "$document" | json "['id']")
 [ -n "$document_id" ] || fail "document was not created"
+# Attached as it arrives, not in a second step.
+[ "$(echo "$document" | json "['deal_ids']")" = "['$deal_id']" ] \
+  || fail "document was not filed against the deal"
 curl -fsS "$API/documents/$document_id/content" "${auth[@]}" -o /tmp/ci-smoke-download.txt
 diff -q /tmp/ci-smoke.txt /tmp/ci-smoke-download.txt > /dev/null \
   || fail "downloaded document differs from what was uploaded"
+# "Everything filed against this record" — impossible before documents could
+# attach to anything but a project.
+on_deal=$(curl -fsS "$API/documents/?deal_id=$deal_id" "${auth[@]}" | json "['total']")
+[ "$on_deal" = "1" ] || fail "expected 1 document on the deal, got $on_deal"
+
+step "an interaction attaches to a deal, and a bad link is refused"
+interaction_id=$(curl -fsS -X POST "$API/interactions/" "${auth[@]}" \
+  -H 'Content-Type: application/json' \
+  -d "{\"subject\":\"CI Smoke call\",\"occurred_at\":\"2026-01-01T10:00:00Z\",\"deal_ids\":[\"$deal_id\"]}" \
+  | json "['id']")
+[ -n "$interaction_id" ] || fail "interaction was not created"
+about_deal=$(curl -fsS "$API/interactions/?deal_id=$deal_id" "${auth[@]}" | json "['total']")
+[ "$about_deal" = "1" ] || fail "expected 1 interaction about the deal, got $about_deal"
+# A link id that does not exist is a 404, not a silently dropped attachment.
+missing='00000000-0000-0000-0000-000000000001'
+code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$API/interactions/" "${auth[@]}" \
+  -H 'Content-Type: application/json' \
+  -d "{\"subject\":\"X\",\"occurred_at\":\"2026-01-01T10:00:00Z\",\"deal_ids\":[\"$missing\"]}")
+[ "$code" = "404" ] || fail "an unknown deal link should be 404, got $code"
+
+step "deleting the deal drops the links, not the document"
+curl -fsS -X DELETE "$API/deals/$deal_id" "${auth[@]}"
+after=$(curl -fsS "$API/documents/$document_id" "${auth[@]}")
+[ "$(echo "$after" | json "['deal_ids']")" = "[]" ] \
+  || fail "the document should have been detached from the deleted deal"
+[ "$(echo "$after" | json "['title']")" = "CI Smoke" ] \
+  || fail "the document itself should have survived the deal delete"
 
 step "cleanup"
 curl -fsS -X DELETE "$API/documents/$document_id" "${auth[@]}"
+curl -fsS -X DELETE "$API/interactions/$interaction_id" "${auth[@]}"
 curl -fsS -X DELETE "$API/tasks/$task_id" "${auth[@]}"
-curl -fsS -X DELETE "$API/deals/$deal_id" "${auth[@]}"
+# The linked deal is already gone — deleted to prove the document survives it.
 curl -fsS -X DELETE "$API/deals/$open_ended_id" "${auth[@]}"
 # The contact is already gone — it was deleted to prove the task survives it.
 curl -fsS -X DELETE "$API/organizations/$org_id" "${auth[@]}"

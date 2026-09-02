@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from sqlalchemy import Column, DateTime, ForeignKey, String, Table, func
@@ -7,15 +8,39 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
 from app.models.contact import Contact
+from app.models.deal import Deal
+from app.models.organization import Organization
+
+if TYPE_CHECKING:
+    # Runtime import would be a cycle: project.py imports task.py, which imports
+    # this module. The relationship resolves "Project" through SQLAlchemy's
+    # registry instead, so only the annotation needs the name.
+    from app.models.project import Project
+
+
+def _link_table(name: str, other: str, other_table: str) -> Table:
+    """An interaction-to-something join table. See document.py for the why."""
+    return Table(
+        name,
+        Base.metadata,
+        Column(
+            "interaction_id", ForeignKey("interactions.id", ondelete="CASCADE"), primary_key=True
+        ),
+        Column(other, ForeignKey(f"{other_table}.id", ondelete="CASCADE"), primary_key=True),
+    )
+
 
 # An interaction can involve several people (a meeting with two contacts), so the
 # link is many-to-many — same pattern as project_contacts.
-interaction_contacts = Table(
-    "interaction_contacts",
-    Base.metadata,
-    Column("interaction_id", ForeignKey("interactions.id", ondelete="CASCADE"), primary_key=True),
-    Column("contact_id", ForeignKey("contacts.id", ondelete="CASCADE"), primary_key=True),
+interaction_contacts = _link_table("interaction_contacts", "contact_id", "contacts")
+# A kickoff call is about a deal and happens under a project. Before this an
+# interaction could only point at people, so "every call about this deal" had no
+# answer.
+interaction_organizations = _link_table(
+    "interaction_organizations", "organization_id", "organizations"
 )
+interaction_deals = _link_table("interaction_deals", "deal_id", "deals")
+interaction_projects = _link_table("interaction_projects", "project_id", "projects")
 
 
 class Interaction(Base):
@@ -43,3 +68,27 @@ class Interaction(Base):
     )
 
     contacts: Mapped[list[Contact]] = relationship(secondary=interaction_contacts, lazy="selectin")
+    organizations: Mapped[list[Organization]] = relationship(
+        secondary=interaction_organizations, lazy="selectin"
+    )
+    deals: Mapped[list[Deal]] = relationship(secondary=interaction_deals, lazy="selectin")
+    projects: Mapped[list["Project"]] = relationship(
+        "Project", secondary=interaction_projects, lazy="selectin"
+    )
+
+    # The API speaks in ids; these keep InteractionRead a plain model_validate.
+    @property
+    def contact_ids(self) -> list[UUID]:
+        return [c.id for c in self.contacts]
+
+    @property
+    def organization_ids(self) -> list[UUID]:
+        return [o.id for o in self.organizations]
+
+    @property
+    def deal_ids(self) -> list[UUID]:
+        return [d.id for d in self.deals]
+
+    @property
+    def project_ids(self) -> list[UUID]:
+        return [p.id for p in self.projects]

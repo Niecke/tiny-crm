@@ -17,8 +17,9 @@ import '../providers/contacts_provider.dart';
 import '../providers/documents_provider.dart';
 import '../providers/projects_provider.dart';
 import '../providers/tasks_provider.dart';
-import '../widgets/pagination_bar.dart';
+import '../widgets/attached_interactions_section.dart';
 import '../widgets/confirm_dialog.dart';
+import '../widgets/pagination_bar.dart';
 import 'contact_detail_page.dart';
 import 'project_form_page.dart';
 import 'task_form_page.dart';
@@ -429,6 +430,10 @@ class _ProjectDetail extends ConsumerWidget {
             onUpdate: (ids) => _updateLinks(context, ref, p, documentIds: ids),
             onTap: (ctx, d) => _showDocumentInfo(ctx, d),
           ),
+          const SizedBox(height: 16),
+          // Interactions could not attach to a project at all before this, so
+          // "what was discussed under this project" had no answer.
+          AttachedInteractionsSection(projectId: p.id),
         ],
       ),
     );
