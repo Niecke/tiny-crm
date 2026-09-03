@@ -67,7 +67,9 @@ URL the database rejects.
 Then point Flux at the repo:
 
 ```bash
-kubectl apply -f deploy/flux/
+# -k, not -f: kustomization.yaml is a kustomize build file, not a cluster
+# resource, and `apply -f` would try to POST it to the API.
+kubectl apply -k deploy/flux/
 flux -n tinycrm get kustomization tinycrm-flux
 flux -n tinycrm get helmrelease tinycrm
 ```

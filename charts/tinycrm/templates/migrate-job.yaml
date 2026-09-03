@@ -9,6 +9,31 @@
 # part of this same release, so a pre-install hook would run before any database
 # exists. pre-upgrade is correct for every release after that — the migration
 # lands before the new image serves traffic.
+#
+# The hook carries its own Secret rather than reading the backend's. A
+# pre-upgrade hook runs before the release's regular manifests are applied, so
+# on any release that changes the backend Secret — including the one that first
+# introduces it — the Job would start against a Secret that does not exist yet
+# and fail with CreateContainerConfigError. A lower hook weight orders this
+# ahead of the Job.
+#
+# alembic/env.py:25 reads only settings.database_url; every other setting has a
+# default, so this is the whole of what the migration needs.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "tinycrm.fullname" . }}-migrate
+  labels:
+    {{- include "tinycrm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migrate
+  annotations:
+    helm.sh/hook: post-install,pre-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation
+type: Opaque
+stringData:
+  DATABASE_URL: {{ include "tinycrm.databaseUrl" . | quote }}
+---
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -35,7 +60,7 @@ spec:
           imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
           envFrom:
             - secretRef:
-                name: {{ include "tinycrm.fullname" . }}-backend
+                name: {{ include "tinycrm.fullname" . }}-migrate
           command: ["/bin/sh", "-c"]
           args:
             - |
