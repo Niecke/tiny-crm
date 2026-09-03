@@ -218,9 +218,41 @@ after=$(curl -fsS "$API/documents/$document_id" "${auth[@]}")
 [ "$(echo "$after" | json "['title']")" = "CI Smoke" ] \
   || fail "the document itself should have survived the deal delete"
 
+step "a watch sweeps on a cadence and a find becomes a deal"
+watch_id=$(curl -fsS -X POST "$API/watches/" "${auth[@]}" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"CI Smoke portal","url":"https://ci.example/tenders","kind":"tender_portal","recurrence_rule":"weekly"}' \
+  | json "['id']")
+[ -n "$watch_id" ] || fail "watch was not created"
+# A source nobody has swept yet is due immediately.
+due=$(curl -fsS "$API/watches/?due=true" "${auth[@]}" | json "['total']")
+[ "$due" = "1" ] || fail "expected 1 source due, got $due"
+
+swept=$(curl -fsS -X POST "$API/watches/$watch_id/check" "${auth[@]}" \
+  -H 'Content-Type: application/json' \
+  -d '{"outcome":"found","note":"CI Smoke tender","create_deal":{"title":"CI Smoke find"}}')
+found_deal_id=$(echo "$swept" | json "['check']['created_deal_id']")
+[ "$found_deal_id" != "None" ] || fail "the find should have created a deal"
+# Logging the sweep advances the cadence in the same call, so it is no longer due.
+[ "$(echo "$swept" | json "['watch']['last_checked_at']")" != "None" ] \
+  || fail "the sweep was not stamped on the watch"
+still_due=$(curl -fsS "$API/watches/?due=true" "${auth[@]}" | json "['total']")
+[ "$still_due" = "0" ] || fail "expected the swept source to leave the due list, got $still_due"
+
+step "deleting the deal keeps the record of finding it"
+curl -fsS -X DELETE "$API/deals/$found_deal_id" "${auth[@]}"
+history=$(curl -fsS "$API/watches/$watch_id/checks" "${auth[@]}")
+[ "$(echo "$history" | json "['total']")" = "1" ] || fail "the sweep log should have survived"
+[ "$(echo "$history" | json "['items'][0]['created_deal_id']")" = "None" ] \
+  || fail "the deleted deal should have been unlinked from the sweep"
+[ "$(echo "$history" | json "['items'][0]['note']")" = "CI Smoke tender" ] \
+  || fail "the note of the find should have survived"
+
 step "cleanup"
 curl -fsS -X DELETE "$API/documents/$document_id" "${auth[@]}"
 curl -fsS -X DELETE "$API/interactions/$interaction_id" "${auth[@]}"
+# Takes its sweep log with it (CASCADE).
+curl -fsS -X DELETE "$API/watches/$watch_id" "${auth[@]}"
 curl -fsS -X DELETE "$API/tasks/$task_id" "${auth[@]}"
 # The linked deal is already gone — deleted to prove the document survives it.
 curl -fsS -X DELETE "$API/deals/$open_ended_id" "${auth[@]}"

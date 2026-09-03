@@ -22,6 +22,7 @@ from app.routers import (
     projects,
     tasks,
     users,
+    watches,
 )
 from app.schemas.user import UserRead, UserUpdate
 from app.storage import check_storage
@@ -93,6 +94,7 @@ app.include_router(tasks.router)
 app.include_router(documents.router)
 app.include_router(projects.router)
 app.include_router(interactions.router)
+app.include_router(watches.router)
 # The throttle covers logout as well as login. That is deliberate: both are the
 # credential surface, and the budget is generous enough that no real session
 # hits it.

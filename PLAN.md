@@ -46,6 +46,8 @@ A small CRM for self-employment, built as a learning project for FastAPI and Flu
 | Task | title, description (markdown), due_date, priority 0–2, done, tags, recurrence (rule / interval / until / parent) | → contact, deal, interaction (nullable FKs), ← projects (M2M), ← previous instance of a series | CRUD, `?search`, `?include_done`, `?contact_id`, `?deal_id`, `?interaction_id` |
 | Project | name, description, start_date, end_date | M2M contacts, tasks, documents, ← interactions | CRUD, `?search` on name |
 | Document | title, description, format (pdf/md/txt), size, storage_key, preview_key, tags | M2M contacts, organizations, deals, projects | CRUD + upload (links set at upload time), replace-content, download, JPEG preview, filters by any linked record |
+| Watch | name, url, kind (job_board/careers_page/tender_portal/other), query_note, notes, recurrence (rule / interval), last_checked_at, next_due_at, active | → organization (FK), ← watch checks | CRUD, `POST /{id}/check`, `?due`, `?active`, `?kind`, `?search`, `?organization_id` |
+| WatchCheck | checked_at, outcome (nothing/found), note | → watch (CASCADE), → created deal / task (SET NULL) | append-only; listed per watch |
 | User | fastapi-users base + name, password_changed_at | owns everything | `/users/me`, `/users/me/password`, JWT login/logout |
 
 `Interaction.occurred_at` does double duty: past = activity log, future = planned mail/meeting, `done` closes the loop. One table serves both history and calendar.
@@ -223,7 +225,7 @@ Priorities: **P0** not a CRM without it · **P1** daily friction · **P2** expec
       *Scope — extra columns on `Deal` (T13), not a parallel entity:* `deal_kind` (`direct` / `tender`), `contracting_authority` (FK to organization — reuse T12, do not re-type the buyer), `cpv_type` (service / supply / labour leasing), `procedure`, `submission_deadline`, `sme_suitable`, `consortium_allowed` (ARGE), `multi_role`, and the decision pair `fit` (`solo` / `consortium_only` / `no`) + `fit_reason` (one sentence, required when `fit` is set — a verdict without a reason is unusable three months later).
       *Rationale for folding into `Deal`:* a tender is an opportunity with a deadline and a bid/no-bid gate. A second entity would duplicate the pipeline, the contact links, the document links and the whole UI, and then need merging when a tender turns into an actual engagement. `deal_kind` plus a conditional form section costs one column.
       *Links:* contacts (who is on it) via T13's FKs, the PDFs via T16 (documents on any record). `submission_deadline` must reach T20's reminder job — a missed tender deadline is the single most expensive thing this app can fail to do.
-      *Depends on:* T13, T16.
+      *Depends on:* T13, T16. *Fed by:* T40 — a tender-portal sweep is how these get found in the first place, and it creates them as plain deals until this lands.
 
 - [x] **T39 · P1 · Recurring tasks**
       `Task.due_date` existed; recurrence did not, so "check the ORF winners' job pages monthly" and "follow up with EBCONT in two weeks" had to be retyped after every tick — which means they stop happening.
@@ -234,11 +236,20 @@ Priorities: **P0** not a CRM without it · **P1** daily friction · **P2** expec
       *Still open:* the reminder half. A recurrence that only surfaces in an open browser tab is still passive — see T20.
       *Pairs with:* T20 (a reminder that never leaves the browser makes recurrence pointless).
 
-- [ ] **T40 · P2 · Job-watch list**
-      For companies worth watching without an active conversation: are they hiring for roles that imply the work the operator does?
-      *Scope:* on `Organization` — `careers_url`, `jobs_checked_at`, `relevant_role_seen` (bool) plus a short note. Three columns, no module, no scraper.
-      *Done when:* an "unchecked longest" list exists, and marking one checked is one tap. Combined with T39 that is the whole feature: a recurring task points at the list.
-      *Explicitly not:* crawling careers pages. That is a different project with a different failure mode.
+- [x] **T40 · P1 · Watch list: job boards, careers pages and tender portals**
+      The recurring sweep that finds work before there is a conversation to record. Two kinds of question, one habit: *are they hiring for roles that imply what I do?* and *has a tender come up that I could bid on?*
+      **Not three columns on `Organization`.** The earlier scope assumed every watch target is a company. The two sources that matter most are not: `karriere.at` with a saved search, ANKÖ, TED are things you check, not parties you have a relationship with, and there is no organization row to hang them on.
+      *Done:* a `Watch` entity — `name`, `url` (required: a source you cannot open is not a source), `kind` (`job_board` / `careers_page` / `tender_portal` / `other`), `query_note` (the saved search in words — keywords, CPV codes, region, because a query string is unreadable six months later), `notes`, `active`, and a nullable `organization_id` reusing T12. The company link is deliberately **not** enforced per kind: finding a company you have not filed yet is normal, and refusing the source until you do is backwards. Filters: `?due=`, `?active=`, `?kind=`, `?search=`, `?organization_id=`.
+      **The cadence lives on the watch and reuses T39 rather than the task table.** `recurrence_rule` + `recurrence_interval` go straight through `app/recurrence.py` — the same closed dropdown, the same month-end clamping, and the same *"next due is computed from the check, not the missed slot"* rule, so a portal swept three weeks late is due once rather than three times (verified end to end: 21 days late → next due in 6 days, no backlog). What it does **not** reuse is `Task`: one task per watch would put twenty identical "check X" rows in the dashboard panel and bury the one real follow-up.
+      *Load-bearing detail:* **the anchor differs by caller, and getting it wrong is silent.** Logging a sweep anchors on the *scheduled* date, which is what keeps a cadence on its rhythm — due on the 1st, swept on the 28th, due the 1st again. Changing the cadence anchors on the *last sweep* instead, because `next_due_at` by then already holds a date the old cadence produced; anchoring there carried the old rhythm into the new rule and put a monthly-to-weekly switch five weeks out. A test pins it. Editing the cadence of a source that has **never** been swept leaves it due — it is still unchecked whatever its cadence now says.
+      `last_checked_at` and `next_due_at` are stamped together by the check endpoint and nowhere else, so they cannot drift from the log they summarise. Stored rather than derived because the sweep list sorts and pages by "most overdue" in SQL.
+      *Append-only `WatchCheck` log:* `checked_at`, `outcome` (`nothing` / `found`), `note`, and nullable `created_deal_id` / `created_task_id`. "Nothing found" is a **valuable** answer — it is what makes a year of diligence on a quiet portal provable, and `found_count` / `check_count` (correlated subqueries, like T12's `contact_count`) answer the question a single timestamp cannot: has this source ever actually produced anything? CASCADE from the watch, `SET NULL` on what a find produced — deleting the deal must not erase the record of having found it. Verified at the database level.
+      *A find converts in one call.* `POST /watches/{id}/check` logs the sweep, advances the cadence and creates the deal or task, all in one transaction — a check that logged but failed to advance would come straight back as due, and a deal created separately could end up with no check pointing at it. A refused find (another tenant's company) leaves **no check, no deal and an unmoved cadence**; there is a test for exactly that. `create_deal` / `create_task` with `outcome: "nothing"` is a 422, the same shape as T13 refusing a lost reason on a won deal. The creation payload is deliberately narrow — a title, a date, a company — because the full form is one tap away and the point is to capture the find before the tab is closed. For a tender-portal watch this creates a **plain deal until T38 lands**; the tender fields fill in later rather than blocking this.
+      *Tests:* `backend/tests/test_watches.py` (29 cases: the round trip, due-on-create, cadence and unit validation, the company link and its SET NULL, cross-tenant refusal, sweeping with and without a find, the late-sweep re-anchor, append-only history ordering, both conversions, the two atomicity cases, most-overdue-first ordering with paused sources sinking, kind/search/company filters, and both cadence-change paths), watches added to the table-driven cross-user isolation suite, plus `frontend/test/watch_test.dart` (15 cases). `ci/smoke.sh` creates a source, sweeps it into a deal, deletes the deal and asserts the sweep log survived.
+      *UI:* `/watches` — list beside detail, scoped "Due now" (the default) / "All active" / "Everything", filterable by kind. **"Open & sweep"** opens the source in a new tab and then offers the check dialog, which is the habit in the order it actually happens; the dialog is nothing-or-found, a note, and one field to turn a find into a deal or a task (defaulting to a deal for a tender portal, a task for a job board). The per-source history is on the detail, and a **badge on the Sources nav item** shows how many are due — a watch list nobody looks at is the failure mode this whole feature exists to avoid. Delete warns how many sweeps it would take with it and points at pausing instead.
+      *Explicitly not:* crawling anything. No scraper, no feed parser, no TED API client — a different project with a different failure mode (silent breakage that looks like "no new tenders"). `openInNewTab` uses `package:web`, which the app already reaches for, rather than adding a plugin dependency.
+      *Still open:* overdue watches only surface in an open tab — see T20, which must nudge them alongside overdue tasks.
+      *Feeds:* T38 — tender-portal finds become tender deals once `deal_kind` exists.
 
 - [ ] **T18 · P0 · One search across everything**
       Search is per-panel and matches exactly one column each — a contact is unfindable by email, phone or note text. Postgres full-text (`tsvector` + GIN, or `pg_trgm` for fuzzy names), not the FTS5 the original plan assumed.
@@ -250,7 +261,7 @@ Priorities: **P0** not a CRM without it · **P1** daily friction · **P2** expec
 
 - [ ] **T20 · P1 · Reminders that leave the browser**
       Overdue tasks and planned meetings are only visible if the app is open, which makes the "Upcoming" panel passive. Needs a scheduled job plus an outbound mail sender: due-today digest, overdue nudge, meeting reminder.
-      *Also carries:* tender submission deadlines (T38) and recurring-task instances (T39) — both are worthless without a nudge that leaves the browser.
+      *Also carries:* tender submission deadlines (T38), recurring-task instances (T39) and overdue watches (T40) — all three are worthless without a nudge that leaves the browser.
       *Shares infrastructure with:* T21, T23.
 
 - [ ] **T21 · P1 · Log an email without syncing mailboxes**
@@ -293,6 +304,13 @@ Priorities: **P0** not a CRM without it · **P1** daily friction · **P2** expec
 - [ ] **T29 · P2 · Change history**
       Only `updated_at` is kept, and concurrent edits silently last-write-win. An append-only audit table gives "who changed this and when" and supports optimistic-concurrency checks on PATCH.
 
+- [ ] **T41 · P2 · Priority visible at a glance in the task list**
+      `_TaskTile` renders priority as the grey line `Priority: Low|Med|High` (`dashboard_page.dart:588`), fourth in a stack of grey subtitle rows — so scanning the panel for what matters means reading every tile. Priority 0–2 already exists on the model and the form; only the presentation is missing.
+      *Scope:* a colour-coded indicator on each task tile — a leading priority bar or a small chip — plus the same treatment wherever tasks are listed (`LinkedTasksSection` on contact and deal detail, not just the dashboard). One shared widget and one `priorityColor(int)` helper, so the three surfaces cannot drift apart.
+      *Load-bearing detail:* **red is already taken.** An overdue task colours its title and due date with `colorScheme.error`; a red high-priority chip beside it makes the two states indistinguishable, and an overdue low-priority task would read as urgent. Pick a palette that reads against both — and keep the text label, since colour alone fails for colour-blind users and in a screenshot printed in grey.
+      *Done when:* a high-priority task is identifiable without reading its subtitle, and an overdue one is still distinguishable from a high-priority one.
+      *Pairs with:* T30 — sorting a list by priority is the other half of the same question.
+
 - [ ] **T30 · P2 · Filter by tag, status and date range**
       Tags are stored on every entity and cannot be filtered by anywhere. Also: sort lists by name, last contact and due date.
 
@@ -319,7 +337,7 @@ Dependency- and leverage-ordered, not a strict ranking:
 6. **T17 + T36** — one migration on `contacts`: the business fields and the channel-compliance fields together. T36 is cheap, prevents an expensive mistake, and has no dependencies — do not let it sit behind the pipeline work.
 7. **T18, T19** — search and import/export, once the model has settled.
 8. **T23, T20, T22** — password reset, reminders, calendar feed. All three need outbound mail; build the sender once. T39 (recurring tasks) shipped ahead of T20; its instances stay silent until that reminder job exists.
-9. **T38** — tender fields, after T13 and T16 exist. T37 and T40 are one-migration jobs; slot them into any spare afternoon.
+9. **T38** — tender fields, now that T40 feeds them: portal finds land as plain deals until `deal_kind` exists. T37 is still a one-migration job; slot it into any spare afternoon.
 
 Everything else is opportunistic.
 
