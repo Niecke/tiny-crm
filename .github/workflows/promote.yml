@@ -75,8 +75,40 @@ jobs:
 
       - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
 
+      # ci.yml only builds images when application code changed, so a pull
+      # request touching just the chart, the deploy manifests or documentation
+      # merges without ever producing a ci-<sha> tag. There is nothing to
+      # promote then, and nothing to redeploy either — Flux reconciles chart
+      # changes from the commit itself.
+      #
+      # A build that genuinely failed cannot reach here: those are required
+      # checks, so the pull request would not have been mergeable.
+      - name: Check whether images were built for this commit
+        id: images
+        env:
+          SOURCE_TAG: ${{ steps.source.outputs.tag }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for image in backend frontend; do
+            if docker buildx imagetools inspect "$REGISTRY/$image:$SOURCE_TAG" >/dev/null 2>&1; then
+              echo "found $image:$SOURCE_TAG"
+            else
+              echo "missing $image:$SOURCE_TAG"
+              missing=1
+            fi
+          done
+
+          if [ "$missing" -eq 0 ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "No images tagged \`$SOURCE_TAG\` — ci.yml skipped the builds because no application code changed. Nothing to promote; Flux still picks up any chart change from the commit itself." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       # imagetools copies the manifest by digest: same bytes, extra tags.
       - name: Tag with the main commit and latest
+        if: steps.images.outputs.exists == 'true'
         env:
           SOURCE_TAG: ${{ steps.source.outputs.tag }}
         run: |
@@ -98,6 +130,7 @@ jobs:
       # The push uses GITHUB_TOKEN, and GitHub does not re-trigger workflows for
       # commits made with it — so this cannot loop back into promote.
       - name: Record the deployed tag for Flux
+        if: steps.images.outputs.exists == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE: deploy/flux/helmrelease.yaml
