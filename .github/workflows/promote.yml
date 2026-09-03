@@ -13,7 +13,9 @@ on:
         required: true
 
 permissions:
-  contents: read
+  # write, because the promoted sha is committed back to main for Flux to pick
+  # up. Branch protection on main must allow this push.
+  contents: write
   packages: write
   pull-requests: read
 
@@ -87,3 +89,36 @@ jobs:
               "$REGISTRY/$image:$SOURCE_TAG"
             docker buildx imagetools inspect "$REGISTRY/$image:$short" --format '{{.Manifest.Digest}}'
           done
+
+      # Flux deploys whatever main says, so the sha that was just promoted has
+      # to land in git. Nothing else moves it: the chart's `latest` default with
+      # IfNotPresent would leave the rendered manifest unchanged, and an
+      # unchanged manifest neither rolls the pods nor re-pulls the image.
+      #
+      # The push uses GITHUB_TOKEN, and GitHub does not re-trigger workflows for
+      # commits made with it — so this cannot loop back into promote.
+      - name: Record the deployed tag for Flux
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE: deploy/flux/helmrelease.yaml
+        run: |
+          set -euo pipefail
+          short="${GITHUB_SHA:0:7}"
+
+          SHORT="$short" yq -i '
+            .spec.values.backend.image.tag = strenv(SHORT) |
+            .spec.values.frontend.image.tag = strenv(SHORT)
+          ' "$RELEASE"
+
+          if git diff --quiet -- "$RELEASE"; then
+            echo "Already at $short — nothing to commit."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$RELEASE"
+          git commit -m "Deploy $short
+
+          Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+          git push origin HEAD:main

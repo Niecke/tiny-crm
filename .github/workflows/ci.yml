@@ -29,6 +29,57 @@ env:
   REGISTRY: ghcr.io/niecke/tiny-crm
 
 jobs:
+  # Chart, deploy manifests and documentation now live in this repo, and none of
+  # them are exercised by anything below. Gating on a real diff keeps a
+  # docs-only pull request from running two image builds and an integration
+  # test.
+  #
+  # Deliberately a job-level `if:` on each consumer rather than a `paths:` filter
+  # on the trigger: a workflow skipped by path filtering never reports its
+  # checks, so the required checks in branch protection would sit Pending and
+  # the pull request could never merge. A job skipped by `if:` reports a
+  # `skipped` conclusion, which satisfies them.
+  changes:
+    name: Detect code changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - id: filter
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          # workflow_dispatch has no pull request to diff — run everything.
+          if [ -z "$BASE" ]; then
+            echo "Manual run — nothing to filter on."
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Three dots compares against the merge base, so commits that landed
+          # on main while this pull request was open are not mistaken for its
+          # own changes. Captured to a variable rather than piped: `grep -q`
+          # exits early, and under pipefail the resulting SIGPIPE on git would
+          # fail the step.
+          changed="$(git diff --name-only "$BASE...$HEAD")"
+          echo "$changed"
+
+          if echo "$changed" | grep -qE '^(backend/|frontend/|ci/|compose\.ci\.yml|\.github/workflows/ci\.yml)'; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            echo "Application code touched — running the full pipeline." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+            echo "No application code changed — tests, builds and the integration test are skipped." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   # The sha under test. For a pull_request event github.sha is the ephemeral
   # merge commit, which no image should ever be tagged with — the promote
   # workflow looks images up by the PR head sha after the merge.
@@ -48,6 +99,8 @@ jobs:
 
   backend-tests:
     name: Backend tests
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # The suite runs against a real Postgres — the models use text[], ilike and
@@ -114,6 +167,8 @@ jobs:
 
   frontend-tests:
     name: Frontend tests
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # Same SDK digest the frontend image builds with (see frontend/Dockerfile),
@@ -150,9 +205,9 @@ jobs:
 
   report:
     name: Test report
-    needs: [backend-tests, frontend-tests]
+    needs: [changes, backend-tests, frontend-tests]
     # Runs even when a suite failed — that is when the summary is worth reading.
-    if: always() && github.event_name == 'pull_request'
+    if: always() && github.event_name == 'pull_request' && needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -202,11 +257,11 @@ jobs:
 
   build-backend:
     name: Build backend
-    needs: [meta, backend-tests, frontend-tests]
+    needs: [changes, meta, backend-tests, frontend-tests]
     # A fork PR's GITHUB_TOKEN is read-only whatever this block asks for, and a
     # manual run has no PR head to tag images with — both fall back to running
     # the tests only.
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event.pull_request.head.repo.full_name == github.repository && needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -241,8 +296,8 @@ jobs:
 
   build-frontend:
     name: Build frontend
-    needs: [meta, backend-tests, frontend-tests]
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    needs: [changes, meta, backend-tests, frontend-tests]
+    if: github.event.pull_request.head.repo.full_name == github.repository && needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -274,8 +329,8 @@ jobs:
 
   integration:
     name: Integration test
-    needs: [meta, build-backend, build-frontend]
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    needs: [changes, meta, build-backend, build-frontend]
+    if: github.event.pull_request.head.repo.full_name == github.repository && needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:

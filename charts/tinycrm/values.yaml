@@ -1,0 +1,113 @@
+nameOverride: ""
+fullnameOverride: ""
+
+# ---------------------------------------------------------------------------
+# Database — a CloudNativePG Cluster, not a StatefulSet the chart owns.
+# ---------------------------------------------------------------------------
+postgres:
+  # One instance. The cluster is a single node, so a second replica would land
+  # on the same disk and buy no availability — only contention. Restarts are
+  # therefore downtime; that is the accepted trade for this deployment.
+  instances: 1
+  image: ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie
+
+  database: crm
+  username: crm
+  # Required. `openssl rand -base64 24`
+  password: ""
+
+  storage:
+    size: 10Gi
+    # local-path binds a directory under the node's data volume. It does not
+    # enforce this size — the number is documentation, and postgres and MinIO
+    # share the same 20 GB volume with nothing stopping either from filling it.
+    storageClass: local-path
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+# ---------------------------------------------------------------------------
+# Document store
+# ---------------------------------------------------------------------------
+minio:
+  # Digest-pinned the same way compose.yml pins it.
+  image: docker.io/minio/minio:latest@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+  mcImage: docker.io/minio/mc:latest@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
+
+  bucket: tinycrm-documents
+
+  # Required, and they must not be minioadmin: the backend refuses to start in
+  # production on the demo credentials (backend/app/config.py).
+  rootUser: ""
+  rootPassword: ""
+
+  storage:
+    size: 5Gi
+    storageClass: local-path
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+# ---------------------------------------------------------------------------
+# Application — templates land in the next increment; values are here so the
+# whole configuration surface can be reviewed in one place.
+# ---------------------------------------------------------------------------
+backend:
+  image:
+    repository: ghcr.io/niecke/tiny-crm/backend
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicas: 1
+
+  # production turns the insecure-default warnings in config.py into a hard
+  # startup failure. Keep it.
+  environment: production
+  # Required. `openssl rand -hex 32`
+  jwtSecret: ""
+
+  s3Region: us-east-1
+
+  # k3s allocates pod addresses from this range by default. uvicorn only honours
+  # X-Forwarded-For from peers it trusts, and the peer is always Traefik — so
+  # without this every user shares one address in the login throttle.
+  forwardedAllowIps: 10.42.0.0/16
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+frontend:
+  image:
+    repository: ghcr.io/niecke/tiny-crm/frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicas: 1
+
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 128Mi
+
+ingress:
+  className: traefik
+  # The end state. The phase 5 parallel run overrides this with
+  # values-crm-new.yaml; the frontend's apiUrl is derived from this value, so
+  # the two cannot drift apart.
+  host: crm.niecke-it.de
+  tls:
+    enabled: true
+    # cert-manager ClusterIssuer, installed as a cluster add-on.
+    clusterIssuer: letsencrypt

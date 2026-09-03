@@ -1,0 +1,9 @@
+# Plain kustomize manifest listing what the Flux Kustomization in sync.yaml
+# applies. Flux would infer this from the directory contents, but listing the
+# files makes an accidental addition to this directory a deliberate act.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - gitrepository.yaml
+  - sync.yaml
+  - helmrelease.yaml

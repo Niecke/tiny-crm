@@ -15,6 +15,22 @@ services:
       timeout: 5s
       retries: 10
 
+  # See compose.ci.yml: migrations left the image's CMD so rolling updates
+  # cannot race them. This one-shot service is the compose equivalent of the
+  # chart's pre-upgrade hook Job.
+  migrate:
+    build:
+      context: ./backend
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://crm:crm@db:5432/crm
+    depends_on:
+      db:
+        condition: service_healthy
+
   backend:
     build:
       context: ./backend
@@ -38,6 +54,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   frontend:
     build:

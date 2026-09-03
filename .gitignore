@@ -1,1 +1,6 @@
 .env
+
+# Helm values holding real credentials. This repo is public — nothing that
+# unlocks the production database or document store may land in it.
+values-secrets.yaml
+charts/**/values-secrets.yaml

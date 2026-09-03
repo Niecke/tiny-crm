@@ -1,0 +1,166 @@
+{{- $user := required "minio.rootUser is required and must not be 'minioadmin'" .Values.minio.rootUser }}
+{{- $password := required "minio.rootPassword is required and must not be 'minioadmin'" .Values.minio.rootPassword }}
+{{- if or (eq $user "minioadmin") (eq $password "minioadmin") }}
+{{- fail "minio.rootUser/rootPassword are the demo credentials — the backend refuses to start on them in production (backend/app/config.py)" }}
+{{- end }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "tinycrm.minioFullname" . }}
+  labels:
+    {{- include "tinycrm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: minio
+type: Opaque
+stringData:
+  MINIO_ROOT_USER: {{ $user | quote }}
+  MINIO_ROOT_PASSWORD: {{ $password | quote }}
+---
+# Governing Service for the StatefulSet: headless, so the pod gets stable DNS.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "tinycrm.minioFullname" . }}-headless
+  labels:
+    {{- include "tinycrm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: minio
+spec:
+  clusterIP: None
+  selector:
+    {{- include "tinycrm.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: minio
+  ports:
+    - name: api
+      port: 9000
+      targetPort: api
+---
+# What clients connect to. The backend's S3_ENDPOINT_URL points here.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "tinycrm.minioFullname" . }}
+  labels:
+    {{- include "tinycrm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: minio
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "tinycrm.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: minio
+  ports:
+    - name: api
+      port: 9000
+      targetPort: api
+    - name: console
+      port: 9001
+      targetPort: console
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "tinycrm.minioFullname" . }}
+  labels:
+    {{- include "tinycrm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: minio
+spec:
+  serviceName: {{ include "tinycrm.minioFullname" . }}-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "tinycrm.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: minio
+  template:
+    metadata:
+      labels:
+        {{- include "tinycrm.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: minio
+    spec:
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: minio
+          image: {{ .Values.minio.image | quote }}
+          args: ["server", "/data", "--console-address", ":9001"]
+          envFrom:
+            - secretRef:
+                name: {{ include "tinycrm.minioFullname" . }}
+          ports:
+            - name: api
+              containerPort: 9000
+            - name: console
+              containerPort: 9001
+          readinessProbe:
+            httpGet:
+              path: /minio/health/ready
+              port: api
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /minio/health/live
+              port: api
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.minio.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        storageClassName: {{ .Values.minio.storage.storageClass | quote }}
+        resources:
+          requests:
+            storage: {{ .Values.minio.storage.size | quote }}
+---
+# Ports the minio-init service from compose.yml. Versioning is enabled because
+# the GCS bucket it replaces was versioned, and after the migration this store
+# is the only live copy of every document.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "tinycrm.minioFullname" . }}-bucket
+  labels:
+    {{- include "tinycrm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: minio-bucket
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 6
+  template:
+    metadata:
+      labels:
+        {{- include "tinycrm.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: minio-bucket
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mc
+          image: {{ .Values.minio.mcImage | quote }}
+          envFrom:
+            - secretRef:
+                name: {{ include "tinycrm.minioFullname" . }}
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+              # The hook can start before MinIO is serving; alias set is the
+              # readiness check that matters, so retry it rather than sleeping
+              # for a guessed interval.
+              until mc alias set local {{ include "tinycrm.minioEndpoint" . }} \
+                    "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"; do
+                echo "waiting for minio..."
+                sleep 3
+              done
+              mc mb --ignore-existing local/{{ .Values.minio.bucket }}
+              mc version enable local/{{ .Values.minio.bucket }}
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
