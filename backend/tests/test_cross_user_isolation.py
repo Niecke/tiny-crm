@@ -110,6 +110,19 @@ RESOURCES = [
         _json_creator("/interactions/", {"subject": "Alice's call", "occurred_at": OCCURRED_AT}),
         {"subject": "Renamed by Bob"},
     ),
+    Resource(
+        "watches",
+        "/watches/",
+        _json_creator(
+            "/watches/",
+            {
+                "name": "Alice's watch",
+                "url": "https://example.com/jobs",
+                "recurrence_rule": "weekly",
+            },
+        ),
+        {"name": "Renamed by Bob"},
+    ),
     Resource("documents", "/documents/", _create_document, {"title": "Renamed by Bob"}),
 ]
 

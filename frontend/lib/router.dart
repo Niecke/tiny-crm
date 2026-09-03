@@ -10,6 +10,7 @@ import 'providers/documents_provider.dart';
 import 'providers/interactions_provider.dart';
 import 'providers/organizations_provider.dart';
 import 'providers/projects_provider.dart';
+import 'providers/watches_provider.dart';
 import 'pages/change_password_page.dart';
 import 'pages/dashboard_page.dart';
 import 'pages/deals_page.dart';
@@ -20,6 +21,7 @@ import 'pages/login_page.dart';
 import 'pages/organizations_page.dart';
 import 'pages/profile_page.dart';
 import 'pages/projects_page.dart';
+import 'pages/watches_page.dart';
 import 'widgets/app_footer.dart';
 
 final routerProvider = Provider<GoRouter>((ref) => _buildRouter(ref));
@@ -65,6 +67,10 @@ GoRouter _buildRouter(Ref ref) {
           GoRoute(
             path: '/deals',
             builder: (context, state) => const DealsPage(),
+          ),
+          GoRoute(
+            path: '/watches',
+            builder: (context, state) => const WatchesPage(),
           ),
           GoRoute(
             path: '/projects',
@@ -135,6 +141,7 @@ class AppShell extends ConsumerWidget {
           if (isWide)
             for (final (label, path) in [
               ('Dashboard', '/'),
+              ('Sources', '/watches'),
               ('Deals', '/deals'),
               ('Organizations', '/organizations'),
               ('Projects', '/projects'),
@@ -148,13 +155,22 @@ class AppShell extends ConsumerWidget {
                       ? scheme.primary
                       : scheme.onSurface,
                 ),
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontWeight: location == path
-                        ? FontWeight.bold
-                        : FontWeight.normal,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontWeight: location == path
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                      ),
+                    ),
+                    // How many sources are due, so the sweep is visible without
+                    // opening the screen — a watch list nobody looks at is the
+                    // failure mode this whole feature exists to avoid.
+                    if (path == '/watches') const _DueWatchBadge(),
+                  ],
                 ),
               )
           else
@@ -163,6 +179,7 @@ class AppShell extends ConsumerWidget {
               tooltip: 'Navigate',
               onSelected: context.go,
               itemBuilder: (_) => const [
+                PopupMenuItem(value: '/watches', child: Text('Sources')),
                 PopupMenuItem(value: '/deals', child: Text('Deals')),
                 PopupMenuItem(
                   value: '/organizations',
@@ -183,6 +200,8 @@ class AppShell extends ConsumerWidget {
               ref.invalidate(organizationsProvider),
               ref.invalidate(allOrganizationsProvider),
               ref.invalidate(dealsProvider),
+              ref.invalidate(watchesProvider),
+              ref.invalidate(dueWatchCountProvider),
               ref.invalidate(tasksProvider),
               ref.invalidate(allTasksProvider),
               ref.invalidate(documentsProvider),
@@ -211,6 +230,41 @@ class AppShell extends ConsumerWidget {
           Expanded(child: child),
           const AppFooter(),
         ],
+      ),
+    );
+  }
+}
+
+/// The count of sources due for a sweep, beside the Sources nav item.
+///
+/// Silent when nothing is due and while the count is loading — a badge that
+/// flashes "0" on every navigation is noise, and a failure here must never
+/// break the app bar.
+class _DueWatchBadge extends ConsumerWidget {
+  const _DueWatchBadge();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final due = ref.watch(dueWatchCountProvider).asData?.value ?? 0;
+    if (due == 0) return const SizedBox.shrink();
+
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(left: 6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+        decoration: BoxDecoration(
+          color: scheme.primary,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          '$due',
+          style: TextStyle(
+            color: scheme.onPrimary,
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ),
     );
   }

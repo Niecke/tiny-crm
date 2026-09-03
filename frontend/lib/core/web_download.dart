@@ -18,6 +18,15 @@ String extensionForFormat(String format) {
   return {'pdf': 'pdf', 'markdown': 'md', 'txt': 'txt'}[format] ?? 'bin';
 }
 
+/// Opens [url] in a new browser tab.
+///
+/// `package:web` rather than url_launcher: this app is web-only and already
+/// reaches for the DOM here, so a plugin dependency would buy nothing.
+/// `noopener` because the opened page must not get a handle on this one.
+void openInNewTab(String url) {
+  web.window.open(url, '_blank', 'noopener,noreferrer');
+}
+
 /// Triggers a browser "Save as" for [bytes] under [filename].
 ///
 /// The bytes are handed to [web.Blob] as a typed array (BufferSource). If we
