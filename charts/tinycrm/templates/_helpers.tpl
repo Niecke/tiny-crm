@@ -39,6 +39,16 @@ so the read-write endpoint is <cluster>-rw — that is what DATABASE_URL points 
 {{- printf "%s-rw" (include "tinycrm.postgresCluster" .) -}}
 {{- end -}}
 
+{{/*
+Used by both the backend Secret and the migration hook's own Secret. The two
+cannot share one object: pre-upgrade hooks run before the release's regular
+manifests are applied, so the backend Secret does not exist yet when the hook
+starts.
+*/}}
+{{- define "tinycrm.databaseUrl" -}}
+{{- printf "postgresql+asyncpg://%s:%s@%s:5432/%s" .Values.postgres.username .Values.postgres.password (include "tinycrm.postgresHost" .) .Values.postgres.database -}}
+{{- end -}}
+
 {{- define "tinycrm.minioFullname" -}}
 {{- printf "%s-minio" (include "tinycrm.fullname" .) -}}
 {{- end -}}

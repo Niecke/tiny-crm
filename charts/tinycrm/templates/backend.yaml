@@ -1,5 +1,5 @@
 {{- $jwt := required "backend.jwtSecret is required — generate one with `openssl rand -hex 32`" .Values.backend.jwtSecret }}
-{{- $dbUrl := printf "postgresql+asyncpg://%s:%s@%s:5432/%s" .Values.postgres.username .Values.postgres.password (include "tinycrm.postgresHost" .) .Values.postgres.database }}
+{{- $dbUrl := include "tinycrm.databaseUrl" . }}
 apiVersion: v1
 kind: Secret
 metadata:
