@@ -11,7 +11,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 : "${IMAGE_TAG:?set IMAGE_TAG to the tag that was just pushed}"
-export REGISTRY="${REGISTRY:-europe-west1-docker.pkg.dev/niecke-it/tiny-crm}"
+export REGISTRY="${REGISTRY:-ghcr.io/niecke/tiny-crm}"
 # Throwaway, but not the built-in defaults: the backend runs with
 # ENVIRONMENT=production, which refuses to start on placeholder credentials.
 export JWT_SECRET="${JWT_SECRET:-$(openssl rand -hex 32)}"

@@ -51,7 +51,7 @@ services:
       "
 
   backend:
-    image: ${REGISTRY:-europe-west1-docker.pkg.dev/niecke-it/tiny-crm}/backend:${IMAGE_TAG:?set IMAGE_TAG}
+    image: ${REGISTRY:-ghcr.io/niecke/tiny-crm}/backend:${IMAGE_TAG:?set IMAGE_TAG}
     environment:
       ENVIRONMENT: production
       DATABASE_URL: postgresql+asyncpg://crm:crm@db:5432/crm
@@ -71,7 +71,7 @@ services:
         condition: service_healthy
 
   frontend:
-    image: ${REGISTRY:-europe-west1-docker.pkg.dev/niecke-it/tiny-crm}/frontend:${IMAGE_TAG:?set IMAGE_TAG}
+    image: ${REGISTRY:-ghcr.io/niecke/tiny-crm}/frontend:${IMAGE_TAG:?set IMAGE_TAG}
     ports:
       - "${FRONTEND_PORT:-8080}:8080"
     depends_on:
