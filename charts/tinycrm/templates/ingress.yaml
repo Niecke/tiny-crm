@@ -1,0 +1,86 @@
+{{- $fullName := include "tinycrm.fullname" . -}}
+{{- $tlsSecret := printf "%s-tls" $fullName -}}
+# Replaces the host Caddy from the compose deployment. Its two rules map
+# straight over: /api/* strips the prefix and goes to the backend, everything
+# else goes to the frontend.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ $fullName }}-strip-api
+  labels:
+    {{- include "tinycrm.labels" . | nindent 4 }}
+spec:
+  stripPrefix:
+    prefixes:
+      - /api
+---
+# Two Ingress objects, not one with two paths: Traefik's router.middlewares
+# annotation applies to every route in the Ingress it sits on, so a single
+# object would strip /api from the frontend's routes as well.
+#
+# This one owns the certificate — it carries the cert-manager annotation, and
+# the API Ingress below only references the Secret it produces. Annotating both
+# would have cert-manager reconcile two Certificates onto one Secret.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $fullName }}
+  labels:
+    {{- include "tinycrm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+  annotations:
+    {{- if .Values.ingress.tls.enabled }}
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.tls.clusterIssuer | quote }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host | quote }}
+      secretName: {{ $tlsSecret }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $fullName }}-frontend
+                port:
+                  number: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $fullName }}-api
+  labels:
+    {{- include "tinycrm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-%s-strip-api@kubernetescrd" .Release.Namespace $fullName }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- if .Values.ingress.tls.enabled }}
+  # References the Secret the Ingress above causes cert-manager to fill. No
+  # issuer annotation here, so no second Certificate is created for it.
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host | quote }}
+      secretName: {{ $tlsSecret }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.host | quote }}
+      http:
+        paths:
+          # Traefik prioritises Ingress routers by rule length, so /api wins
+          # over / without any explicit priority.
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $fullName }}-backend
+                port:
+                  number: 8000

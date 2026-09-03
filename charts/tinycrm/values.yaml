@@ -73,6 +73,13 @@ backend:
   # Required. `openssl rand -hex 32`
   jwtSecret: ""
 
+  s3Region: us-east-1
+
+  # k3s allocates pod addresses from this range by default. uvicorn only honours
+  # X-Forwarded-For from peers it trusts, and the peer is always Traefik — so
+  # without this every user shares one address in the login throttle.
+  forwardedAllowIps: 10.42.0.0/16
+
   resources:
     requests:
       cpu: 100m

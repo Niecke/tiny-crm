@@ -31,7 +31,13 @@ RUN date -u +"%Y-%m-%dT%H:%M:%SZ" > /app/build_timestamp.txt
 
 EXPOSE 8000
 
-# Run migrations then start the server. `.venv/bin` is on PATH, so alembic and
-# uvicorn resolve to the locked environment.
-# alembic upgrade head is idempotent — safe to run on every startup.
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-config log_config.json"]
+# Serve only. `.venv/bin` is on PATH, so uvicorn resolves to the locked
+# environment.
+#
+# Migrations deliberately do not run here. Under a rolling update, or with more
+# than one replica, every starting pod would race the same `alembic upgrade
+# head`. The Helm chart runs it once per release instead, as a pre-upgrade hook
+# Job that must succeed before the new pods start
+# (charts/tinycrm/templates/migrate-job.yaml). The image still carries alembic,
+# which is what that Job runs.
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-config log_config.json"]

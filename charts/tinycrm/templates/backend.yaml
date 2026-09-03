@@ -1,0 +1,109 @@
+{{- $jwt := required "backend.jwtSecret is required — generate one with `openssl rand -hex 32`" .Values.backend.jwtSecret }}
+{{- $dbUrl := printf "postgresql+asyncpg://%s:%s@%s:5432/%s" .Values.postgres.username .Values.postgres.password (include "tinycrm.postgresHost" .) .Values.postgres.database }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "tinycrm.fullname" . }}-backend
+  labels:
+    {{- include "tinycrm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+type: Opaque
+stringData:
+  # Assembled here rather than read back from CloudNativePG's generated secret,
+  # which is why the chart supplies the bootstrap password instead of letting
+  # the operator invent one.
+  DATABASE_URL: {{ $dbUrl | quote }}
+  JWT_SECRET: {{ $jwt | quote }}
+  S3_ACCESS_KEY: {{ .Values.minio.rootUser | quote }}
+  S3_SECRET_KEY: {{ .Values.minio.rootPassword | quote }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "tinycrm.fullname" . }}-backend
+  labels:
+    {{- include "tinycrm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "tinycrm.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "tinycrm.fullname" . }}-backend
+  labels:
+    {{- include "tinycrm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  replicas: {{ .Values.backend.replicas }}
+  selector:
+    matchLabels:
+      {{- include "tinycrm.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: backend
+  template:
+    metadata:
+      labels:
+        {{- include "tinycrm.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: backend
+      annotations:
+        # Helm does not roll pods when only a referenced Secret changes, so a
+        # rotated password would leave the running pods on the old one.
+        checksum/credentials: {{ printf "%s|%s|%s" .Values.postgres.password $jwt .Values.minio.rootPassword | sha256sum }}
+    spec:
+      containers:
+        - name: backend
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8000
+          envFrom:
+            - secretRef:
+                name: {{ include "tinycrm.fullname" . }}-backend
+          env:
+            - name: ENVIRONMENT
+              value: {{ .Values.backend.environment | quote }}
+            # pydantic-settings parses a list field from JSON. A bare hostname
+            # would be read as a one-character-per-item list.
+            - name: CORS_ORIGINS
+              value: {{ printf "[\"https://%s\"]" .Values.ingress.host | quote }}
+            - name: S3_ENDPOINT_URL
+              value: {{ include "tinycrm.minioEndpoint" . | quote }}
+            - name: S3_BUCKET
+              value: {{ .Values.minio.bucket | quote }}
+            - name: S3_REGION
+              value: {{ .Values.backend.s3Region | quote }}
+            # Traefik is the peer, so uvicorn sees the ingress pod's address on
+            # every request. Without trusting the pod network it discards
+            # X-Forwarded-For and the login throttle buckets every user under
+            # one address. k3s allocates pods from 10.42.0.0/16 by default.
+            - name: FORWARDED_ALLOW_IPS
+              value: {{ .Values.backend.forwardedAllowIps | quote }}
+          # readiness only. /health runs SELECT 1 and returns 503 when the
+          # database is unreachable — correct for pulling a pod out of the
+          # Service, wrong for liveness, where it would restart every backend
+          # pod during a database outage and slow the recovery down.
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          # /version touches nothing but process state, so it fails only when
+          # the process is actually wedged.
+          livenessProbe:
+            httpGet:
+              path: /version
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.backend.resources | nindent 12 }}

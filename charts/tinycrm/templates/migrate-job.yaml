@@ -1,0 +1,62 @@
+# Schema migration, moved out of the backend image's CMD.
+#
+# The image used to run `alembic upgrade head && uvicorn`, which races itself
+# the moment there is more than one pod or a rolling update overlaps old and
+# new. As a hook it runs exactly once per release, and the new backend pods do
+# not start until it has succeeded.
+#
+# post-install, not pre-install: on a first install the CloudNativePG cluster is
+# part of this same release, so a pre-install hook would run before any database
+# exists. pre-upgrade is correct for every release after that — the migration
+# lands before the new image serves traffic.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "tinycrm.fullname" . }}-migrate
+  labels:
+    {{- include "tinycrm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migrate
+  annotations:
+    helm.sh/hook: post-install,pre-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        {{- include "tinycrm.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: migrate
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: alembic
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          envFrom:
+            - secretRef:
+                name: {{ include "tinycrm.fullname" . }}-backend
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+              # On a first install the database is still being bootstrapped by
+              # the operator. The image carries no postgres client to poll with,
+              # so retry the migration itself — `alembic upgrade head` is
+              # idempotent, and a genuine migration error still surfaces in the
+              # logs on every attempt before the job gives up.
+              for _ in $(seq 1 30); do
+                if alembic upgrade head; then
+                  exit 0
+                fi
+                echo "database not ready or migration failed; retrying in 5s"
+                sleep 5
+              done
+              echo "migration did not succeed after 30 attempts" >&2
+              exit 1
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
