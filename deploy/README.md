@@ -6,10 +6,18 @@ unpublished.
 
 ```
 merge to main
-  ├─ promote.yml   retags the tested image digest, commits the sha into
-  │                deploy/flux/helmrelease.yaml
-  └─ Flux          sees the new commit, re-renders charts/tinycrm, upgrades
+  ├─ promote.yml           retags the tested image digest, commits the sha
+  │                        into deploy/flux/helmrelease.yaml
+  └─ source-controller     fetches the commit
+       ├─ kustomize-ctrl   applies deploy/flux/ — so the committed tag
+       │                   actually reaches the HelmRelease object
+       └─ helm-controller  re-renders charts/tinycrm, upgrades the release
 ```
+
+The kustomize step is not optional. A HelmRelease is a cluster object; editing
+its manifest in git changes nothing until something applies it. Without that
+controller the images get tagged, the sha lands in git, and the cluster silently
+keeps running the previous release.
 
 Two things trigger a redeploy, and both are just commits on `main`:
 
@@ -26,7 +34,7 @@ is deployable, and a scanner picking up tags it never blessed would undo the
 promote-by-digest guarantee.
 
 ```bash
-flux install --components=source-controller,helm-controller
+flux install --components=source-controller,helm-controller,kustomize-controller
 kubectl create namespace tinycrm
 ```
 
@@ -60,7 +68,23 @@ Then point Flux at the repo:
 
 ```bash
 kubectl apply -f deploy/flux/
+flux -n tinycrm get kustomization tinycrm-flux
 flux -n tinycrm get helmrelease tinycrm
+```
+
+That `kubectl apply` is a bootstrap, run once. From then on the Kustomization
+manages all three objects — including itself and the GitRepository — so later
+changes go through git rather than through `kubectl`.
+
+Which also means hand-patching the GitRepository's branch stops sticking: the
+next reconcile restores whatever git says. To work off a branch, suspend first:
+
+```bash
+flux -n tinycrm suspend kustomization tinycrm-flux
+kubectl -n tinycrm patch gitrepository tinycrm --type=merge \
+  -p '{"spec":{"ref":{"branch":"some-branch"}}}'
+# ... and when done
+flux -n tinycrm resume kustomization tinycrm-flux
 ```
 
 ## Repository settings this depends on
