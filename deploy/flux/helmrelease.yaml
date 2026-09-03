@@ -15,7 +15,6 @@ spec:
       # a template edit merged without a version bump would sit in git and never
       # reach the cluster. Revision keys off the git commit instead.
       reconcileStrategy: Revision
-
   install:
     remediation:
       retries: 3
@@ -23,7 +22,6 @@ spec:
     remediation:
       retries: 3
       remediateLastFailure: true
-
   # Credentials. This Secret is created once by hand and never lives in git —
   # see deploy/README.md. It carries the same YAML that a local
   # values-secrets.yaml would.
@@ -31,7 +29,6 @@ spec:
     - kind: Secret
       name: tinycrm-values
       valuesKey: values.yaml
-
   # Inline values win over valuesFrom, so this is the deployment's own config.
   values:
     ingress:
@@ -41,7 +38,7 @@ spec:
     backend:
       image:
         # Managed by .github/workflows/promote.yml — do not edit by hand.
-        tag: latest
+        tag: 077ae28
     frontend:
       image:
-        tag: latest
+        tag: 077ae28
