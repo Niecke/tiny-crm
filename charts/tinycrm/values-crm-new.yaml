@@ -1,0 +1,17 @@
+# Phase 5 overlay — the parallel run alongside the live GCP stack.
+#
+# values.yaml carries the end state (crm.niecke-it.de) deliberately. Pointing
+# the committed default at the real hostname while DNS still resolves to GCP
+# would have cert-manager fail the http-01 challenge on every reconcile, and
+# Let's Encrypt rate-limits failed validations per account.
+#
+#   helm upgrade --install tinycrm ./charts/tinycrm \
+#     -n tinycrm --create-namespace \
+#     -f charts/tinycrm/values-crm-new.yaml \
+#     -f values-secrets.yaml
+#
+# Cutover (phase 7) is then dropping this -f, not editing a committed default —
+# a removal is harder to forget than an edit, and shows up in the diff of the
+# command rather than nowhere.
+ingress:
+  host: crm-new.niecke-it.de

@@ -1,0 +1,47 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: tinycrm
+  namespace: tinycrm
+spec:
+  interval: 5m
+  chart:
+    spec:
+      chart: ./charts/tinycrm
+      sourceRef:
+        kind: GitRepository
+        name: tinycrm
+      # Without this, Flux only redeploys when Chart.yaml's version changes, so
+      # a template edit merged without a version bump would sit in git and never
+      # reach the cluster. Revision keys off the git commit instead.
+      reconcileStrategy: Revision
+
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+
+  # Credentials. This Secret is created once by hand and never lives in git —
+  # see deploy/README.md. It carries the same YAML that a local
+  # values-secrets.yaml would.
+  valuesFrom:
+    - kind: Secret
+      name: tinycrm-values
+      valuesKey: values.yaml
+
+  # Inline values win over valuesFrom, so this is the deployment's own config.
+  values:
+    ingress:
+      # Cutover (phase 7) is editing this line and merging — reviewable, and it
+      # lands in the git history rather than in someone's shell.
+      host: crm-new.niecke-it.de
+    backend:
+      image:
+        # Managed by .github/workflows/promote.yml — do not edit by hand.
+        tag: latest
+    frontend:
+      image:
+        tag: latest

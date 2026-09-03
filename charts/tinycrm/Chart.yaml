@@ -1,0 +1,14 @@
+apiVersion: v2
+name: tinycrm
+description: tinyCRM — Flutter web frontend, FastAPI backend, MinIO document store and a CloudNativePG database
+type: application
+
+# Chart version. Bump on chart changes; appVersion tracks nothing because the
+# image tags are set per deploy (--set backend.image.tag=<sha>).
+version: 0.1.0
+appVersion: "latest"
+
+# The CloudNativePG operator and cert-manager are cluster-scoped and shared, so
+# they are installed once by hand rather than being subcharts here. `helm
+# uninstall tinycrm` must not be able to take the cluster's certificate issuer
+# or its database operator with it.

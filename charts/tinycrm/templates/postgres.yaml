@@ -1,0 +1,45 @@
+{{- $password := required "postgres.password is required — generate one with `openssl rand -base64 24`" .Values.postgres.password }}
+# CloudNativePG bootstraps the cluster with credentials we supply rather than
+# ones it generates, so DATABASE_URL can be assembled in this chart instead of
+# being read back out of an operator-managed Secret at deploy time.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "tinycrm.postgresCluster" . }}-app
+  labels:
+    {{- include "tinycrm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+type: kubernetes.io/basic-auth
+stringData:
+  username: {{ .Values.postgres.username | quote }}
+  password: {{ $password | quote }}
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ include "tinycrm.postgresCluster" . }}
+  labels:
+    {{- include "tinycrm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+spec:
+  instances: {{ .Values.postgres.instances }}
+  imageName: {{ .Values.postgres.image | quote }}
+
+  bootstrap:
+    initdb:
+      database: {{ .Values.postgres.database | quote }}
+      owner: {{ .Values.postgres.username | quote }}
+      secret:
+        name: {{ include "tinycrm.postgresCluster" . }}-app
+
+  storage:
+    size: {{ .Values.postgres.storage.size | quote }}
+    storageClass: {{ .Values.postgres.storage.storageClass | quote }}
+
+  resources:
+    {{- toYaml .Values.postgres.resources | nindent 4 }}
+
+  # With one instance there is no replica to promote, so an update is a restart
+  # either way. Unsupervised keeps it from waiting for a switchover that cannot
+  # happen.
+  primaryUpdateStrategy: unsupervised
