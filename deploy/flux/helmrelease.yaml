@@ -31,7 +31,6 @@ spec:
     remediation:
       retries: 3
       remediateLastFailure: true
-
   # Credentials. This Secret is created once by hand and never lives in git —
   # see deploy/README.md. It carries the same YAML that a local
   # values-secrets.yaml would.
@@ -39,7 +38,6 @@ spec:
     - kind: Secret
       name: tinycrm-values
       valuesKey: values.yaml
-
   # Inline values win over valuesFrom, so this is the deployment's own config.
   values:
     ingress:
@@ -49,10 +47,12 @@ spec:
     backend:
       image:
         # Managed by .github/workflows/promote.yml — do not edit by hand.
-        tag: latest
+        tag: 077ae28
     frontend:
       image:
-        tag: latest
+        tag: 077ae28
     backup:
       image:
+        # No image at 077ae28 — that promote predates this one existing. promote
+        # sets all three to the merge sha on the next release.
         tag: latest
