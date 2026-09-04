@@ -48,8 +48,15 @@ Containers are build each time to get latest code changes.
 ```bash
 podman-compose -f compose.full.yml build frontend && \
   podman-compose -f compose.full.yml build backend && \
+  podman-compose -f compose.full.yml build migrate && \
   podman-compose -f compose.full.yml up -d --force-recreate frontend backend
 ```
+
+The `migrate` service runs `alembic upgrade head` once and exits; `backend`
+waits for it to succeed. Migrations no longer run from the backend image's
+`CMD` — under a rolling update every starting replica would race the same
+migration — so the Helm chart runs them as a pre-upgrade hook and compose runs
+them as this one-shot service.
 
 Shutdown again
 ```bash

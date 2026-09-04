@@ -15,6 +15,15 @@ spec:
       # a template edit merged without a version bump would sit in git and never
       # reach the cluster. Revision keys off the git commit instead.
       reconcileStrategy: Revision
+
+  # Off by default, which is why a manual `kubectl scale` on the backend
+  # survived a suspend/resume cycle: without this, helm-controller only acts
+  # when the chart revision or the values change, never on a live object being
+  # edited underneath it. Enabled, the cluster is corrected back to the chart on
+  # every interval.
+  driftDetection:
+    mode: enabled
+
   install:
     remediation:
       retries: 3
@@ -42,3 +51,8 @@ spec:
     frontend:
       image:
         tag: 077ae28
+    backup:
+      image:
+        # No image at 077ae28 — that promote predates this one existing. promote
+        # sets all three to the merge sha on the next release.
+        tag: latest
