@@ -16,6 +16,14 @@ spec:
       # reach the cluster. Revision keys off the git commit instead.
       reconcileStrategy: Revision
 
+  # Off by default, which is why a manual `kubectl scale` on the backend
+  # survived a suspend/resume cycle: without this, helm-controller only acts
+  # when the chart revision or the values change, never on a live object being
+  # edited underneath it. Enabled, the cluster is corrected back to the chart on
+  # every interval.
+  driftDetection:
+    mode: enabled
+
   install:
     remediation:
       retries: 3
@@ -43,5 +51,8 @@ spec:
         # Managed by .github/workflows/promote.yml — do not edit by hand.
         tag: latest
     frontend:
+      image:
+        tag: latest
+    backup:
       image:
         tag: latest

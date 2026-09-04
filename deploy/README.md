@@ -125,6 +125,25 @@ A failed upgrade is retried three times and then rolled back
 (`remediateLastFailure`), so a bad merge leaves the previous release running
 rather than a half-applied one.
 
+If an upgrade times out mid-flight, Helm can be left claiming an operation is
+still running and will refuse the next one. `helm -n tinycrm list -a` shows
+`pending-upgrade` when that has happened; `helm -n tinycrm rollback tinycrm`
+clears it, then reconcile.
+
+`flux resume` and `flux reconcile` block while watching. Ctrl-C only stops the
+watching — pass `--wait=false` to skip it.
+
+### Creating an admin user
+
+No signup flow; the first account comes from the CLI.
+
+```bash
+read -rsp 'password: ' PW && echo
+kubectl -n tinycrm exec -i deploy/tinycrm-backend -- \
+  env PYTHONPATH=/app python scripts/create_admin.py you@niecke-it.de "$PW"
+unset PW
+```
+
 ## Local install, without Flux
 
 For a k3d cluster, or to test the chart before merging:

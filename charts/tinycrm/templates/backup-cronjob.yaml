@@ -1,0 +1,85 @@
+{{- if .Values.backup.enabled }}
+{{- $accessKey := required "backup.gcs.accessKey is required when backup.enabled — terraform output tiny_crm_documents_hmac_access_id" .Values.backup.gcs.accessKey }}
+{{- $secretKey := required "backup.gcs.secretKey is required when backup.enabled — terraform output tiny_crm_documents_hmac_secret" .Values.backup.gcs.secretKey }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "tinycrm.fullname" . }}-backup
+  labels:
+    {{- include "tinycrm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backup
+type: Opaque
+stringData:
+  PGPASSWORD: {{ .Values.postgres.password | quote }}
+  MINIO_USER: {{ .Values.minio.rootUser | quote }}
+  MINIO_PASSWORD: {{ .Values.minio.rootPassword | quote }}
+  # HMAC key for the GCS bucket, reached over its S3-compatible endpoint. The
+  # service account behind it already holds objectAdmin on the backups bucket,
+  # so this one credential covers both stores and no GCP key file is involved.
+  GCS_ACCESS_KEY: {{ $accessKey | quote }}
+  GCS_SECRET_KEY: {{ $secretKey | quote }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "tinycrm.fullname" . }}-backup
+  labels:
+    {{- include "tinycrm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backup
+spec:
+  schedule: {{ .Values.backup.schedule | quote }}
+  timeZone: {{ .Values.backup.timeZone | quote }}
+  # Every run copies the whole document store, so two overlapping runs would
+  # double the scratch usage and the egress for no benefit.
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            {{- include "tinycrm.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: backup
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: backup
+              image: "{{ .Values.backup.image.repository }}:{{ .Values.backup.image.tag }}"
+              imagePullPolicy: {{ .Values.backup.image.pullPolicy }}
+              envFrom:
+                - secretRef:
+                    name: {{ include "tinycrm.fullname" . }}-backup
+              env:
+                - name: DATABASE_HOST
+                  value: {{ include "tinycrm.postgresHost" . | quote }}
+                - name: DATABASE_USER
+                  value: {{ .Values.postgres.username | quote }}
+                - name: DATABASE_NAME
+                  value: {{ .Values.postgres.database | quote }}
+                - name: MINIO_ENDPOINT
+                  value: {{ include "tinycrm.minioEndpoint" . | quote }}
+                - name: MINIO_BUCKET
+                  value: {{ .Values.minio.bucket | quote }}
+                - name: GCS_ENDPOINT
+                  value: {{ .Values.backup.gcs.endpoint | quote }}
+                - name: BACKUP_BUCKET
+                  value: {{ .Values.backup.gcs.bucket | quote }}
+                - name: BROTLI_QUALITY
+                  value: {{ .Values.backup.brotliQuality | quote }}
+                - name: WORK_DIR
+                  value: /backup
+              volumeMounts:
+                - name: work
+                  mountPath: /backup
+              resources:
+                {{- toYaml .Values.backup.resources | nindent 16 }}
+          volumes:
+            # Scratch for the dump and the mirrored documents. emptyDir comes
+            # off the node's boot disk, not the data volume — sizeLimit keeps a
+            # grown document store from filling it and evicting the pod.
+            - name: work
+              emptyDir:
+                sizeLimit: {{ .Values.backup.workDirSize }}
+{{- end }}

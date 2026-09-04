@@ -90,7 +90,7 @@ jobs:
         run: |
           set -euo pipefail
           missing=0
-          for image in backend frontend; do
+          for image in backend frontend backup; do
             if docker buildx imagetools inspect "$REGISTRY/$image:$SOURCE_TAG" >/dev/null 2>&1; then
               echo "found $image:$SOURCE_TAG"
             else
@@ -114,7 +114,7 @@ jobs:
         run: |
           set -euo pipefail
           short="${GITHUB_SHA:0:7}"
-          for image in backend frontend; do
+          for image in backend frontend backup; do
             docker buildx imagetools create \
               --tag "$REGISTRY/$image:$short" \
               --tag "$REGISTRY/$image:latest" \
@@ -140,7 +140,8 @@ jobs:
 
           SHORT="$short" yq -i '
             .spec.values.backend.image.tag = strenv(SHORT) |
-            .spec.values.frontend.image.tag = strenv(SHORT)
+            .spec.values.frontend.image.tag = strenv(SHORT) |
+            .spec.values.backup.image.tag = strenv(SHORT)
           ' "$RELEASE"
 
           if git diff --quiet -- "$RELEASE"; then

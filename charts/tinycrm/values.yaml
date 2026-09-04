@@ -101,6 +101,51 @@ frontend:
     limits:
       memory: 128Mi
 
+# ---------------------------------------------------------------------------
+# Off-site backup. One tar per run holding a brotli'd SQL dump and the raw
+# documents, streamed to the GCS backups bucket over its S3 endpoint.
+#
+# Complements Hetzner's server snapshots rather than duplicating them: those are
+# whole-machine, crash-consistent and never leave Hetzner. This is per-object,
+# restorable into any stack, and lives at a different provider.
+# ---------------------------------------------------------------------------
+backup:
+  enabled: true
+
+  # Daily, not hourly. Every run copies the whole document store, and the
+  # bucket's lifecycle rule keeps 14 days — hourly would mean 336 full copies.
+  # Hourly with deduplication is a restic or borg job, not this one.
+  schedule: "0 3 * * *"
+  timeZone: Europe/Berlin
+
+  image:
+    repository: ghcr.io/niecke/tiny-crm/backup
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  # brotli's default of 11 costs minutes on two shared vCPUs for a few percent.
+  brotliQuality: 5
+
+  gcs:
+    endpoint: https://storage.googleapis.com
+    bucket: niecke-it-tiny-crm-backups
+    # Required. Both from terraform/niecke-it:
+    #   terraform output tiny_crm_documents_hmac_access_id
+    #   terraform output tiny_crm_documents_hmac_secret
+    accessKey: ""
+    secretKey: ""
+
+  # Scratch space for the dump plus a full copy of the documents. Comes off the
+  # node's 40 GB boot disk, so it has to stay well under it.
+  workDirSize: 10Gi
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+
 ingress:
   className: traefik
   # The end state. The phase 5 parallel run overrides this with
