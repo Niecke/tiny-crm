@@ -1,3 +1,4 @@
+{{- if .Values.ingress.enabled -}}
 {{- $fullName := include "tinycrm.fullname" . -}}
 {{- $tlsSecret := printf "%s-tls" $fullName -}}
 # Replaces the host Caddy from the compose deployment. Its two rules map
@@ -84,3 +85,4 @@ spec:
                 name: {{ $fullName }}-backend
                 port:
                   number: 8000
+{{- end }}

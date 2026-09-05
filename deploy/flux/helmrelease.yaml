@@ -39,9 +39,7 @@ spec:
   # Inline values win over valuesFrom, so this is the deployment's own config.
   values:
     ingress:
-      # Cutover (phase 7) is editing this line and merging — reviewable, and it
-      # lands in the git history rather than in someone's shell.
-      host: crm-new.niecke-it.de
+      host: crm.niecke-it.de
     backend:
       image:
         # Managed by .github/workflows/promote.yml — do not edit by hand.
