@@ -202,8 +202,21 @@ class _ContactsPanel extends ConsumerStatefulWidget {
 class _ContactsPanelState extends ConsumerState<_ContactsPanel> {
   final _searchController = TextEditingController();
   String _search = '';
+
+  /// Status and type stay separate controls, because they are separate
+  /// questions: how far along we are, and what this party is to me. Set both
+  /// and the list narrows to "partners we have not approached yet".
+  LifecycleStatus? _lifecycleStatus;
+  RelationType? _relationType;
+  FreelancerAnswer? _worksWithFreelancers;
   int _skip = 0;
   Timer? _debounce;
+
+  bool get _hasFilters =>
+      _search.isNotEmpty ||
+      _lifecycleStatus != null ||
+      _relationType != null ||
+      _worksWithFreelancers != null;
 
   @override
   void dispose() {
@@ -215,7 +228,14 @@ class _ContactsPanelState extends ConsumerState<_ContactsPanel> {
   @override
   Widget build(BuildContext context) {
     final contactsAsync = ref.watch(
-      contactsProvider((search: _search, organizationId: null, skip: _skip)),
+      contactsProvider((
+        search: _search,
+        organizationId: null,
+        lifecycleStatus: _lifecycleStatus,
+        relationType: _relationType,
+        worksWithFreelancers: _worksWithFreelancers,
+        skip: _skip,
+      )),
     );
 
     return Card(
@@ -277,6 +297,7 @@ class _ContactsPanelState extends ConsumerState<_ContactsPanel> {
               },
             ),
           ),
+          _filters(),
           const Divider(height: 1),
           Expanded(
             child: contactsAsync.when(
@@ -288,7 +309,13 @@ class _ContactsPanelState extends ConsumerState<_ContactsPanel> {
                 ),
               ),
               data: (page) => page.items.isEmpty
-                  ? const Center(child: Text('No contacts yet.'))
+                  ? Center(
+                      child: Text(
+                        // An empty filtered list is a different message from an
+                        // empty address book, or the filter looks broken.
+                        _hasFilters ? 'No contacts match these filters.' : 'No contacts yet.',
+                      ),
+                    )
                   : Column(
                       children: [
                         Expanded(
@@ -328,6 +355,81 @@ class _ContactsPanelState extends ConsumerState<_ContactsPanel> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Three controls rather than one combined scope: status, type and the
+  /// freelancer question are independent, and the useful queries are the
+  /// combinations — "partners we have not approached yet", "customers nobody
+  /// has asked about freelancers". A single flattened dropdown could not ask
+  /// any of them.
+  Widget _filters() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          _filter<LifecycleStatus>(
+            hint: 'Any status',
+            value: _lifecycleStatus,
+            values: LifecycleStatus.values,
+            labelOf: (v) => v.label,
+            onChanged: (v) => setState(() {
+              _lifecycleStatus = v;
+              _skip = 0;
+            }),
+          ),
+          _filter<RelationType>(
+            hint: 'Any type',
+            value: _relationType,
+            values: RelationType.values,
+            labelOf: (v) => v.label,
+            onChanged: (v) => setState(() {
+              _relationType = v;
+              _skip = 0;
+            }),
+          ),
+          _filter<FreelancerAnswer>(
+            hint: 'Freelancers: any',
+            value: _worksWithFreelancers,
+            values: FreelancerAnswer.values,
+            labelOf: (v) => v.label,
+            onChanged: (v) => setState(() {
+              _worksWithFreelancers = v;
+              _skip = 0;
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _filter<T extends Enum>({
+    required String hint,
+    required T? value,
+    required List<T> values,
+    required String Function(T) labelOf,
+    required ValueChanged<T?> onChanged,
+  }) {
+    return SizedBox(
+      width: 164,
+      child: DropdownButtonFormField<T?>(
+        initialValue: value,
+        isDense: true,
+        isExpanded: true,
+        decoration: const InputDecoration(
+          isDense: true,
+          border: OutlineInputBorder(),
+        ),
+        items: [
+          // Null is "don't filter", not a value — the label says so.
+          DropdownMenuItem<T?>(value: null, child: Text(hint)),
+          for (final option in values)
+            DropdownMenuItem<T?>(value: option, child: Text(labelOf(option))),
+        ],
+        onChanged: onChanged,
       ),
     );
   }
@@ -650,7 +752,10 @@ class _ContactTile extends StatelessWidget {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (contact.organizationName != null) Text(contact.organizationName!),
+            // "Head of Delivery · ACME" — the job title is half of whether an
+            // approach is worth making, so it rides with the company name.
+            if (contact.jobTitle != null || contact.organizationName != null)
+              Text([?contact.jobTitle, ?contact.organizationName].join(' · ')),
             if (contact.email != null)
               Text(contact.email!, style: const TextStyle(color: Colors.grey)),
             if (contact.tags.isNotEmpty)

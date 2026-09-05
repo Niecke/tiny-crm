@@ -3,7 +3,9 @@ from decimal import Decimal
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, StringConstraints
+from pydantic import BaseModel, Field
+
+from app.schemas.common import Currency, Money
 
 DealStage = Literal[
     "lead",
@@ -28,13 +30,9 @@ RateUnit = Literal["hour", "day", "week", "month"]
 # what is done with.
 DealStatus = Literal["open", "active", "won", "finished"]
 
-# ISO 4217, normalised to upper case so "eur" and "EUR" are one currency rather
-# than two columns in a pipeline report.
-Currency = Annotated[str, StringConstraints(to_upper=True, pattern=r"^[A-Za-z]{3}$")]
+# Currency and Money live in schemas/common.py: a contact's known day rate is
+# the same kind of number as a deal's rate, and two definitions would drift.
 
-# 14 digits with 2 after the point — up to 999,999,999,999.99, which is more
-# headroom than a solo business needs and still fits Numeric(14, 2).
-Money = Annotated[Decimal, Field(ge=0, max_digits=14, decimal_places=2)]
 # Hours or days, so 12 digits is already absurd headroom.
 Volume = Annotated[Decimal, Field(ge=0, max_digits=12, decimal_places=2)]
 

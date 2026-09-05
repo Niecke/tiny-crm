@@ -1,3 +1,5 @@
+from decimal import Decimal
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -9,7 +11,15 @@ from app.auth.users import User
 from app.db import count_rows, get_session
 from app.models.contact import Contact
 from app.models.organization import Organization
-from app.schemas.contact import ContactCreate, ContactRead, ContactUpdate
+from app.schemas.contact import (
+    ContactCreate,
+    ContactRead,
+    ContactSource,
+    ContactUpdate,
+    FreelancerAnswer,
+    LifecycleStatus,
+    RelationType,
+)
 from app.schemas.page import Page
 
 router = APIRouter(prefix="/contacts", tags=["contacts"])
@@ -31,12 +41,61 @@ async def _check_organization(
         raise HTTPException(status_code=404, detail="Organization not found")
 
 
+def _reject_orphan_rate(known_day_rate: Decimal | None, rate_currency: str | None) -> None:
+    """Refuse half of a rate.
+
+    "800" is not a rate and "EUR" is not a number — the same rule the deals
+    router applies to a volume with no unit. Neither half can be read back six
+    months later without the other.
+    """
+    if known_day_rate is not None and rate_currency is None:
+        raise HTTPException(
+            status_code=422,
+            detail="rate_currency is required when a known day rate is given",
+        )
+    if rate_currency is not None and known_day_rate is None:
+        raise HTTPException(
+            status_code=422,
+            detail="rate_currency is only valid alongside a known day rate",
+        )
+
+
+def _merge_rate_fields(contact: Contact, updates: dict[str, Any]) -> None:
+    """Validate the rate pair as it will be *after* this PATCH.
+
+    A PATCH that sets only `known_day_rate` on a contact with no currency has
+    to be refused even though the request never mentions a currency, so the
+    check runs against the merged row rather than against what was sent.
+
+    Clearing the rate clears the currency with it: a currency alone says
+    nothing, and making the caller remember to send both would be a trap rather
+    than a rule. Sending a currency explicitly alongside that clear still fails
+    — that is a contradiction, not a tidy-up.
+    """
+    if "known_day_rate" in updates and updates["known_day_rate"] is None:
+        updates.setdefault("rate_currency", None)
+    _reject_orphan_rate(
+        updates.get("known_day_rate", contact.known_day_rate),
+        updates.get("rate_currency", contact.rate_currency),
+    )
+
+
 @router.get("/", response_model=Page[ContactRead])
 async def list_contacts(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
     search: str | None = Query(default=None),
     organization_id: UUID | None = Query(default=None),
+    # Two orthogonal questions, so two filters: "how far along are we" and
+    # "what is this party to me". Sent together they narrow rather than widen —
+    # "partners we have not approached yet" is one request.
+    lifecycle_status: LifecycleStatus | None = Query(default=None),
+    relation_type: RelationType | None = Query(default=None),
+    source: ContactSource | None = Query(default=None),
+    country: str | None = Query(default=None, min_length=2, max_length=2),
+    # Tri-state, because a bool could not ask for the never-asked ones — and
+    # those are the list that produces the next approach.
+    works_with_freelancers: FreelancerAnswer | None = Query(default=None),
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> Page[ContactRead]:
@@ -46,6 +105,22 @@ async def list_contacts(
     # "Everyone at ACME" — the question free-text company could never answer.
     if organization_id is not None:
         q = q.where(Contact.organization_id == organization_id)
+    if lifecycle_status is not None:
+        q = q.where(Contact.lifecycle_status == lifecycle_status)
+    if relation_type is not None:
+        q = q.where(Contact.relation_type == relation_type)
+    if source is not None:
+        q = q.where(Contact.source == source)
+    if country is not None:
+        # Stored upper-cased by the schema, so match that rather than trusting
+        # however the caller happened to type it.
+        q = q.where(Contact.country == country.upper())
+    if works_with_freelancers is not None:
+        if works_with_freelancers == "unknown":
+            q = q.where(Contact.works_with_freelancers.is_(None))
+        else:
+            q = q.where(Contact.works_with_freelancers.is_(works_with_freelancers == "yes"))
+
     total = await count_rows(session, q)
     # Paging without a total order lets rows repeat or vanish between pages,
     # so every list sorts by something unique-enough plus id as a tiebreaker.
@@ -79,6 +154,7 @@ async def create_contact(
     user: User = Depends(current_active_user),
 ) -> Contact:
     await _check_organization(session, body.organization_id, user)
+    _reject_orphan_rate(body.known_day_rate, body.rate_currency)
     contact = Contact(**body.model_dump(), user_id=user.id)
     session.add(contact)
     await session.commit()
@@ -99,6 +175,8 @@ async def update_contact(
     updates = body.model_dump(exclude_unset=True)
     if "organization_id" in updates:
         await _check_organization(session, updates["organization_id"], user)
+    if "known_day_rate" in updates or "rate_currency" in updates:
+        _merge_rate_fields(contact, updates)
     # exclude_unset=True — only update fields the caller actually sent
     for field, value in updates.items():
         setattr(contact, field, value)

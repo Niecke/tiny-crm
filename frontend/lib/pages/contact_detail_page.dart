@@ -64,15 +64,34 @@ class ContactDetailPage extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
+          // What this party is, above the contact details: it decides whether
+          // the rest of the page is worth reading.
+          _RelationshipChips(contact: contact),
           _Field(label: 'Name', value: contact.name),
+          if (contact.jobTitle != null)
+            _Field(label: 'Job title', value: contact.jobTitle!),
           if (contact.organizationName != null)
             _Field(label: 'Organization', value: contact.organizationName!),
           if (contact.email != null)
             _Field(label: 'Email', value: contact.email!),
+          if (contact.emailSecondary != null)
+            _Field(label: 'Second email', value: contact.emailSecondary!),
           if (contact.phone != null)
             _Field(label: 'Phone', value: contact.phone!),
-          if (contact.address != null)
-            _Field(label: 'Address', value: contact.address!),
+          if (contact.phoneSecondary != null)
+            _Field(label: 'Second phone', value: contact.phoneSecondary!),
+          if (contact.website != null)
+            _Field(label: 'Website', value: contact.website!),
+          if (contact.postalAddress != null)
+            _Field(label: 'Address', value: contact.postalAddress!),
+          if (contact.formattedDayRate != null)
+            _Field(label: 'Known day rate', value: contact.formattedDayRate!),
+          if (contact.source != null)
+            _Field(label: 'Source', value: contact.source!.label),
+          if (contact.preferredLanguage != null)
+            _Field(label: 'Preferred language', value: contact.preferredLanguage!),
+          if (contact.birthday != null)
+            _Field(label: 'Birthday', value: _ymd(contact.birthday!)),
           if (contact.notes != null)
             _Field(label: 'Notes', value: contact.notes!),
           // What I owe this person, above what has already happened with them.
@@ -110,6 +129,75 @@ class ContactDetailPage extends ConsumerWidget {
         onPressed: () => _edit(context, ref),
         icon: const Icon(Icons.edit),
         label: const Text('Edit'),
+      ),
+    );
+  }
+}
+
+String _ymd(DateTime d) =>
+    '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+/// Status, type and the freelancer answer, at the top where they are read
+/// before anything else.
+///
+/// Status and type are separate chips because they answer different questions —
+/// how far along we are, and what this party is to me. "Never asked" is shown
+/// rather than left blank: it is the state that produces the next approach, and
+/// a blank would read as "no".
+class _RelationshipChips extends StatelessWidget {
+  const _RelationshipChips({required this.contact});
+
+  final Contact contact;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final answer = contact.freelancerAnswer;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        children: [
+          if (contact.lifecycleStatus != null)
+            _Tag(label: contact.lifecycleStatus!.label, color: scheme.primary),
+          if (contact.relationType != null)
+            _Tag(label: contact.relationType!.label, color: scheme.secondary),
+          _Tag(
+            label: answer.label,
+            color: switch (answer) {
+              FreelancerAnswer.yes => Colors.green.shade700,
+              // Grey, not red: "they don't" is a fact, not a failure — and red
+              // is already the overdue colour everywhere else in the app.
+              FreelancerAnswer.no => scheme.onSurfaceVariant,
+              // The list worth working through, so it reads as actionable.
+              FreelancerAnswer.unknown => scheme.tertiary,
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Tag extends StatelessWidget {
+  const _Tag({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600),
       ),
     );
   }
