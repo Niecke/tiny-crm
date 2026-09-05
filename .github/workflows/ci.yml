@@ -174,7 +174,7 @@ jobs:
     # Same SDK digest the frontend image builds with (see frontend/Dockerfile),
     # so the gate cannot pass on a different Flutter than the one that ships.
     container:
-      image: ghcr.io/adrianjagielak/flutter:3.47.2@sha256:9752ff1013386dbb5391c3843dbb37b2f6da5fcbeccd12f83d2644d6f3ffb540
+      image: ghcr.io/adrianjagielak/flutter:3.47.2@sha256:083e197fd1382da5d8da14a0f9dfef7ae11b44e00f26e977ddd30d5897c81d51
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
