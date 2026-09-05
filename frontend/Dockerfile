@@ -1,4 +1,4 @@
-FROM ghcr.io/adrianjagielak/flutter:3.47.2@sha256:9752ff1013386dbb5391c3843dbb37b2f6da5fcbeccd12f83d2644d6f3ffb540 AS builder
+FROM ghcr.io/adrianjagielak/flutter:3.47.2@sha256:083e197fd1382da5d8da14a0f9dfef7ae11b44e00f26e977ddd30d5897c81d51 AS builder
 WORKDIR /app
 RUN flutter precache --web
 COPY pubspec.* ./
