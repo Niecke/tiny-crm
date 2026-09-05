@@ -147,10 +147,12 @@ backup:
       memory: 512Mi
 
 ingress:
+  # The Ingress pair and the stripPrefix rule are Traefik-specific, so this
+  # subtree cannot render on a cluster without Traefik's CRDs. Turn it off for a
+  # restore drill or any other cluster reached by port-forward — host is still
+  # read below, because the frontend's apiUrl derives from it either way.
+  enabled: true
   className: traefik
-  # The end state. The phase 5 parallel run overrides this with
-  # values-crm-new.yaml; the frontend's apiUrl is derived from this value, so
-  # the two cannot drift apart.
   host: crm.niecke-it.de
   tls:
     enabled: true
