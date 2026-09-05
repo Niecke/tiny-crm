@@ -11,9 +11,20 @@ class ContactsRepository {
   final Dio _dio;
 
   /// [organizationId] narrows the list to everyone at one company.
+  ///
+  /// [lifecycleStatus] and [relationType] are two different questions — how far
+  /// along we are, and what this party is to me — so they narrow together:
+  /// "partners we have not approached yet" is one request.
+  ///
+  /// [worksWithFreelancers] is tri-state on purpose. [FreelancerAnswer.unknown]
+  /// asks for the never-asked ones, which a plain bool could not.
   Future<PagedResult<Contact>> list({
     String? search,
     String? organizationId,
+    LifecycleStatus? lifecycleStatus,
+    RelationType? relationType,
+    ContactSource? source,
+    FreelancerAnswer? worksWithFreelancers,
     int skip = 0,
     int limit = kPageSize,
   }) async {
@@ -22,6 +33,11 @@ class ContactsRepository {
       queryParameters: <String, dynamic>{
         if (search != null && search.isNotEmpty) 'search': search,
         'organization_id': ?organizationId,
+        if (lifecycleStatus != null) 'lifecycle_status': lifecycleStatus.wire,
+        if (relationType != null) 'relation_type': relationType.wire,
+        if (source != null) 'source': source.wire,
+        if (worksWithFreelancers != null)
+          'works_with_freelancers': worksWithFreelancers.wire,
         'skip': skip,
         'limit': limit,
       },

@@ -84,13 +84,37 @@ step "unauthenticated requests are rejected"
 [ "$(curl -s -o /dev/null -w '%{http_code}' "$API/contacts/")" = "401" ] \
   || fail "GET /contacts/ without a token should be 401"
 
-step "a contact round-trips through Postgres"
-contact_id=$(curl -fsS -X POST "$API/contacts/" "${auth[@]}" \
+step "a contact round-trips through Postgres, business fields and all"
+contact=$(curl -fsS -X POST "$API/contacts/" "${auth[@]}" \
   -H 'Content-Type: application/json' \
-  -d '{"name":"CI Smoke","tags":["ci"]}' | json "['id']")
+  -d '{"name":"CI Smoke","tags":["ci"],"job_title":"Head of Delivery",
+       "street":"Hauptstraße 1","postal_code":"1010","city":"Wien","country":"at",
+       "lifecycle_status":"prospect","relation_type":"partner","source":"event",
+       "known_day_rate":"850.00","rate_currency":"eur"}')
+contact_id=$(echo "$contact" | json "['id']")
 [ -n "$contact_id" ] || fail "contact was not created"
+# Upper-cased on the way in, or "at" and "AT" become two countries in a filter.
+[ "$(echo "$contact" | json "['country']")" = "AT" ] || fail "country was not normalised"
+# Money is a string end to end — Numeric in, decimal string out, never a float.
+[ "$(echo "$contact" | json "['known_day_rate']")" = "850.00" ] \
+  || fail "the day rate did not read back exactly"
 total=$(curl -fsS "$API/contacts/?search=CI%20Smoke" "${auth[@]}" | json "['total']")
 [ "$total" = "1" ] || fail "expected 1 contact from search, got $total"
+
+step "contact filters answer the two orthogonal questions"
+partners=$(curl -fsS "$API/contacts/?relation_type=partner&lifecycle_status=prospect" "${auth[@]}" \
+  | json "['total']")
+[ "$partners" = "1" ] || fail "expected 1 partner prospect, got $partners"
+# Nobody has been asked yet, and "never asked" is not the same answer as "no".
+unknown=$(curl -fsS "$API/contacts/?works_with_freelancers=unknown" "${auth[@]}" | json "['total']")
+[ "$unknown" = "1" ] || fail "expected 1 never-asked contact, got $unknown"
+no=$(curl -fsS "$API/contacts/?works_with_freelancers=no" "${auth[@]}" | json "['total']")
+[ "$no" = "0" ] || fail "expected 0 contacts answering no, got $no"
+# Half a rate is refused: "800" is not a rate and "EUR" is not a number.
+code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$API/contacts/" "${auth[@]}" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Half a rate","known_day_rate":"800.00"}')
+[ "$code" = "422" ] || fail "a rate with no currency should be 422, got $code"
 
 step "an organization round-trips and a contact files under it"
 org_id=$(curl -fsS -X POST "$API/organizations/" "${auth[@]}" \

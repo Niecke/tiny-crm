@@ -382,6 +382,11 @@ class _OrganizationContactsState extends ConsumerState<_OrganizationContacts> {
       contactsProvider((
         search: '',
         organizationId: organization.id,
+        // Everyone at this company, whatever they are to me: a company's people
+        // list is not the place to hide half of them behind a status.
+        lifecycleStatus: null,
+        relationType: null,
+        worksWithFreelancers: null,
         skip: _skip,
       )),
     );
