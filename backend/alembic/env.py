@@ -6,19 +6,13 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 
-# Import Base and all models so Alembic can see the full schema.
-# Adding a new model file? Import it here too.
+# Import Base and all models so Alembic can see the full schema. The model
+# list lives in app/models/__init__.py — one place, so a new model cannot be
+# picked up by the app and missed by autogenerate.
 from app.db import Base
 from app.config import settings  # noqa: F401
 from app.logging_config import configure_logging
-from app.models import organization as _organization  # noqa: F401
-from app.models import contact as _contact  # noqa: F401
-from app.models import deal as _deal  # noqa: F401
-from app.models import document as _doc  # noqa: F401
-from app.models import task as _task  # noqa: F401
-from app.models import project as _project  # noqa: F401
-from app.models import interaction as _interaction  # noqa: F401
-from app.models import watch as _watch  # noqa: F401
+from app import models as _models  # noqa: F401
 from app.auth import users as _auth  # noqa: F401
 
 config = context.config

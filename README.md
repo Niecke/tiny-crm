@@ -132,6 +132,38 @@ change, delete, list, and anonymous access — table-driven in
 and validation per router, the login and password-change flows, and the pure helpers.
 S3 is faked in memory for the document tests; the real MinIO round-trip is `ci/smoke.sh`.
 
+## The morning briefing
+
+Overdue tasks, today's plan and the sources due to be swept, posted to Slack on
+weekday mornings — the same information the dashboard's "Upcoming" panel holds,
+pushed, so it is visible without an open browser tab.
+
+`backend/app/briefing.py` gathers and renders it; `scripts/send_briefing.py`
+runs it. There is no endpoint and no scheduler inside the API: a loop in the
+API would fire once per replica, and a delivery that quietly stops looks
+exactly like a quiet week. In the cluster it is a CronJob
+(`charts/tinycrm/templates/briefing-cronjob.yaml`) running the backend image,
+so a failed briefing is a failed Job.
+
+```bash
+cd backend
+uv run python scripts/send_briefing.py --dry-run   # print it, send nothing
+uv run python scripts/send_briefing.py             # needs SLACK_WEBHOOK_URL
+```
+
+Three settings, all in `.env.example`: `SLACK_WEBHOOK_URL` (Slack → Apps →
+Incoming Webhooks; without it a real send exits 2 rather than doing nothing),
+`BRIEFING_TIMEZONE` and `APP_URL` for the link in the message.
+
+**`BRIEFING_TIMEZONE` is not cosmetic.** The task form files a due date as
+23:59 local, which is 21:59Z in summer — so a briefing that computed "today"
+in UTC would put a task due tonight in tomorrow's message. The day boundary is
+the operator's, and the window is 23 or 25 hours long across a DST switch.
+
+One webhook, one channel, so every user's briefing lands in the same place.
+That is the single-operator shape this app is built for; a second real user
+needs a destination per user first.
+
 ## CI/CD
 
 Work happens on `dev`; `main` is what ships. Two workflows:

@@ -50,6 +50,18 @@ class Settings(BaseSettings):
     s3_bucket: str = "tinycrm-documents"
     s3_region: str = "us-east-1"
 
+    # Morning briefing to Slack (app/briefing.py, sent by scripts/send_briefing.py
+    # from a CronJob). Unset means there is nowhere to send it, and the script
+    # says so and exits non-zero rather than silently doing nothing.
+    slack_webhook_url: str | None = None
+    # What "today" means in the briefing. Task due dates are filed as 23:59
+    # local time, which is the previous day in UTC for half the year, so the
+    # day boundary has to be the operator's, not the server's.
+    briefing_timezone: str = "Europe/Berlin"
+    # Public origin of the frontend, for the "Open tinyCRM" link in the
+    # message. Optional: without it the briefing simply has no link.
+    app_url: str | None = None
+
     def insecure_defaults(self) -> list[str]:
         """Env vars still sitting on a built-in default that is unsafe to deploy.
 

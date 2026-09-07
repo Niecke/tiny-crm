@@ -179,7 +179,8 @@ on_my_plate=$(curl -fsS "$API/deals/?status=active" "${auth[@]}" | json "['total
 step "a task records who and what it is about"
 task_id=$(curl -fsS -X POST "$API/tasks/" "${auth[@]}" \
   -H 'Content-Type: application/json' \
-  -d "{\"title\":\"Call CI Smoke back\",\"contact_id\":\"$contact_id\",\"deal_id\":\"$deal_id\"}" \
+  -d "{\"title\":\"Call CI Smoke back\",\"due_date\":\"2020-01-02T22:59:00Z\",
+       \"contact_id\":\"$contact_id\",\"deal_id\":\"$deal_id\"}" \
   | json "['id']")
 [ -n "$task_id" ] || fail "task was not created"
 task=$(curl -fsS "$API/tasks/$task_id" "${auth[@]}")
@@ -271,6 +272,18 @@ history=$(curl -fsS "$API/watches/$watch_id/checks" "${auth[@]}")
   || fail "the deleted deal should have been unlinked from the sweep"
 [ "$(echo "$history" | json "['items'][0]['note']")" = "CI Smoke tender" ] \
   || fail "the note of the find should have survived"
+
+step "the morning briefing renders from the same image the API runs"
+# No endpoint to drive: the briefing is a CronJob running this script against
+# the database. --dry-run proves the whole path inside the built image —
+# script imports app, reaches Postgres, resolves the timezone (tzdata has to
+# be in the image) and renders — without needing a Slack webhook.
+briefing=$($COMPOSE exec -T backend python scripts/send_briefing.py --dry-run)
+echo "$briefing" | grep -q '\*Overdue\*' \
+  || fail "the briefing did not report the overdue task section"
+echo "$briefing" | grep -q 'Call CI Smoke back' \
+  || fail "the overdue task is missing from the briefing"
+echo "$briefing" | grep -q "$EMAIL" || fail "the briefing does not name its recipient"
 
 step "cleanup"
 curl -fsS -X DELETE "$API/documents/$document_id" "${auth[@]}"

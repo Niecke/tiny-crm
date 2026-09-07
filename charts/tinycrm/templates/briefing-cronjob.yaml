@@ -1,0 +1,81 @@
+{{- if .Values.briefing.enabled }}
+{{- $webhook := required "briefing.slackWebhookUrl is required when briefing.enabled — Slack → Apps → Incoming Webhooks" .Values.briefing.slackWebhookUrl }}
+# The morning briefing (backend/app/briefing.py), pushed to Slack on weekday
+# mornings so overdue work is visible without an open browser tab.
+#
+# A CronJob rather than a scheduler inside the API. An in-process loop fires
+# once per replica — or needs a lock to stop doing that — and a delivery that
+# silently stops looks exactly like a quiet week. This shows up in `kubectl get
+# jobs`, and a failed run is a failed Job.
+#
+# Its own Secret rather than the backend's: that one also carries the JWT
+# signing key and the object-store credentials, none of which this needs.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "tinycrm.fullname" . }}-briefing
+  labels:
+    {{- include "tinycrm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: briefing
+type: Opaque
+stringData:
+  DATABASE_URL: {{ include "tinycrm.databaseUrl" . | quote }}
+  # A bearer credential: anyone holding it can post to the channel. It never
+  # reaches the log — app/briefing.py keeps it out of its error messages.
+  SLACK_WEBHOOK_URL: {{ $webhook | quote }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "tinycrm.fullname" . }}-briefing
+  labels:
+    {{- include "tinycrm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: briefing
+spec:
+  schedule: {{ .Values.briefing.schedule | quote }}
+  # The schedule is a working-hours one, so it has to be read in the operator's
+  # zone. Without this Kubernetes reads it as UTC and the briefing arrives an
+  # hour or two off, drifting again at every DST switch.
+  timeZone: {{ .Values.briefing.timeZone | quote }}
+  concurrencyPolicy: Forbid
+  # A missed run is not worth catching up on: yesterday's briefing delivered
+  # this morning is noise on top of this morning's.
+  startingDeadlineSeconds: {{ .Values.briefing.startingDeadlineSeconds }}
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      # Two attempts. A briefing that cannot be delivered by the time the
+      # working day starts is better reported as a failed Job than retried
+      # into the afternoon.
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            {{- include "tinycrm.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: briefing
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: briefing
+              # The same image the API runs: the script imports the models, so
+              # the two can never disagree about what "overdue" means.
+              image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+              imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+              command: ["python", "scripts/send_briefing.py"]
+              envFrom:
+                - secretRef:
+                    name: {{ include "tinycrm.fullname" . }}-briefing
+              env:
+                # What "today" means. Task due dates are filed as 23:59 local,
+                # which is the previous day in UTC for half the year, so this
+                # is not cosmetic — it decides which day a task counts against.
+                - name: BRIEFING_TIMEZONE
+                  value: {{ .Values.briefing.timeZone | quote }}
+                {{- if .Values.ingress.host }}
+                - name: APP_URL
+                  value: {{ printf "https://%s" .Values.ingress.host | quote }}
+                {{- end }}
+              resources:
+                {{- toYaml .Values.briefing.resources | nindent 16 }}
+{{- end }}
