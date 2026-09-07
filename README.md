@@ -1,5 +1,15 @@
 # tinyCRM
 
+A single-operator CRM for self-employment: contacts, organizations, deals,
+tasks, interactions, projects, documents and a watch list of sources to sweep.
+
+- **[FEATURES.md](FEATURES.md)** — what it does, the API surface, and the rules
+  worth knowing before changing anything.
+- **[PLAN.md](PLAN.md)** — what is still open, and in what order.
+- **[deploy/README.md](deploy/README.md)** — how it reaches the cluster.
+
+This file is the how-to-run-it half.
+
 ## Local Development
 
 ### Setup Python
@@ -116,7 +126,7 @@ throttle, upload guards) run without one; everything that touches a router does 
 
 ```bash
 podman-compose up -d db                       # or point TEST_DATABASE_URL elsewhere
-cd backend && uv run pytest                   # 80 tests
+cd backend && uv run pytest                   # 282 tests
 cd backend && uv run pytest --cov=app         # with a coverage summary
 
 cd frontend && flutter test                   # widget_test.dart is browser-only, skipped here
@@ -126,11 +136,13 @@ cd frontend && flutter test --platform chrome # includes the widget test
 `TEST_DATABASE_URL` defaults to `postgresql+asyncpg://crm:crm@localhost:5432/postgres`. The
 database it names is only used to issue `CREATE DATABASE`, never written to.
 
-What the backend suite covers: cross-user isolation for all five owned resources (read,
+What the backend suite covers: cross-user isolation for every owned resource (read,
 change, delete, list, and anonymous access — table-driven in
 `tests/test_cross_user_isolation.py`, add a row when a router is added), CRUD round-trips
-and validation per router, the login and password-change flows, and the pure helpers.
-S3 is faked in memory for the document tests; the real MinIO round-trip is `ci/smoke.sh`.
+and validation per router, the deal pricing and stage rules, task recurrence, the watch
+sweep and its cadence, the briefing windows, the login and password-change flows, and the
+pure helpers. S3 is faked in memory for the document tests; the real MinIO round-trip is
+`ci/smoke.sh`. `uv run mypy app tests` must also be clean — it is a CI gate.
 
 ## The morning briefing
 
@@ -199,9 +211,11 @@ and re-tags the already-tested images with `<short-main-sha>` and `latest` via
 `docker buildx imagetools create`. Nothing is rebuilt, so the digest that passed the
 integration test is the digest that deploys.
 
-Required once, in GitHub → Settings → Branches → `main`: require the checks
-`Backend tests`, `Frontend tests`, `Build backend`, `Build frontend`, `Integration test`,
-and disallow direct pushes — a commit that never went through a PR has no image to promote.
+`main` is protected in GitHub → Settings → Branches: `Backend tests`, `Frontend tests`,
+`Build backend`, `Build frontend` and `Integration test` are required checks, and direct
+pushes are disallowed — a commit that never went through a PR has no image to promote.
+Adding a job to `ci.yml` means adding it to that list, or it can go red without blocking a
+merge.
 
 ### Running the integration test locally
 
