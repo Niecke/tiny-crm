@@ -133,6 +133,49 @@ clears it, then reconcile.
 `flux resume` and `flux reconcile` block while watching. Ctrl-C only stops the
 watching — pass `--wait=false` to skip it.
 
+### Turning on the morning briefing
+
+Off by default: it cannot work without a Slack webhook, and a CronJob that
+fails every morning is worse than no CronJob. Enabling it is two changes that
+must land together — the credential in the cluster Secret, the flag in git.
+
+The webhook is a bearer credential (anyone holding it can post to the channel),
+so it goes in the same Secret as the database and JWT secrets, never in git.
+Create it in Slack under Apps → Incoming Webhooks → add to a channel, then
+merge it into the existing values:
+
+```bash
+kubectl -n tinycrm get secret tinycrm-values \
+  -o jsonpath='{.data.values\.yaml}' | base64 -d > /tmp/values.yaml
+
+cat >> /tmp/values.yaml <<'EOF'
+briefing:
+  slackWebhookUrl: https://hooks.slack.com/services/T000/B000/XXXX
+EOF
+
+kubectl -n tinycrm create secret generic tinycrm-values \
+  --from-file=values.yaml=/tmp/values.yaml --dry-run=client -o yaml \
+  | kubectl apply -f -
+
+shred -u /tmp/values.yaml
+```
+
+Then set `briefing.enabled: true` under `values:` in
+`deploy/flux/helmrelease.yaml` and merge. Doing it in the other order renders
+a template error — `briefing.slackWebhookUrl is required` — and Flux leaves
+the previous release running, which is the intended failure.
+
+```bash
+kubectl -n tinycrm get cronjob tinycrm-briefing
+kubectl -n tinycrm create job briefing-now --from=cronjob/tinycrm-briefing  # send one now
+kubectl -n tinycrm logs job/briefing-now
+```
+
+The schedule (`0 7 * * 1-5`, Europe/Berlin) and the timezone are in
+`charts/tinycrm/values.yaml`. The timezone is also the operator's day boundary,
+which decides whether a task due at 23:59 counts as today — change both
+together or not at all.
+
 ### Creating an admin user
 
 No signup flow; the first account comes from the CLI.

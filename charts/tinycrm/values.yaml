@@ -102,6 +102,40 @@ frontend:
       memory: 128Mi
 
 # ---------------------------------------------------------------------------
+# The morning briefing: overdue tasks, today's plan and the sources due to be
+# swept, posted to Slack so they are visible without an open browser tab.
+#
+# Off by default because it cannot work without a webhook URL, and a CronJob
+# that fails every morning is worse than no CronJob. Turning it on means
+# adding `briefing.slackWebhookUrl` to the credentials Secret (see
+# deploy/README.md) in the same change.
+# ---------------------------------------------------------------------------
+briefing:
+  enabled: true
+
+  # Weekdays only — 1-5 is Monday to Friday. Early enough to be read before the
+  # day starts, late enough not to arrive overnight.
+  schedule: "0 7 * * 1-5"
+  # Read as the schedule's zone *and* as the operator's day boundary, which is
+  # what decides whether a task due at 23:59 counts as today.
+  timeZone: Europe/Berlin
+
+  # A run that could not start within ten minutes of its slot is skipped
+  # rather than queued: yesterday's briefing is not worth delivering today.
+  startingDeadlineSeconds: 600
+
+  # Required when enabled. Slack → Apps → Incoming Webhooks → add to a channel.
+  # A bearer credential: it belongs in the cluster Secret, never in git.
+  slackWebhookUrl: ""
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+# ---------------------------------------------------------------------------
 # Off-site backup. One tar per run holding a brotli'd SQL dump and the raw
 # documents, streamed to the GCS backups bucket over its S3 endpoint.
 #

@@ -27,6 +27,7 @@ A small CRM for self-employment, built as a learning project for FastAPI and Flu
 | Auth | fastapi-users, JWT bearer, admin created via `scripts/create_admin.py` | No register / verify / reset routers mounted |
 | Blob store | S3-compatible via aioboto3, MinIO locally | Bucket versioning checked at boot |
 | Client | Flutter web, Riverpod 3, go_router 17, dio, flutter_secure_storage | Hand-written models; original plan said `freezed` |
+| Scheduling | Kubernetes CronJobs on the backup and backend images | Off-site backup; the weekday morning briefing to Slack (T20). No scheduler inside the API |
 | CI/CD | GitHub Actions → Google Artifact Registry (`europe-west1`), WIF auth, Renovate | Original plan said ghcr.io + Hetzner SSH; no deploy workflow yet |
 | Serving | Caddy inside the frontend image, Podman/Docker Compose | `compose.full.yml` = db + minio + backend + frontend |
 
@@ -226,7 +227,7 @@ Priorities: **P0** not a CRM without it · **P1** daily friction · **P2** expec
       Vergabe opportunities (`ausschreibung`) do not fit the plain deal shape: they have a hard deadline, a procedure type, and a go/no-go that depends on whether the operator can bid alone.
       *Scope — extra columns on `Deal` (T13), not a parallel entity:* `deal_kind` (`direct` / `tender`), `contracting_authority` (FK to organization — reuse T12, do not re-type the buyer), `cpv_type` (service / supply / labour leasing), `procedure`, `submission_deadline`, `sme_suitable`, `consortium_allowed` (ARGE), `multi_role`, and the decision pair `fit` (`solo` / `consortium_only` / `no`) + `fit_reason` (one sentence, required when `fit` is set — a verdict without a reason is unusable three months later).
       *Rationale for folding into `Deal`:* a tender is an opportunity with a deadline and a bid/no-bid gate. A second entity would duplicate the pipeline, the contact links, the document links and the whole UI, and then need merging when a tender turns into an actual engagement. `deal_kind` plus a conditional form section costs one column.
-      *Links:* contacts (who is on it) via T13's FKs, the PDFs via T16 (documents on any record). `submission_deadline` must reach T20's reminder job — a missed tender deadline is the single most expensive thing this app can fail to do.
+      *Links:* contacts (who is on it) via T13's FKs, the PDFs via T16 (documents on any record). `submission_deadline` must reach T20's morning briefing, which now exists and has no section for it — a missed tender deadline is the single most expensive thing this app can fail to do, and adding it is one query and one section in `app/briefing.py`.
       *Depends on:* T13, T16. *Fed by:* T40 — a tender-portal sweep is how these get found in the first place, and it creates them as plain deals until this lands.
 
 - [x] **T39 · P1 · Recurring tasks**
@@ -235,8 +236,7 @@ Priorities: **P0** not a CRM without it · **P1** daily friction · **P2** expec
       **Completing a recurring task creates the next instance and leaves the current one done**, so "did I actually check in March?" stays answerable; `recurrence_parent_id` chains the instances (`ON DELETE SET NULL`, so deleting one completed instance does not take the series with it) and doubles as the guard that ticking a task done, undone and done again cannot fork the series. The successor inherits description, priority, tags, the recurrence settings and the task's project links.
       *Next due date is computed from the completion, not the missed slot:* finishing early or on time keeps the cadence (due on the 1st, ticked off on the 28th → due the 1st again), finishing late re-anchors on the completion (a monthly check-in last due in March, done in June, is next due in July), so an overdue task yields exactly one instance instead of a backlog. Month steps clamp to the end of shorter months (31 Jan + 1 month = 28/29 Feb) and the user's time of day is preserved. `recurrence_until` is inclusive; past it the series simply stops.
       *Validation* is on the merged state, so a PATCH cannot leave a rule without a due date to repeat from, and an end date before the due date is refused. The PATCH response carries `next_occurrence` — the UI reports the new due date only when the server actually created one, rather than guessing that a repeat happened.
-      *Still open:* the reminder half. A recurrence that only surfaces in an open browser tab is still passive — see T20.
-      *Pairs with:* T20 (a reminder that never leaves the browser makes recurrence pointless).
+      *The reminder half landed with T20:* a new instance now shows up in the next morning's Slack briefing, marked as repeating, instead of waiting for someone to open the tab.
 
 - [x] **T40 · P1 · Watch list: job boards, careers pages and tender portals**
       The recurring sweep that finds work before there is a conversation to record. Two kinds of question, one habit: *are they hiring for roles that imply what I do?* and *has a tender come up that I could bid on?*
@@ -250,7 +250,7 @@ Priorities: **P0** not a CRM without it · **P1** daily friction · **P2** expec
       *Tests:* `backend/tests/test_watches.py` (29 cases: the round trip, due-on-create, cadence and unit validation, the company link and its SET NULL, cross-tenant refusal, sweeping with and without a find, the late-sweep re-anchor, append-only history ordering, both conversions, the two atomicity cases, most-overdue-first ordering with paused sources sinking, kind/search/company filters, and both cadence-change paths), watches added to the table-driven cross-user isolation suite, plus `frontend/test/watch_test.dart` (15 cases). `ci/smoke.sh` creates a source, sweeps it into a deal, deletes the deal and asserts the sweep log survived.
       *UI:* `/watches` — list beside detail, scoped "Due now" (the default) / "All active" / "Everything", filterable by kind. **"Open & sweep"** opens the source in a new tab and then offers the check dialog, which is the habit in the order it actually happens; the dialog is nothing-or-found, a note, and one field to turn a find into a deal or a task (defaulting to a deal for a tender portal, a task for a job board). The per-source history is on the detail, and a **badge on the Sources nav item** shows how many are due — a watch list nobody looks at is the failure mode this whole feature exists to avoid. Delete warns how many sweeps it would take with it and points at pausing instead.
       *Explicitly not:* crawling anything. No scraper, no feed parser, no TED API client — a different project with a different failure mode (silent breakage that looks like "no new tenders"). `openInNewTab` uses `package:web`, which the app already reaches for, rather than adding a plugin dependency.
-      *Still open:* overdue watches only surface in an open tab — see T20, which must nudge them alongside overdue tasks.
+      *The nudge landed with T20:* sources due today or overdue are a section of the morning briefing, each one a link, so the sweep starts from Slack rather than from remembering to look.
       *Feeds:* T38 — tender-portal finds become tender deals once `deal_kind` exists.
 
 - [ ] **T18 · P0 · One search across everything**
@@ -261,10 +261,17 @@ Priorities: **P0** not a CRM without it · **P1** daily friction · **P2** expec
 - [ ] **T19 · P0 · Import and export**
       No way to get data in or out except by typing. CSV import with column mapping and a dry-run preview, CSV export per entity, vCard in/out for contacts. Also the GDPR data-portability answer and the escape hatch that makes a self-hosted CRM safe to adopt.
 
-- [ ] **T20 · P1 · Reminders that leave the browser**
-      Overdue tasks and planned meetings are only visible if the app is open, which makes the "Upcoming" panel passive. Needs a scheduled job plus an outbound mail sender: due-today digest, overdue nudge, meeting reminder.
-      *Also carries:* tender submission deadlines (T38), recurring-task instances (T39) and overdue watches (T40) — all three are worthless without a nudge that leaves the browser.
-      *Shares infrastructure with:* T21, T23.
+- [x] **T20 · P1 · Reminders that leave the browser**
+      Overdue tasks and planned meetings were only visible if the app was open, which made the "Upcoming" panel passive.
+      *Done:* a **morning briefing to Slack**, weekdays at 07:00 — one message carrying overdue tasks, what is due today, today's planned interactions, planned interactions that were never confirmed, and the sources due to be swept. `app/briefing.py` gathers and renders; `scripts/send_briefing.py` runs it; `charts/tinycrm/templates/briefing-cronjob.yaml` schedules it on the backend image.
+      **Slack, not mail.** An incoming webhook is one URL and one POST with nothing to configure and nothing to get blocked as spam; a mail sender is a dependency, a from-address, an SPF record and a deliverability problem. T23 was supposed to bring the sender first and has not, so waiting for it is what kept every recurrence and every overdue watch silent. One webhook, one channel, every user's briefing in the same place — the single-operator shape this app is built for.
+      **A CronJob, not a scheduler in the API.** An in-process loop fires once per replica, or needs a lock to stop doing that, and a delivery that quietly stops looks exactly like a quiet week. A Job shows up in `kubectl get jobs` and fails visibly. `startingDeadlineSeconds` skips a missed slot rather than queueing it: yesterday's briefing delivered this morning is noise on top of this morning's.
+      *Load-bearing detail:* **the day boundary is the operator's, not UTC.** The task form files a due date as 23:59 local, which is 21:59Z in summer — computing "today" in UTC puts a task due tonight in tomorrow's message, and a meeting at 23:30 local in the wrong briefing entirely. `DayWindow` is local midnight to local midnight, so it is 23 or 25 hours long across a DST switch, and `days_late` counts calendar days rather than 24-hour periods (due 23:59 yesterday is "1 day overdue" at 07:00, not 0). `BRIEFING_TIMEZONE` is the CronJob's `timeZone` too, or the message arrives on a schedule that disagrees with its own contents.
+      *A second bug this surfaced:* nothing outside the API had ever opened a session, and **importing one model is not enough to use it** — `Interaction.projects` names `"Project"` as a string, resolved against the registry at first query, so the script died on "failed to locate a name". The model list now lives in `app/models/__init__.py`; `alembic/env.py` reads it instead of keeping its own copy, so a new model cannot be picked up by the app and missed by autogenerate.
+      *Watches are "due today", not "due now"* (which is what the API's `?due=true` means): a source due at 15:00 belongs in the 07:00 briefing, not in tomorrow's as overdue. Paused sources never appear.
+      *Tests:* `backend/tests/test_briefing.py` (19 cases: the window and its DST edges, calendar-day lateness, what each section picks up and what it excludes, cross-user separation, mrkdwn escaping and link encoding, section capping, the empty day, one message per active user, and delivery — Slack's "ok", a 4xx, a 200 that is not "ok", and an unreachable host, asserting the webhook never reaches the error text). `ci/smoke.sh` runs `--dry-run` inside the built image, which is what proves the script imports, reaches Postgres and resolves its timezone there.
+      *Still open:* **no outbound mail sender**, so T23 inherits nothing from this. Tender submission deadlines (T38) are not in the briefing because `submission_deadline` does not exist yet — adding them is a query and a section. Per-item timing (a reminder 30 minutes before a meeting) is deliberately not built: one message a day is the whole point.
+      *Deployment:* off by default (`briefing.enabled`), because it cannot run without a webhook and a CronJob that fails every morning is worse than none. Turning it on is a credential in the cluster Secret plus a flag in git, and they must land together — see `deploy/README.md`.
 
 - [ ] **T21 · P1 · Log an email without syncing mailboxes**
       Full IMAP sync stays out of scope. The 80%: `mailto:` links from a contact, a "log this email" form, and a BCC-to-inbox address that files a message as an interaction.
@@ -277,7 +284,7 @@ Priorities: **P0** not a CRM without it · **P1** daily friction · **P2** expec
 
 - [ ] **T23 · P0 · Password reset**
       A forgotten password today means SSH plus a Python script. fastapi-users already ships the reset and verify routers — they are simply not mounted, and no mail sender is wired up.
-      *Shares infrastructure with:* T20.
+      *Inherits nothing from T20:* that shipped to a Slack webhook, and a reset link has to reach the person's mailbox rather than a channel. The sender is still this task's to build.
 
 - [ ] **T24 · P1 · Short-lived tokens with refresh, and a real logout**
       `jwt_lifetime_seconds` is 270 days with no refresh token and no denylist. A leaked token stays valid until it expires; changing the password does not invalidate it; logout only clears client storage.
@@ -338,7 +345,7 @@ Dependency- and leverage-ordered, not a strict ranking:
 5. **T14 → T15** — link tasks, then build the timeline; it becomes the main screen.
 6. **T17 + T36** — T17 shipped on its own, so T36 is now a second `ALTER TABLE` on `contacts` rather than a rider on the first. Still cheap, still prevents an expensive mistake, still has no dependencies — do not let it sit behind the pipeline work.
 7. **T18, T19** — search and import/export, once the model has settled.
-8. **T23, T20, T22** — password reset, reminders, calendar feed. All three need outbound mail; build the sender once. T39 (recurring tasks) shipped ahead of T20; its instances stay silent until that reminder job exists.
+8. **T23, T22** — password reset and the calendar feed. Both still need outbound mail, and the sender is still unbuilt: T20 shipped to Slack instead, precisely because waiting for that sender was what kept every recurrence and every overdue watch silent. T23 is the one that genuinely cannot be done any other way.
 9. **T38** — tender fields, now that T40 feeds them: portal finds land as plain deals until `deal_kind` exists. T37 is still a one-migration job; slot it into any spare afternoon.
 
 Everything else is opportunistic.
