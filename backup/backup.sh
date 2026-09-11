@@ -12,9 +12,10 @@
 # two.
 #
 # Both object stores are reached with mc. The GCS bucket is addressed through
-# its S3-compatible endpoint using the HMAC key that already exists for the
-# documents bucket — the same service account holds objectAdmin on the backups
-# bucket, so no GCP service account key is needed anywhere in this path.
+# its S3-compatible endpoint using an HMAC key on the tiny-crm-backup service
+# account, which may add and read archives in the backups bucket but not delete
+# or overwrite them — so no GCP service account key is needed anywhere in this
+# path, and a leaked key cannot destroy existing backups.
 set -euo pipefail
 
 : "${DATABASE_HOST:?}"
