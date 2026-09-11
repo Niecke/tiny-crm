@@ -1,6 +1,6 @@
 {{- if .Values.backup.enabled }}
-{{- $accessKey := required "backup.gcs.accessKey is required when backup.enabled — terraform output tiny_crm_documents_hmac_access_id" .Values.backup.gcs.accessKey }}
-{{- $secretKey := required "backup.gcs.secretKey is required when backup.enabled — terraform output tiny_crm_documents_hmac_secret" .Values.backup.gcs.secretKey }}
+{{- $accessKey := required "backup.gcs.accessKey is required when backup.enabled — terraform output tiny_crm_backup_hmac_access_id" .Values.backup.gcs.accessKey }}
+{{- $secretKey := required "backup.gcs.secretKey is required when backup.enabled — terraform output tiny_crm_backup_hmac_secret" .Values.backup.gcs.secretKey }}
 apiVersion: v1
 kind: Secret
 metadata:
@@ -13,9 +13,10 @@ stringData:
   PGPASSWORD: {{ .Values.postgres.password | quote }}
   MINIO_USER: {{ .Values.minio.rootUser | quote }}
   MINIO_PASSWORD: {{ .Values.minio.rootPassword | quote }}
-  # HMAC key for the GCS bucket, reached over its S3-compatible endpoint. The
-  # service account behind it already holds objectAdmin on the backups bucket,
-  # so this one credential covers both stores and no GCP key file is involved.
+  # HMAC key for the GCS bucket, reached over its S3-compatible endpoint. It
+  # belongs to the tiny-crm-backup service account, which may add and read
+  # archives in the backups bucket but not delete them, and no GCP key file is
+  # involved.
   GCS_ACCESS_KEY: {{ $accessKey | quote }}
   GCS_SECRET_KEY: {{ $secretKey | quote }}
 ---

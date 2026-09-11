@@ -164,8 +164,8 @@ backup:
     endpoint: https://storage.googleapis.com
     bucket: niecke-it-tiny-crm-backups
     # Required. Both from terraform/niecke-it:
-    #   terraform output tiny_crm_documents_hmac_access_id
-    #   terraform output tiny_crm_documents_hmac_secret
+    #   terraform output tiny_crm_backup_hmac_access_id
+    #   terraform output tiny_crm_backup_hmac_secret
     accessKey: ""
     secretKey: ""
 
