@@ -4,6 +4,7 @@ import 'package:frontend/providers/tasks_provider.dart';
 import 'package:go_router/go_router.dart';
 
 import 'features/auth/auth_provider.dart';
+import 'providers/captures_provider.dart';
 import 'providers/contacts_provider.dart';
 import 'providers/deals_provider.dart';
 import 'providers/documents_provider.dart';
@@ -11,11 +12,13 @@ import 'providers/interactions_provider.dart';
 import 'providers/organizations_provider.dart';
 import 'providers/projects_provider.dart';
 import 'providers/watches_provider.dart';
+import 'pages/capture_share_page.dart';
 import 'pages/change_password_page.dart';
 import 'pages/dashboard_page.dart';
 import 'pages/deals_page.dart';
 import 'pages/documents_page.dart';
 import 'pages/health_page.dart';
+import 'pages/inbox_page.dart';
 import 'pages/interactions_page.dart';
 import 'pages/login_page.dart';
 import 'pages/organizations_page.dart';
@@ -23,6 +26,7 @@ import 'pages/profile_page.dart';
 import 'pages/projects_page.dart';
 import 'pages/watches_page.dart';
 import 'widgets/app_footer.dart';
+import 'widgets/quick_capture.dart';
 
 final routerProvider = Provider<GoRouter>((ref) => _buildRouter(ref));
 
@@ -48,8 +52,15 @@ GoRouter _buildRouter(Ref ref) {
       final isLoggedIn = authState.asData?.value != null;
       final onLogin = state.matchedLocation == '/login';
 
-      if (!isLoggedIn && !onLogin) return '/login';
-      if (isLoggedIn && onLogin) return '/';
+      if (!isLoggedIn && !onLogin) {
+        // Carry where they were going through the login. Without this a share
+        // from Android that arrives while signed out lands on the login screen
+        // and the shared link is simply gone — a silent loss of exactly the
+        // thing the share target exists to catch.
+        final from = Uri.encodeComponent(state.uri.toString());
+        return '/login?from=$from';
+      }
+      if (isLoggedIn && onLogin) return _safeReturnTo(state.uri.queryParameters['from']);
       return null;
     },
     routes: [
@@ -59,6 +70,10 @@ GoRouter _buildRouter(Ref ref) {
           GoRoute(
             path: '/',
             builder: (context, state) => const DashboardPage(),
+          ),
+          GoRoute(
+            path: '/inbox',
+            builder: (context, state) => const InboxPage(),
           ),
           GoRoute(
             path: '/organizations',
@@ -98,9 +113,33 @@ GoRouter _buildRouter(Ref ref) {
           ),
         ],
       ),
+      // Outside the shell: arrived at from Android's share sheet, not navigated
+      // to, so it gets its own screen rather than the app's nav chrome.
+      GoRoute(
+        path: '/capture',
+        builder: (context, state) => CaptureSharePage(
+          title: state.uri.queryParameters['title'],
+          text: state.uri.queryParameters['text'],
+          url: state.uri.queryParameters['url'],
+        ),
+      ),
       GoRoute(path: '/login', builder: (context, state) => const LoginPage()),
     ],
   );
+}
+
+/// Where to land after a successful login.
+///
+/// Only in-app paths: an absolute or protocol-relative URL here would let a
+/// crafted link bounce someone off this app after signing in, and nothing the
+/// app itself produces ever needs one.
+String _safeReturnTo(String? from) {
+  if (from == null || from.isEmpty) return '/';
+  final target = Uri.decodeComponent(from);
+  if (!target.startsWith('/') || target.startsWith('//')) return '/';
+  // Bouncing back to /login would loop.
+  if (target == '/login' || target.startsWith('/login?')) return '/';
+  return target;
 }
 
 class AppShell extends ConsumerWidget {
@@ -141,6 +180,7 @@ class AppShell extends ConsumerWidget {
           if (isWide)
             for (final (label, path) in [
               ('Dashboard', '/'),
+              ('Inbox', '/inbox'),
               ('Sources', '/watches'),
               ('Deals', '/deals'),
               ('Organizations', '/organizations'),
@@ -170,6 +210,10 @@ class AppShell extends ConsumerWidget {
                     // opening the screen — a watch list nobody looks at is the
                     // failure mode this whole feature exists to avoid.
                     if (path == '/watches') const _DueWatchBadge(),
+                    // How many captures are waiting. Same reasoning as the
+                    // sweep badge: an inbox nobody opens is the failure this
+                    // feature exists to prevent.
+                    if (path == '/inbox') const _WaitingCaptureBadge(),
                   ],
                 ),
               )
@@ -179,6 +223,7 @@ class AppShell extends ConsumerWidget {
               tooltip: 'Navigate',
               onSelected: context.go,
               itemBuilder: (_) => const [
+                PopupMenuItem(value: '/inbox', child: Text('Inbox')),
                 PopupMenuItem(value: '/watches', child: Text('Sources')),
                 PopupMenuItem(value: '/deals', child: Text('Deals')),
                 PopupMenuItem(
@@ -193,6 +238,9 @@ class AppShell extends ConsumerWidget {
                 ),
               ],
             ),
+          // Before Refresh so it is the first thing under the thumb on a
+          // phone, and present whichever nav layout is showing.
+          const QuickCaptureButton(),
           IconButton(
             onPressed: () => {
               ref.invalidate(contactsProvider),
@@ -208,6 +256,8 @@ class AppShell extends ConsumerWidget {
               ref.invalidate(allDocumentsProvider),
               ref.invalidate(projectsProvider),
               ref.invalidate(interactionsProvider),
+              ref.invalidate(capturesProvider),
+              ref.invalidate(newCaptureCountProvider),
             },
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh',
@@ -240,6 +290,22 @@ class AppShell extends ConsumerWidget {
 /// Silent when nothing is due and while the count is loading — a badge that
 /// flashes "0" on every navigation is noise, and a failure here must never
 /// break the app bar.
+/// The count of captures waiting to be worked, beside the Inbox nav item.
+///
+/// Silent at zero and while loading, like [_DueWatchBadge] — a badge that
+/// flashes "0" on every navigation is noise, and a failure here must never
+/// break the app bar.
+class _WaitingCaptureBadge extends ConsumerWidget {
+  const _WaitingCaptureBadge();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final waiting = ref.watch(newCaptureCountProvider).asData?.value.waiting ?? 0;
+    if (waiting == 0) return const SizedBox.shrink();
+    return _NavBadge(count: waiting);
+  }
+}
+
 class _DueWatchBadge extends ConsumerWidget {
   const _DueWatchBadge();
 
@@ -247,7 +313,19 @@ class _DueWatchBadge extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final due = ref.watch(dueWatchCountProvider).asData?.value ?? 0;
     if (due == 0) return const SizedBox.shrink();
+    return _NavBadge(count: due);
+  }
+}
 
+/// The pill both nav counts render as, so a second badge cannot drift from the
+/// first in colour, size or padding.
+class _NavBadge extends StatelessWidget {
+  const _NavBadge({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(left: 6),
@@ -258,7 +336,7 @@ class _DueWatchBadge extends ConsumerWidget {
           borderRadius: BorderRadius.circular(10),
         ),
         child: Text(
-          '$due',
+          '$count',
           style: TextStyle(
             color: scheme.onPrimary,
             fontSize: 11,
