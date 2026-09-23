@@ -8,7 +8,12 @@ FROM ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie@sha256:5a6a677d3fa2bc3
 # mc from the official image, the same way the backend Dockerfile takes uv from
 # the astral image. Pinned by digest; there is no other supported way to get a
 # specific mc build.
-COPY --from=docker.io/minio/mc:latest@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727 /usr/bin/mc /usr/local/bin/mc
+#
+# quay.io, not Docker Hub: MinIO withdrew minio/mc and minio/minio from Hub and
+# archived the upstream repo, so the Hub pin stopped resolving mid-build. The
+# digest is unchanged — quay serves the same artifact. Public builds are frozen,
+# so this is a stopgap; see the issue on moving documents to Hetzner S3.
+COPY --from=quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727 /usr/bin/mc /usr/local/bin/mc
 
 USER root
 RUN apt-get update \
