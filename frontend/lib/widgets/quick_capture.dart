@@ -6,11 +6,26 @@ import '../models/capture.dart';
 import '../providers/captures_provider.dart';
 
 /// Opens the quick-add box. One line in, nothing else required.
-Future<void> showQuickCapture(BuildContext context, {String? initialText}) {
-  return showDialog<void>(
+///
+/// The inbox and the nav badge are refreshed here rather than inside the
+/// dialog, once it has closed: a barrier tap or the back button dismisses it
+/// without going through any of its buttons, and those paths were leaving a
+/// stale list and a stale badge behind. Once at the end rather than per save,
+/// so putting four people in costs one refresh.
+Future<void> showQuickCapture(BuildContext context, {String? initialText}) async {
+  final container = ProviderScope.containerOf(context);
+  var saved = false;
+  await showDialog<void>(
     context: context,
-    builder: (_) => _QuickCaptureDialog(initialText: initialText),
+    builder: (_) => _QuickCaptureDialog(
+      initialText: initialText,
+      onSaved: () => saved = true,
+    ),
   );
+  if (saved) {
+    container.invalidate(capturesProvider);
+    container.invalidate(newCaptureCountProvider);
+  }
 }
 
 /// The always-available capture affordance in the app bar.
@@ -37,9 +52,13 @@ class QuickCaptureButton extends StatelessWidget {
 /// would turn that into four round trips through the app bar, so the dialog
 /// stays open and the field stays hot.
 class _QuickCaptureDialog extends ConsumerStatefulWidget {
-  const _QuickCaptureDialog({this.initialText});
+  const _QuickCaptureDialog({this.initialText, required this.onSaved});
 
   final String? initialText;
+
+  /// Called after each successful save, so the caller knows a refresh is owed
+  /// however the dialog ends up closing.
+  final VoidCallback onSaved;
 
   @override
   ConsumerState<_QuickCaptureDialog> createState() => _QuickCaptureDialogState();
@@ -78,6 +97,7 @@ class _QuickCaptureDialogState extends ConsumerState<_QuickCaptureDialog> {
       final capture = await ref
           .read(capturesRepositoryProvider)
           .create(raw, note: note.isEmpty ? null : note);
+      widget.onSaved();
       if (!mounted) return;
       setState(() {
         _saved.insert(0, capture);
@@ -107,12 +127,6 @@ class _QuickCaptureDialogState extends ConsumerState<_QuickCaptureDialog> {
   }
 
   void _close() {
-    // Only now, so the inbox and the badge are refreshed once rather than on
-    // every keystroke-sized save.
-    if (_saved.isNotEmpty) {
-      ref.invalidate(capturesProvider);
-      ref.invalidate(newCaptureCountProvider);
-    }
     Navigator.pop(context);
   }
 

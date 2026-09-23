@@ -545,6 +545,12 @@ class _TriagePanelState extends ConsumerState<_TriagePanel> {
             loading: () => const LinearProgressIndicator(),
             error: (e, _) => Text('Could not load contacts. ${errorText(e)}'),
             data: (options) => DropdownButtonFormField<String?>(
+              // `initialValue` is read once per form-field state, so the reset
+              // in _prefill() would not reach a field that stays mounted from
+              // one capture to the next: the previous person would still be
+              // shown while a new one was submitted. Keying on the capture
+              // forces a fresh field for each.
+              key: ValueKey('contact-${capture.id}'),
               initialValue: _existingContactId,
               isExpanded: true,
               decoration: const InputDecoration(
@@ -593,6 +599,7 @@ class _TriagePanelState extends ConsumerState<_TriagePanel> {
               loading: () => const LinearProgressIndicator(),
               error: (e, _) => Text('Could not load organizations. ${errorText(e)}'),
               data: (options) => DropdownButtonFormField<String?>(
+                key: ValueKey('organization-${capture.id}'),
                 initialValue: _organizationId,
                 isExpanded: true,
                 decoration: const InputDecoration(labelText: 'Organization'),

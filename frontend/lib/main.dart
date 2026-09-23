@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 
 import 'api.dart';
 import 'config.dart';
@@ -14,6 +15,10 @@ import 'router.dart';
 void main() {
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
+    // Real paths, not `#/…`. Android's share sheet posts to the `share_target`
+    // action in web/manifest.json, and a hash route would never reach
+    // go_router — the shared link would land on the dashboard and vanish.
+    usePathUrlStrategy();
     final config = await AppConfig.load();
     final container = ProviderContainer();
     dio = Dio(BaseOptions(

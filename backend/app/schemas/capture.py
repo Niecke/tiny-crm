@@ -1,8 +1,8 @@
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from typing import Annotated, Literal, Self
 from uuid import UUID
 
-from pydantic import BaseModel, StringConstraints, model_validator
+from pydantic import BaseModel, StringConstraints, field_validator, model_validator
 
 from app.schemas.contact import (
     ContactRead,
@@ -143,6 +143,21 @@ class CaptureInteraction(BaseModel):
     # Defaults to now. Overridable so a message actually sent last night can be
     # logged this morning without lying about when it happened.
     occurred_at: datetime | None = None
+
+    @field_validator("occurred_at")
+    @classmethod
+    def _assume_utc(cls, value: datetime | None) -> datetime | None:
+        """Read a timestamp with no offset as UTC.
+
+        The convert route compares this against `datetime.now(UTC)` to decide
+        whether the outreach has happened yet, and comparing a naive datetime
+        with an aware one is a TypeError — a 500 on input that should simply be
+        taken at face value. Everything this API stores is UTC, so a client
+        that omitted the offset meant UTC.
+        """
+        if value is not None and value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
+        return value
 
 
 class CaptureConvert(BaseModel):

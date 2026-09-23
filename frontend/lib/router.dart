@@ -135,7 +135,10 @@ GoRouter _buildRouter(Ref ref) {
 /// app itself produces ever needs one.
 String _safeReturnTo(String? from) {
   if (from == null || from.isEmpty) return '/';
-  final target = Uri.decodeComponent(from);
+  // Already decoded: `queryParameters` undoes the `Uri.encodeComponent` from
+  // the redirect above. Decoding a second time turns a shared `%` into an
+  // invalid escape (FormatException) and truncates anything after an `&`.
+  final target = from;
   if (!target.startsWith('/') || target.startsWith('//')) return '/';
   // Bouncing back to /login would loop.
   if (target == '/login' || target.startsWith('/login?')) return '/';
