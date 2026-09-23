@@ -34,9 +34,12 @@ postgres:
 # Document store
 # ---------------------------------------------------------------------------
 minio:
-  # Digest-pinned the same way compose.yml pins it.
-  image: docker.io/minio/minio:latest@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
-  mcImage: docker.io/minio/mc:latest@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
+  # Digest-pinned the same way compose.yml pins it. On quay.io rather than
+  # Docker Hub, where MinIO withdrew both repositories; the digests are the same
+  # artifacts. Release tags rather than :latest, so a moving tag cannot orphan
+  # the pin again.
+  image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+  mcImage: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
 
   bucket: tinycrm-documents
 
