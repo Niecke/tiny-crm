@@ -99,20 +99,24 @@ Priorities: **P0** not a CRM without it · **P1** daily friction · **P2** expec
       Contact detail shows interactions only. Merge interactions, tasks, deals, documents and field changes into one reverse-chronological history — the view that answers "where are we with this person?". Becomes the app's main screen.
       *Unblocked:* every link it has to merge now exists — tasks carry contact / deal / interaction FKs, and documents and interactions attach to any record. Field changes need T29; ship the timeline without them rather than waiting.
       *Pairs with:* T37, which is what makes a run of unanswered outbound messages visible as a run.
+      *Now has a starting point:* converting a capture logs the first outbound interaction and opens the deal, so a freshly made lead already has two rows for the timeline to merge instead of an empty history.
 
 - [ ] **T18 · P0 · One search across everything**
       Search is per-panel and matches exactly one column each — a contact is unfindable by email, phone or note text. Postgres full-text (`tsvector` + GIN, or `pg_trgm` for fuzzy names).
       *Done when:* a single search box in the app bar returns contacts, organizations, interactions, tasks, deals, documents and watches.
+      *Add captures to that list:* `raw` and `name` are already searched together by `/captures/`, and a link parked last month is exactly the thing nobody can find again.
       *Now safe to do:* the model has settled — nine tables, no entity work pending except T36's and T38's columns.
 
 - [ ] **T19 · P0 · Import and export**
       No way to get data in or out except by typing. CSV import with column mapping and a dry-run preview, CSV export per entity, vCard in/out for contacts. Also the GDPR data-portability answer and the escape hatch that makes a self-hosted CRM safe to adopt.
       *Note:* contacts now have 30-odd columns including a closed-set status, type and source. The importer needs a mapping UI that can say "this column is unmappable" rather than guessing, and must reject unknown enum values the way the filters do.
+      *Cheaper first step, already shipped:* a list of names or links pasted into the quick-capture box lands in the inbox without any mapping at all. A bulk-paste variant of that box is a fraction of this task and covers the common case.
 
 - [ ] **T21 · P1 · Log an email without syncing mailboxes**
       Full IMAP sync stays out of scope. The 80%: `mailto:` links from a contact, a "log this email" form, and a BCC-to-inbox address that files a message as an interaction.
       *Gated by:* T36 — the `mailto:` affordance is where channel compliance has to bite, or the field is decoration.
       *Pairs with:* T37 — a logged email is the archetypal `outbound` interaction.
+      *Overlaps with captures:* `POST /captures/{id}/convert` already writes that interaction as part of triage, so the "log this email" form is the same body minus the capture. Build one shape, not two.
 
 - [ ] **T22 · P1 · Calendar view and `.ics` feed**
       Interactions already carry `occurred_at` and `duration_minutes`, so a month/week view is mostly presentation. A read-only iCalendar feed gets planned meetings into the calendar the operator already uses, at a fraction of the cost of real sync.
@@ -164,6 +168,7 @@ Priorities: **P0** not a CRM without it · **P1** daily friction · **P2** expec
 - [ ] **T27 · P2 · Duplicate detection and merge**
       Nothing prevents entering the same person twice, and CSV import (T19) makes it routine. Warn on matching email or fuzzy name at create time; merge re-points interactions, tasks, deals, documents and watch links.
       *Do after T19*, which is what makes duplicates common enough to be worth solving.
+      *Where it belongs:* the capture triage panel already picks between "new person" and an existing contact, and `captures` deliberately has no unique constraint — refusing a duplicate at the moment of capture would be the opposite of frictionless. Warning at triage, where a human is already looking at the row, is the cheap version of this whole task.
 
 - [ ] **T29 · P2 · Change history**
       Only `updated_at` is kept, and concurrent edits silently last-write-win. An append-only audit table gives "who changed this and when" and supports optimistic-concurrency checks on PATCH.

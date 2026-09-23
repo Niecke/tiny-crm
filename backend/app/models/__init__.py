@@ -15,6 +15,7 @@ instead, and gets the whole registry from one import.
 *Adding a model file? Add it here*, and every entry point picks it up.
 """
 
+from app.models.capture import Capture
 from app.models.contact import Contact
 from app.models.deal import Deal
 from app.models.document import Document
@@ -25,6 +26,7 @@ from app.models.task import Task
 from app.models.watch import Watch, WatchCheck
 
 __all__ = [
+    "Capture",
     "Contact",
     "Deal",
     "Document",

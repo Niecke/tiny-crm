@@ -14,6 +14,7 @@ from app.db import get_session
 from app.logging_config import configure_logging
 from app.ratelimit import count_failed_logins, enforce_login_rate_limit
 from app.routers import (
+    captures,
     contacts,
     deals,
     documents,
@@ -88,6 +89,7 @@ app.add_middleware(
 app.middleware("http")(count_failed_logins)
 
 app.include_router(contacts.router)
+app.include_router(captures.router)
 app.include_router(organizations.router)
 app.include_router(deals.router)
 app.include_router(tasks.router)

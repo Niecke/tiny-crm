@@ -32,6 +32,10 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
+  # For usePathUrlStrategy(): the PWA share target posts to a real path, which
+  # the default hash strategy would hide from go_router.
+  flutter_web_plugins:
+    sdk: flutter
 
   cupertino_icons: ^1.0.8
   dio: ^5.0.0

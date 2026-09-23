@@ -81,6 +81,12 @@ RESOURCES = [
         {"name": "Renamed by Bob"},
     ),
     Resource(
+        "captures",
+        "/captures/",
+        _json_creator("/captures/", {"raw": "Ada Lovelace"}),
+        {"name": "Renamed by Bob"},
+    ),
+    Resource(
         "organizations",
         "/organizations/",
         _json_creator("/organizations/", {"name": "Alice's company"}),

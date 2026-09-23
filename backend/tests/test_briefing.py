@@ -35,6 +35,7 @@ from app.briefing import (
     render_slack,
     send_briefings,
 )
+from app.models.capture import Capture
 from app.models.contact import Contact
 from app.models.interaction import Interaction
 from app.models.task import Task
@@ -89,6 +90,16 @@ def _watch(account: Account, name: str, due: datetime, **fields: Any) -> Watch:
         url=f"https://example.com/{name}",
         recurrence_rule="weekly",
         next_due_at=due,
+        **fields,
+    )
+
+
+def _capture(account: Account, raw: str, created_at: datetime, **fields: Any) -> Capture:
+    return Capture(
+        user_id=account.id,
+        raw=raw,
+        name=raw,
+        created_at=created_at,
         **fields,
     )
 
@@ -192,6 +203,61 @@ async def test_watches_due_today_or_overdue_and_never_a_paused_one(
     briefing = await _briefing_for(session_factory, alice)
 
     assert [w.name for w in briefing.watches_due] == ["ted", "karriere"]
+
+
+async def test_captures_waiting_are_listed_oldest_first(
+    session_factory: async_sessionmaker[AsyncSession], alice: Account, bob: Account
+) -> None:
+    """No date filter: a capture has no due date, which is why it is here."""
+    await _seed(
+        session_factory,
+        _capture(alice, "recent", berlin("2026-09-04T06:00")),
+        _capture(alice, "ancient", berlin("2026-07-14T09:00")),
+        _capture(alice, "already written to", berlin("2026-08-01T09:00"), status="converted"),
+        _capture(alice, "decided against", berlin("2026-08-02T09:00"), status="dismissed"),
+        _capture(bob, "bobs", berlin("2026-07-01T09:00")),
+    )
+
+    briefing = await _briefing_for(session_factory, alice)
+
+    assert [c.raw for c in briefing.captures_waiting] == ["ancient", "recent"]
+
+
+async def test_captures_alone_make_a_briefing_worth_sending(
+    session_factory: async_sessionmaker[AsyncSession], alice: Account
+) -> None:
+    """Otherwise the one thing with no other way to resurface stays silent."""
+    await _seed(session_factory, _capture(alice, "Jane Doe", berlin("2026-08-20T09:00")))
+
+    briefing = await _briefing_for(session_factory, alice)
+
+    assert not briefing.is_empty
+
+
+async def test_a_waiting_capture_says_how_long_it_has_waited(
+    session_factory: async_sessionmaker[AsyncSession], alice: Account
+) -> None:
+    await _seed(
+        session_factory,
+        _capture(alice, "Jane Doe", berlin("2026-08-20T09:00"), url="https://example.com/jane"),
+        _capture(alice, "John Roe", berlin("2026-09-03T09:00")),
+        _capture(alice, "Today Person", berlin("2026-09-04T06:00")),
+    )
+
+    briefing = await _briefing_for(session_factory, alice)
+    payload = render_slack(briefing)
+    text = _text_of(payload)
+
+    assert "People to write to" in text
+    assert "waiting 15 days" in text
+    # Singular, not "1 days".
+    assert "waiting 1 day" in text
+    # Captured this morning: no age claim at all.
+    assert "Today Person" in text
+    # The link is clickable when there is one.
+    assert "<https://example.com/jane|Jane Doe>" in text
+    # And the preview line counts them.
+    assert "3 to write" in payload["text"]
 
 
 async def test_a_clear_day_is_empty(
