@@ -43,12 +43,12 @@ spec:
     backend:
       image:
         # Managed by .github/workflows/promote.yml — do not edit by hand.
-        tag: 596ecfc
+        tag: c24d8fa
     frontend:
       image:
-        tag: 596ecfc
+        tag: c24d8fa
     backup:
       image:
         # No image at 077ae28 — that promote predates this one existing. promote
         # sets all three to the merge sha on the next release.
-        tag: 596ecfc
+        tag: c24d8fa
