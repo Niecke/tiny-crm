@@ -368,7 +368,7 @@ async def send_briefings(
     """Gather and deliver one briefing per active user.
 
     One webhook, one channel: every user's briefing lands in the same place.
-    That is the single-operator shape this app is built for (PLAN.md, out of
+    That is the single-operator shape this app is built for (CONTRIBUTING.md, out of
     scope: teams); a second real user needs a destination per user first.
 
     The first delivery failure raises and ends the run — with one webhook, a

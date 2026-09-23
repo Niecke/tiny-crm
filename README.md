@@ -5,7 +5,8 @@ tasks, interactions, projects, documents and a watch list of sources to sweep.
 
 - **[FEATURES.md](FEATURES.md)** — what it does, the API surface, and the rules
   worth knowing before changing anything.
-- **[PLAN.md](PLAN.md)** — what is still open, and in what order.
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** — goals, scope, and how work is tracked.
+- **[GitHub Issues](https://github.com/Niecke/tiny-crm/issues)** — what is still open, and in what order.
 - **[deploy/README.md](deploy/README.md)** — how it reaches the cluster.
 
 This file is the how-to-run-it half.
