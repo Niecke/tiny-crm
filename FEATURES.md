@@ -266,7 +266,7 @@ the list to what has already been worked; `?search=` matches `raw` as well as
 
 **No unique constraint on anything.** The same person may well be captured twice
 from two places, and refusing the second at the moment of capture is the opposite
-of frictionless. De-duplication belongs at triage (PLAN.md, T-dedupe).
+of frictionless. De-duplication belongs at triage (#141).
 
 ---
 
