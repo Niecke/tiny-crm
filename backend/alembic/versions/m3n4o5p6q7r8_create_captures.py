@@ -15,7 +15,7 @@ inbox would quietly re-open a decision that was already made.
 
 No unique constraint on anything. The same person may well be captured twice
 from two places, and refusing the second one at the moment of capture is the
-opposite of frictionless. De-duplication is its own task (PLAN.md, T-dedupe)
+opposite of frictionless. De-duplication is its own task (issue #141)
 and belongs at triage, not here.
 
 Nothing to backfill; there was nowhere a capture could previously have lived.

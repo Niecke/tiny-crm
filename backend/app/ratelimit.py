@@ -13,7 +13,7 @@ budget, so someone who mistypes twice and then gets it right is unaffected,
 while a password guesser is stopped after `login_max_failures`.
 
 This only throttles per source address. An attacker rotating IPs walks straight
-through it — that needs the durable per-account backoff tracked as T34 in PLAN.md.
+through it — that needs the durable per-account backoff tracked in issue #134.
 """
 
 from __future__ import annotations

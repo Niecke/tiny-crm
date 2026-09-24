@@ -7,7 +7,9 @@ FastAPI + PostgreSQL + S3 on the back, Flutter web on the front. Every row is
 scoped to a `user_id` and every endpoint checks it — there are no teams, roles
 or per-record permissions. Interactive API docs live at `/docs`.
 
-Planned work is in [PLAN.md](PLAN.md); how to run and deploy it is in
+Planned work is in [GitHub Issues](https://github.com/Niecke/tiny-crm/issues);
+scope and conventions are in [CONTRIBUTING.md](CONTRIBUTING.md); how to run and
+deploy it is in
 [README.md](README.md) and [deploy/README.md](deploy/README.md).
 
 ---
@@ -264,7 +266,7 @@ the list to what has already been worked; `?search=` matches `raw` as well as
 
 **No unique constraint on anything.** The same person may well be captured twice
 from two places, and refusing the second at the moment of capture is the opposite
-of frictionless. De-duplication belongs at triage (PLAN.md, T-dedupe).
+of frictionless. De-duplication belongs at triage (#141).
 
 ---
 
@@ -415,8 +417,8 @@ morning is worse than none.
 - **JWT bearer** via fastapi-users. No register / verify / reset routers are
   mounted; the admin is created with `scripts/create_admin.py`.
   `/auth/jwt/login`, `/auth/jwt/logout`, `/users/me`, `/users/me/password`.
-- **Token lifetime is 270 days** with no refresh and no denylist — see T24 in
-  [PLAN.md](PLAN.md).
+- **Token lifetime is 270 days** with no refresh and no denylist — tracked in #133 —
+  [CONTRIBUTING.md](CONTRIBUTING.md).
 - **Login throttle** (`app/ratelimit.py`): sliding window of *failed* logins per
   client address, `LOGIN_MAX_FAILURES` (10) per `LOGIN_FAILURE_WINDOW_SECONDS`
   (300). Over budget → 429 with `Retry-After`. Counted in middleware, because a

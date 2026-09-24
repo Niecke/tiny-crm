@@ -16,7 +16,7 @@ import '../widgets/quick_capture.dart';
 ///
 /// Saves once, on arrival. Sharing the same thing twice is a thing people do
 /// deliberately (two people, one page), so this does not try to be clever about
-/// duplicates — [PLAN.md] T-dedupe is where that belongs.
+/// duplicates — issue #141 is where that belongs.
 class CaptureSharePage extends ConsumerStatefulWidget {
   const CaptureSharePage({super.key, this.title, this.text, this.url});
 
