@@ -127,7 +127,7 @@ throttle, upload guards) run without one; everything that touches a router does 
 
 ```bash
 podman-compose up -d db                       # or point TEST_DATABASE_URL elsewhere
-cd backend && uv run pytest                   # 282 tests
+cd backend && uv run pytest                   # 340 tests
 cd backend && uv run pytest --cov=app         # with a coverage summary
 
 cd frontend && flutter test                   # widget_test.dart is browser-only, skipped here
@@ -147,9 +147,11 @@ pure helpers. S3 is faked in memory for the document tests; the real MinIO round
 
 ## The morning briefing
 
-Overdue tasks, today's plan and the sources due to be swept, posted to Slack on
-weekday mornings — the same information the dashboard's "Upcoming" panel holds,
-pushed, so it is visible without an open browser tab.
+Overdue tasks, today's plan, the sources due to be swept and the people still
+waiting to be written to, posted to Slack on weekday mornings — the same
+information the dashboard's "Upcoming" panel holds, pushed, so it is visible
+without an open browser tab. A waiting capture is the one thing here with no due
+date and no other way to resurface, which is why it is in the message at all.
 
 `backend/app/briefing.py` gathers and renders it; `scripts/send_briefing.py`
 runs it. There is no endpoint and no scheduler inside the API: a loop in the

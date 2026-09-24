@@ -42,7 +42,7 @@ from app.auth.users import User
 # `Interaction.projects` unable to resolve "Project" and the first query
 # fails. See app/models/__init__.py — the API is only safe here because it
 # imports every router.
-from app.models import Interaction, Task, Watch
+from app.models import Capture, Interaction, Task, Watch
 
 logger = logging.getLogger(__name__)
 
@@ -122,6 +122,11 @@ class Briefing:
     # (the API's `?due=true`): a source due at 15:00 belongs in the 07:00
     # briefing, not in tomorrow's as overdue.
     watches_due: list[Watch] = field(default_factory=list)
+    # Captures still waiting to be worked, oldest first. No date filter, unlike
+    # everything above: a capture has no due date, which is exactly why it
+    # needs to be here. Nothing else in the app would ever surface one, so an
+    # inbox nobody opens is invisible until the names in it are cold.
+    captures_waiting: list[Capture] = field(default_factory=list)
 
     @property
     def recipient(self) -> str:
@@ -135,6 +140,7 @@ class Briefing:
             or self.interactions_today
             or self.unconfirmed_interactions
             or self.watches_due
+            or self.captures_waiting
         )
 
 
@@ -170,6 +176,12 @@ async def gather_briefing(session: AsyncSession, user: User, window: DayWindow) 
         .order_by(Watch.next_due_at.asc(), Watch.id.asc())
     )
 
+    captures_waiting = await session.scalars(
+        select(Capture)
+        .where(Capture.user_id == user.id, Capture.status == "new")
+        .order_by(Capture.created_at.asc(), Capture.id.asc())
+    )
+
     return Briefing(
         user=user,
         window=window,
@@ -178,6 +190,7 @@ async def gather_briefing(session: AsyncSession, user: User, window: DayWindow) 
         interactions_today=list(interactions_today),
         unconfirmed_interactions=list(unconfirmed),
         watches_due=list(watches_due),
+        captures_waiting=list(captures_waiting),
     )
 
 
@@ -240,6 +253,24 @@ def _watch_line(watch: Watch, window: DayWindow) -> str:
     return "• " + " · ".join(parts)
 
 
+def _capture_line(capture: Capture, window: DayWindow) -> str:
+    """One waiting capture: who, the link, and how long it has sat there.
+
+    The age is the part that matters. "3 waiting" is a healthy inbox on a
+    Tuesday and a broken habit if the oldest is from March, and a name captured
+    six weeks ago is a name the person no longer remembers giving.
+    """
+    label = capture.display_name
+    parts = [_link(capture.url, label) if capture.url else f"*{escape(label)}*"]
+    if capture.note:
+        parts.append(escape(capture.note))
+    # Days since it was captured. `days_late` measures calendar days before
+    # today, which is the same question asked of a creation date.
+    if waiting := window.days_late(capture.created_at):
+        parts.append("_waiting 1 day_" if waiting == 1 else f"_waiting {waiting} days_")
+    return "• " + " · ".join(parts)
+
+
 def _capped(lines: list[str]) -> list[str]:
     if len(lines) <= MAX_LINES:
         return lines
@@ -283,6 +314,10 @@ def render_slack(briefing: Briefing, *, app_url: str | None = None) -> dict[str,
             ],
         ),
         ("Sources to sweep", [_watch_line(w, window) for w in briefing.watches_due]),
+        (
+            "People to write to",
+            [_capture_line(c, window) for c in briefing.captures_waiting],
+        ),
     ]
 
     blocks: list[dict[str, Any]] = [
@@ -294,7 +329,10 @@ def render_slack(briefing: Briefing, *, app_url: str | None = None) -> dict[str,
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "Nothing due, nothing overdue, nothing to sweep. Clear day.",
+                    "text": (
+                        "Nothing due, nothing overdue, nothing to sweep, "
+                        "nobody waiting to be written to. Clear day."
+                    ),
                 },
             }
         )
@@ -320,6 +358,7 @@ def render_slack(briefing: Briefing, *, app_url: str | None = None) -> dict[str,
             (len(briefing.interactions_today), "on the calendar"),
             (len(briefing.unconfirmed_interactions), "unconfirmed"),
             (len(briefing.watches_due), "to sweep"),
+            (len(briefing.captures_waiting), "to write"),
         ]
         summary = " · ".join(f"{n} {label}" for n, label in counts if n)
     text = f"{window.today:%a} {window.today.day} {window.today:%b}: {summary}"

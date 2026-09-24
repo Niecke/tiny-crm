@@ -25,6 +25,7 @@ deploy it is in
 | **Interaction** | One touchpoint: call, meeting, email, note. Past = log, future = plan. | contacts, organizations, deals, projects |
 | **Project** | A named piece of work with a start and end. | contacts, tasks, documents, interactions |
 | **Document** | A file in S3 with metadata and a preview. | contacts, organizations, deals, projects |
+| **Capture** | A name or a link parked in seconds, waiting to be worked into a lead. | contact + deal (FK, once worked) |
 | **Watch** | A source you check on a cadence: job board, careers page, tender portal. | organization (FK), watch checks |
 | **WatchCheck** | One append-only sweep of one watch. | watch, created deal / task |
 
@@ -208,6 +209,67 @@ the person and their company without being uploaded twice.
 
 ---
 
+## Captures — the inbox
+
+`GET|POST /captures/` · `GET /captures/count` · `GET|PATCH|DELETE /captures/{id}`
+· `POST /captures/{id}/convert` · `POST /captures/{id}/dismiss`
+
+Somewhere to put a person in two seconds, before there is time to decide
+anything about them. `raw` (required) is the one line that was typed, pasted or
+shared; `name` and `url` are pulled out of it by `app/captures.py`; `note`,
+`source` and the triage links are the rest.
+
+**A table of its own, not a half-filled contact.** A `Contact` needs a name and
+rewards a dozen more fields, so a bare profile URL could not be filed as one
+without inventing a name for it. Worse, the filters that make the contact list
+useful — `lifecycle_status`, `works_with_freelancers` — read as "never asked" on
+a stub, which is indistinguishable from a real answer.
+
+**`raw` is never rewritten.** That is what makes the parser safe to get wrong:
+the name and the link are guesses, editable and occasionally nonsense, but what
+was actually in hand at the moment of capture survives all of it. Editing a
+capture later does not re-run the parser either — by then the name on the row is
+the corrected one.
+
+**What the parser does**, in order: lift the first `http(s)` token out as the
+url; whatever text is left becomes the name, in either order; if nothing is
+left and the link is a `linkedin.com/in/` or `xing.com/profile/` slug, title-case
+it into a suggested name, dropping a trailing id; no link at all and the whole
+line is the name. A slug from any other host yields no name — an honest blank
+beats a confident guess at a person's name.
+
+**Status is one column** — `new` / `converted` / `dismissed` — and moves only
+through `/convert` and `/dismiss`, never through PATCH. The same funnel
+`Deal.stage` has, so arriving at an ending always stamps what that ending
+implies. `triaged_at` is a timestamp beside it, not a second source of truth.
+
+**`POST /{id}/convert` is one transaction**: the person (a new contact at
+`lifecycle_status: lead`, or an existing `contact_id` — exactly one, else 422),
+optionally a deal at stage `lead` against them, and optionally the interaction
+recording that they were written to. The four belong together: a contact created
+without its deal is a name nobody follows up, and a deal created without the
+capture being stamped comes straight back in tomorrow's inbox. The response
+carries all four so the triage screen can advance without a second request.
+
+**Converting twice is a 409**, not a second deal. That is the quiet duplicate
+that only surfaces when you write to someone for the second time. A refused
+convert leaves the capture `new`, never half-worked.
+
+**Dismissing keeps the row.** "I looked at this and said no" is an answer, and an
+inbox that forgets its own rejections offers them again next month. `DELETE` is
+for a typo, which is not a decision — it is what Undo in the quick-add box calls.
+
+**Oldest first**, always: an inbox is a queue to empty, not a feed to scroll, and
+newest-first would bury exactly the captures going stale. `?status=all` widens
+the list to what has already been worked; `?search=` matches `raw` as well as
+`name`, because half the rows have no name to be found by.
+
+**No unique constraint on anything.** The same person may well be captured twice
+from two places, and refusing the second at the moment of capture is the opposite
+of frictionless. De-duplication belongs at triage (PLAN.md, T-dedupe).
+
+---
+
 ## Watches — job boards, careers pages, tender portals
 
 `GET|POST /watches/` · `GET|PATCH|DELETE /watches/{id}` ·
@@ -283,6 +345,8 @@ so the 401 handler can see one. Every delete goes through the same
 | Route | What it does |
 |---|---|
 | `/` | Dashboard: Contacts / Tasks / Upcoming panels, responsive to tabs under 700px. Contact panel filters by status, type and freelancer answer. |
+| `/inbox` | The inbox: captures oldest-first beside a triage panel. **Open link** opens the profile in a new tab; one form files the person, opens a deal at stage Lead and logs that you wrote to them, then advances to the next capture. Nav badge counts what is waiting. |
+| `/capture` | Where Android's share sheet lands. Saves what was shared, then offers "Add another" or the inbox. Outside the app shell — arrived at from outside, not navigated to. |
 | `/watches` | Sources: "Due now" / "All active" / "Everything", filter by kind. **Open & sweep** opens the source in a new tab, then offers the check dialog. Nav badge counts what is due. |
 | `/deals` | List beside detail, scoped "On my plate" / "Still competing" / "Won" / "Finished" / one stage. Detail moves the deal with stage chips. |
 | `/organizations` | List beside detail: contacts at the company, add-someone-here, attached documents and interactions. |
@@ -296,17 +360,23 @@ the address as an envelope, that contact's interactions, documents and open
 tasks. A background version check prompts a reload when the deployed build hash
 changes.
 
+The **quick capture** bolt sits in the app bar in both the wide and the narrow
+layout, because the whole feature is worth nothing if putting something in is
+ever more than one tap away. One autofocused field: Enter saves and clears while
+keeping focus, so several go in without leaving the dialog, and each saved line
+can be undone on the spot. A failed save leaves the text where it is.
+
 Shared widgets worth knowing: `RecordPicker` / `AttachmentPickers` (the four
 attach pickers used by every form), `LinkedTasksSection`, `PaginationBar`,
-`AttachedDocumentsSection`, `AttachedInteractionsSection`.
+`AttachedDocumentsSection`, `AttachedInteractionsSection`, `QuickCaptureButton`.
 
 ---
 
 ## The morning briefing
 
 Weekday mornings, 07:00, one Slack message: overdue tasks, what is due today,
-today's planned interactions, planned interactions never confirmed, and the
-sources due to be swept.
+today's planned interactions, planned interactions never confirmed, the sources
+due to be swept, and the people still waiting to be written to.
 
 `app/briefing.py` gathers and renders, `scripts/send_briefing.py` runs it,
 `charts/tinycrm/templates/briefing-cronjob.yaml` schedules it on the backend
@@ -323,6 +393,13 @@ days. `BRIEFING_TIMEZONE` must equal the CronJob's `timeZone`.
 
 Watches appear as "due today", not "due now": a source due at 15:00 belongs in
 the 07:00 message. Paused sources never appear.
+
+**Waiting captures have no date filter**, unlike everything else in the message
+— a capture has no due date, which is precisely why it needs to be here. Nothing
+else in the app would ever surface one, so an inbox nobody opens stays invisible
+until the names in it are cold. Each line carries how long it has waited, which
+is the part that means something: "3 waiting" is a healthy inbox on a Tuesday
+and a broken habit if the oldest is from March.
 
 ```bash
 cd backend
@@ -387,12 +464,12 @@ the frontend polls it to prompt a reload after a deploy.
 
 ## Tests
 
-- **Backend: 282 tests** (`cd backend && uv run pytest`). A scratch Postgres
+- **Backend: 340 tests** (`cd backend && uv run pytest`). A scratch Postgres
   database per session; tables rebuilt from the models before each test; two
   accounts (Alice and Bob) with tokens minted straight from the JWT strategy.
   S3 is faked in memory for document tests. `uv run mypy app tests` is clean and
   gated in CI; `ruff check` and `ruff format --check` too.
-- **Frontend: 10 test files** (`cd frontend && flutter test`) covering the
+- **Frontend: 11 test files** (`cd frontend && flutter test`) covering the
   hand-written models, money and date formatting, and error text.
   `widget_test.dart` is browser-only — add `--platform chrome`.
 - **`ci/smoke.sh`** drives the real built images against Postgres and MinIO:

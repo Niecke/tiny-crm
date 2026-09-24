@@ -273,6 +273,42 @@ history=$(curl -fsS "$API/watches/$watch_id/checks" "${auth[@]}")
 [ "$(echo "$history" | json "['items'][0]['note']")" = "CI Smoke tender" ] \
   || fail "the note of the find should have survived"
 
+step "a captured link becomes a contact, a lead and a logged message"
+capture_id=$(curl -fsS -X POST "$API/captures/" "${auth[@]}" \
+  -H 'Content-Type: application/json' \
+  -d '{"raw":"CI Smoke Person https://www.linkedin.com/in/ci-smoke-person"}' \
+  | json "['id']")
+[ -n "$capture_id" ] || fail "capture was not created"
+# The name and the link are pulled out of the one line that was typed.
+captured=$(curl -fsS "$API/captures/$capture_id" "${auth[@]}")
+[ "$(echo "$captured" | json "['name']")" = "CI Smoke Person" ] \
+  || fail "the name was not parsed out of the captured line"
+[ "$(echo "$captured" | json "['url']")" = "https://www.linkedin.com/in/ci-smoke-person" ] \
+  || fail "the link was not parsed out of the captured line"
+
+worked=$(curl -fsS -X POST "$API/captures/$capture_id/convert" "${auth[@]}" \
+  -H 'Content-Type: application/json' \
+  -d '{"contact":{"name":"CI Smoke Person"},"deal":{"title":"CI Smoke outreach"},"interaction":{"kind":"email","subject":"Wrote to CI Smoke Person"}}')
+capture_contact_id=$(echo "$worked" | json "['contact']['id']")
+capture_deal_id=$(echo "$worked" | json "['deal']['id']")
+[ "$(echo "$worked" | json "['contact']['lifecycle_status']")" = "lead" ] \
+  || fail "the converted contact should be a lead"
+[ "$(echo "$worked" | json "['deal']['stage']")" = "lead" ] \
+  || fail "the deal should open at stage lead"
+[ "$(echo "$worked" | json "['deal']['contact_id']")" = "$capture_contact_id" ] \
+  || fail "the lead should be filed against the person it came from"
+[ "$(echo "$worked" | json "['interaction']['done']")" = "True" ] \
+  || fail "an outreach logged now should already be marked as happened"
+
+# Converting twice would open a second deal on the same person — the quiet
+# duplicate that only surfaces when you write to them again.
+dup=$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$API/captures/$capture_id/convert" \
+  "${auth[@]}" -H 'Content-Type: application/json' -d '{"contact":{"name":"Duplicate"}}')
+[ "$dup" = "409" ] || fail "expected 409 when converting twice, got $dup"
+
+waiting=$(curl -fsS "$API/captures/count" "${auth[@]}" | json "['new']")
+[ "$waiting" = "0" ] || fail "expected the worked capture to leave the inbox, got $waiting"
+
 step "the morning briefing renders from the same image the API runs"
 # No endpoint to drive: the briefing is a CronJob running this script against
 # the database. --dry-run proves the whole path inside the built image —
@@ -286,6 +322,9 @@ echo "$briefing" | grep -q 'Call CI Smoke back' \
 echo "$briefing" | grep -q "$EMAIL" || fail "the briefing does not name its recipient"
 
 step "cleanup"
+curl -fsS -X DELETE "$API/captures/$capture_id" "${auth[@]}"
+curl -fsS -X DELETE "$API/deals/$capture_deal_id" "${auth[@]}"
+curl -fsS -X DELETE "$API/contacts/$capture_contact_id" "${auth[@]}"
 curl -fsS -X DELETE "$API/documents/$document_id" "${auth[@]}"
 curl -fsS -X DELETE "$API/interactions/$interaction_id" "${auth[@]}"
 # Takes its sweep log with it (CASCADE).
