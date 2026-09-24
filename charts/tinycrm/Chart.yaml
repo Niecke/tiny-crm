@@ -1,6 +1,6 @@
 apiVersion: v2
 name: tinycrm
-description: tinyCRM — Flutter web frontend, FastAPI backend, MinIO document store and a CloudNativePG database
+description: tinyCRM — Flutter web frontend, FastAPI backend, S3 document store and a CloudNativePG database
 type: application
 
 # Chart version. Bump on chart changes; appVersion tracks nothing because the

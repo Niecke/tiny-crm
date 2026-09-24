@@ -46,9 +46,11 @@ the HelmRelease's inline values.
 cat > /tmp/values.yaml <<EOF
 postgres:
   password: $(openssl rand -base64 24)
-minio:
-  rootUser: tinycrm
-  rootPassword: $(openssl rand -base64 24)
+s3:
+  # the tinycrm-backend key from the Hetzner Cloud Console
+  # (infrastructure repo, MANUAL-STEPS.md §9)
+  accessKey: ...
+  secretKey: ...
 backend:
   jwtSecret: $(openssl rand -hex 32)
 EOF

@@ -11,8 +11,11 @@ metadata:
 type: Opaque
 stringData:
   PGPASSWORD: {{ .Values.postgres.password | quote }}
-  MINIO_USER: {{ .Values.minio.rootUser | quote }}
-  MINIO_PASSWORD: {{ .Values.minio.rootPassword | quote }}
+  # MINIO_* only because backup.sh reads those names. It is plain S3 via mc and
+  # now points at Hetzner. Renaming them means rebuilding the backup image, which
+  # is blocked until mc is replaced: MinIO stopped publishing the mc image.
+  MINIO_USER: {{ .Values.s3.accessKey | quote }}
+  MINIO_PASSWORD: {{ .Values.s3.secretKey | quote }}
   # HMAC key for the GCS bucket, reached over its S3-compatible endpoint. It
   # belongs to the tiny-crm-backup service account, which may add and read
   # archives in the backups bucket but not delete them, and no GCP key file is
@@ -60,9 +63,9 @@ spec:
                 - name: DATABASE_NAME
                   value: {{ .Values.postgres.database | quote }}
                 - name: MINIO_ENDPOINT
-                  value: {{ include "tinycrm.minioEndpoint" . | quote }}
+                  value: {{ .Values.s3.endpoint | quote }}
                 - name: MINIO_BUCKET
-                  value: {{ .Values.minio.bucket | quote }}
+                  value: {{ .Values.s3.bucket | quote }}
                 - name: GCS_ENDPOINT
                   value: {{ .Values.backup.gcs.endpoint | quote }}
                 - name: BACKUP_BUCKET

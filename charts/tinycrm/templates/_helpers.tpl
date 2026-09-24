@@ -48,11 +48,3 @@ starts.
 {{- define "tinycrm.databaseUrl" -}}
 {{- printf "postgresql+asyncpg://%s:%s@%s:5432/%s" .Values.postgres.username .Values.postgres.password (include "tinycrm.postgresHost" .) .Values.postgres.database -}}
 {{- end -}}
-
-{{- define "tinycrm.minioFullname" -}}
-{{- printf "%s-minio" (include "tinycrm.fullname" .) -}}
-{{- end -}}
-
-{{- define "tinycrm.minioEndpoint" -}}
-{{- printf "http://%s:9000" (include "tinycrm.minioFullname" .) -}}
-{{- end -}}
