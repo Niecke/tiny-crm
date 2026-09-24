@@ -56,7 +56,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: alembic
-          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+          image: {{ include "tinycrm.image" (list "backend" .Values.backend.image) | quote }}
           imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
           envFrom:
             - secretRef:

@@ -49,6 +49,18 @@ starts.
 {{- printf "postgresql+asyncpg://%s:%s@%s:5432/%s" .Values.postgres.username .Values.postgres.password (include "tinycrm.postgresHost" .) .Values.postgres.database -}}
 {{- end -}}
 
+{{/*
+Full image reference for one of the application images. The tag has no default:
+an unset tag fails the render instead of silently pulling whatever a floating
+tag happens to point at. Call with (list "backend" .Values.backend.image).
+*/}}
+{{- define "tinycrm.image" -}}
+{{- $name := index . 0 -}}
+{{- $image := index . 1 -}}
+{{- $tag := required (printf "%s.image.tag is required — set it to a promoted tag such as sha-<short>" $name) $image.tag -}}
+{{- printf "%s:%s" $image.repository $tag -}}
+{{- end -}}
+
 {{- define "tinycrm.minioFullname" -}}
 {{- printf "%s-minio" (include "tinycrm.fullname" .) -}}
 {{- end -}}

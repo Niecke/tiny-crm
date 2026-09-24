@@ -106,26 +106,26 @@ jobs:
             echo "No images tagged \`$SOURCE_TAG\` — ci.yml skipped the builds because no application code changed. Nothing to promote; Flux still picks up any chart change from the commit itself." >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      # imagetools copies the manifest by digest: same bytes, extra tags.
-      - name: Tag with the main commit and latest
+      # imagetools copies the manifest by digest: same bytes, extra tag. No
+      # `latest`: a floating tag under IfNotPresent lets two nodes hold two
+      # different images under one name, and makes the rollback target ambiguous.
+      - name: Tag with the main commit
         if: steps.images.outputs.exists == 'true'
         env:
           SOURCE_TAG: ${{ steps.source.outputs.tag }}
         run: |
           set -euo pipefail
-          short="${GITHUB_SHA:0:7}"
+          tag="sha-${GITHUB_SHA:0:7}"
           for image in backend frontend backup; do
             docker buildx imagetools create \
-              --tag "$REGISTRY/$image:$short" \
-              --tag "$REGISTRY/$image:latest" \
+              --tag "$REGISTRY/$image:$tag" \
               "$REGISTRY/$image:$SOURCE_TAG"
-            docker buildx imagetools inspect "$REGISTRY/$image:$short" --format '{{.Manifest.Digest}}'
+            docker buildx imagetools inspect "$REGISTRY/$image:$tag" --format '{{.Manifest.Digest}}'
           done
 
       # Flux deploys whatever main says, so the sha that was just promoted has
-      # to land in git. Nothing else moves it: the chart's `latest` default with
-      # IfNotPresent would leave the rendered manifest unchanged, and an
-      # unchanged manifest neither rolls the pods nor re-pulls the image.
+      # to land in git. Nothing else moves it: the chart has no default tag, and
+      # an unchanged manifest neither rolls the pods nor re-pulls the image.
       #
       # The push uses GITHUB_TOKEN, and GitHub does not re-trigger workflows for
       # commits made with it — so this cannot loop back into promote.
@@ -138,10 +138,10 @@ jobs:
           set -euo pipefail
           short="${GITHUB_SHA:0:7}"
 
-          SHORT="$short" yq -i '
-            .spec.values.backend.image.tag = strenv(SHORT) |
-            .spec.values.frontend.image.tag = strenv(SHORT) |
-            .spec.values.backup.image.tag = strenv(SHORT)
+          TAG="sha-$short" yq -i '
+            .spec.values.backend.image.tag = strenv(TAG) |
+            .spec.values.frontend.image.tag = strenv(TAG) |
+            .spec.values.backup.image.tag = strenv(TAG)
           ' "$RELEASE"
 
           if git diff --quiet -- "$RELEASE"; then

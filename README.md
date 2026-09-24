@@ -210,7 +210,7 @@ covered from the first push. `workflow_dispatch` runs the two test jobs on deman
 run has no PR head to tag images with, so it stops there).
 
 **`.github/workflows/promote.yml`** — on merge to `main`, resolves the merged PR's head sha
-and re-tags the already-tested images with `<short-main-sha>` and `latest` via
+and re-tags the already-tested images with `sha-<short-main-sha>` via
 `docker buildx imagetools create`. Nothing is rebuilt, so the digest that passed the
 integration test is the digest that deploys.
 

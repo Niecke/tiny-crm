@@ -66,7 +66,9 @@ minio:
 backend:
   image:
     repository: ghcr.io/niecke/tiny-crm/backend
-    tag: latest
+    # No default. Flux sets this to the promoted sha-<short> tag (see
+    # deploy/flux/helmrelease.yaml); rendering without it fails on purpose.
+    tag: ""
     pullPolicy: IfNotPresent
   replicas: 1
 
@@ -93,7 +95,7 @@ backend:
 frontend:
   image:
     repository: ghcr.io/niecke/tiny-crm/frontend
-    tag: latest
+    tag: ""
     pullPolicy: IfNotPresent
   replicas: 1
 
@@ -157,7 +159,7 @@ backup:
 
   image:
     repository: ghcr.io/niecke/tiny-crm/backup
-    tag: latest
+    tag: ""
     pullPolicy: IfNotPresent
 
   # brotli's default of 11 costs minutes on two shared vCPUs for a few percent.

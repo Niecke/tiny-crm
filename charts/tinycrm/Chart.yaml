@@ -4,7 +4,7 @@ description: tinyCRM — Flutter web frontend, FastAPI backend, MinIO document s
 type: application
 
 # Chart version. Bump on chart changes; appVersion tracks nothing because the
-# image tags are set per deploy (--set backend.image.tag=<sha>).
+# image tags are set per deploy (--set backend.image.tag=sha-<short>).
 version: 0.1.0
 appVersion: "latest"
 
