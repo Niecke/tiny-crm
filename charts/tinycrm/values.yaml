@@ -19,8 +19,8 @@ postgres:
   storage:
     size: 10Gi
     # local-path binds a directory under the node's data volume. It does not
-    # enforce this size — the number is documentation, and postgres and MinIO
-    # share the same 20 GB volume with nothing stopping either from filling it.
+    # enforce this size — the number is documentation, and nothing stops
+    # postgres from filling the node's 20 GB data volume.
     storageClass: local-path
 
   resources:
@@ -33,31 +33,20 @@ postgres:
 # ---------------------------------------------------------------------------
 # Document store
 # ---------------------------------------------------------------------------
-minio:
-  # Digest-pinned the same way compose.yml pins it. On quay.io rather than
-  # Docker Hub, where MinIO withdrew both repositories; the digests are the same
-  # artifacts. Release tags rather than :latest, so a moving tag cannot orphan
-  # the pin again.
-  image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
-  mcImage: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
+# Hetzner Object Storage, outside the cluster. Replaced the in-cluster MinIO
+# once MinIO stopped publishing images (#112). The bucket, its versioning and the
+# key are set up by hand: infrastructure repo, MANUAL-STEPS.md §9.
+s3:
+  endpoint: https://nbg1.your-objectstorage.com
+  # Hetzner checks the signing region, so this must match the endpoint's
+  # location. us-east-1 is rejected.
+  region: nbg1
+  bucket: niecke-tinycrm-documents
 
-  bucket: tinycrm-documents
-
-  # Required, and they must not be minioadmin: the backend refuses to start in
-  # production on the demo credentials (backend/app/config.py).
-  rootUser: ""
-  rootPassword: ""
-
-  storage:
-    size: 5Gi
-    storageClass: local-path
-
-  resources:
-    requests:
-      cpu: 50m
-      memory: 256Mi
-    limits:
-      memory: 512Mi
+  # Required. The `tinycrm-backend` key from the Cloud Console. A Hetzner key
+  # reaches every bucket in the project, not only this one.
+  accessKey: ""
+  secretKey: ""
 
 # ---------------------------------------------------------------------------
 # Application — templates land in the next increment; values are here so the
@@ -75,8 +64,6 @@ backend:
   environment: production
   # Required. `openssl rand -hex 32`
   jwtSecret: ""
-
-  s3Region: us-east-1
 
   # k3s allocates pod addresses from this range by default. uvicorn only honours
   # X-Forwarded-For from peers it trusts, and the peer is always Traefik — so
