@@ -1,0 +1,516 @@
+/*
+ * Design tokens and app-shell layout.
+ *
+ * The palette is warm beige with a muted sage accent, tuned for long sessions:
+ * body text sits around 11:1 against the background instead of the 21:1 of
+ * pure black on white, and every text colour still clears WCAG AA (4.5:1) on
+ * every surface it is used on.
+ *
+ * Structure comes from tone first and lines second. The sidebar is a slightly
+ * darker beige with no dividing border; content lives in rounded panels with a
+ * hairline border barely darker than the page. Lines inside a panel are inset
+ * from its edges, so nothing runs edge to edge and cuts the screen in two.
+ */
+
+:root {
+  /* Surfaces, darkest to lightest. */
+  --color-sidebar: #ebe4d6;
+  --color-bg: #f3eee4;
+  --color-surface: #faf7f0;
+
+  /* Borders. Hairline groups things; strong marks what is interactive. */
+  --color-border: #e0d6c4;
+  --color-border-strong: #c9bca5;
+
+  --color-text: #3a332a;
+  --color-text-muted: #6b6152;
+
+  --color-accent: #4f6846;
+  --color-accent-hover: #435a3b;
+  --color-accent-soft: #e4e9da;
+  --color-on-accent: #ffffff;
+
+  --color-danger: #9c4336;
+  --color-danger-soft: #f3e1da;
+  --color-warning: #80601f;
+  --color-warning-soft: #f2e8cf;
+  --color-success: var(--color-accent);
+  --color-success-soft: var(--color-accent-soft);
+
+  --radius-sm: 6px;
+  --radius: 10px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --sidebar-width: 224px;
+  --content-max: 1120px;
+
+  --shadow-panel: 0 1px 2px rgb(58 51 42 / 0.04);
+  --focus-ring: 0 0 0 3px rgb(79 104 70 / 0.35);
+
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+
+  color-scheme: light;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--color-text);
+  background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--color-bg);
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  line-height: 1.25;
+  font-weight: 600;
+}
+
+h1 {
+  font-size: 1.5rem;
+}
+
+h2 {
+  font-size: 1.05rem;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--color-accent);
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
+}
+
+/* ---------- App shell ---------- */
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) 1fr;
+  min-height: 100vh;
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-5) var(--space-3);
+  background: var(--color-sidebar);
+}
+
+.brand {
+  padding: 0 var(--space-3);
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-link {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  text-decoration: none;
+}
+
+.nav-link:hover {
+  background: rgb(58 51 42 / 0.05);
+  color: var(--color-text);
+}
+
+.nav-link[data-status='active'] {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.nav-link[aria-disabled='true'] {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.nav-link[aria-disabled='true']:hover {
+  background: none;
+  color: var(--color-text-muted);
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: 0 var(--space-3);
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.sidebar-user {
+  max-width: calc(var(--sidebar-width) - 2 * var(--space-5));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9rem;
+  color: var(--color-text);
+}
+
+.main {
+  min-width: 0;
+  padding: var(--space-6) var(--space-6) var(--space-6);
+}
+
+.page {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.page-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.page-header p {
+  color: var(--color-text-muted);
+}
+
+/* ---------- Panels ---------- */
+
+.panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-panel);
+}
+
+.panel-header {
+  padding: var(--space-4) var(--space-5) 0;
+}
+
+.panel-body {
+  padding: var(--space-3) var(--space-5) var(--space-4);
+}
+
+/* Rows inside a panel: the separator is inset by the panel padding, so it
+   groups the rows without reaching the panel's edges. */
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rows > li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-4);
+  padding: var(--space-2) 0;
+}
+
+.rows > li > * {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.rows > li + li {
+  border-top: 1px solid var(--color-border);
+}
+
+.rows .label {
+  color: var(--color-text-muted);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+/* ---------- Stat tiles ---------- */
+
+/* Fixed column counts that divide six, rather than auto-fill: an auto-fill row
+   of five leaves one tile stranded on a line of its own. */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+@media (min-width: 1180px) {
+  .stats {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-4) var(--space-5);
+}
+
+.stat-label {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.stat-value {
+  font-size: 1.9rem;
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-hint {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+/* Something waiting: the number takes the warning colour, the tile stays calm. */
+.stat[data-tone='warning'] .stat-value {
+  color: var(--color-warning);
+}
+
+/* ---------- Status badges ---------- */
+
+.badge {
+  display: inline-block;
+  padding: 1px var(--space-2);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: var(--color-sidebar);
+  color: var(--color-text-muted);
+}
+
+.badge[data-tone='success'] {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.badge[data-tone='warning'] {
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+
+.badge[data-tone='danger'] {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+/* ---------- Forms ---------- */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.field-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+/* Inputs take the strong border: the one place a clear edge is wanted,
+   because it marks where typing goes. */
+.input {
+  font: inherit;
+  color: inherit;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+}
+
+.input:focus-visible {
+  border-color: var(--color-accent);
+}
+
+.input[aria-invalid='true'] {
+  border-color: var(--color-danger);
+}
+
+.field-error {
+  font-size: 0.85rem;
+  color: var(--color-danger);
+}
+
+.form-error {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  font-size: 0.9rem;
+}
+
+.button {
+  font: inherit;
+  font-weight: 600;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.button:hover {
+  background: var(--color-accent-hover);
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.button-quiet {
+  padding: var(--space-1) var(--space-3);
+  font-size: 0.85rem;
+  background: transparent;
+  border-color: var(--color-border-strong);
+  color: var(--color-text-muted);
+}
+
+.button-quiet:hover {
+  background: rgb(58 51 42 / 0.05);
+  color: var(--color-text);
+}
+
+/* ---------- Login ---------- */
+
+.auth-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-6) var(--space-5);
+}
+
+.auth-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-bottom: var(--space-2);
+}
+
+.auth-header .brand {
+  padding: 0;
+  font-size: 1.35rem;
+}
+
+.auth-header p {
+  color: var(--color-text-muted);
+}
+
+/* ---------- Narrow screens ---------- */
+
+/* The sidebar becomes a top bar with a horizontally scrolling nav; the phone
+   is where the inbox gets triaged, so it has to work there from the start. */
+@media (max-width: 767px) {
+  /* minmax(0, …) lets the column shrink below the nav's full width, so the nav
+     scrolls instead of widening the page; auto rows keep the bar its own
+     height instead of sharing the spare viewport height with the content. */
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+  }
+
+  .nav {
+    min-width: 0;
+  }
+
+  .sidebar {
+    position: static;
+    height: auto;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .brand {
+    padding: 0;
+  }
+
+  .nav {
+    flex-direction: row;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .nav-link {
+    white-space: nowrap;
+  }
+
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Only the sign-out button survives on the top bar. */
+  .sidebar-footer {
+    flex-shrink: 0;
+    margin: 0 0 0 auto;
+    padding: 0;
+  }
+
+  .sidebar-meta {
+    display: none;
+  }
+
+  .main {
+    padding: var(--space-4);
+  }
+
+  .panel-header {
+    padding: var(--space-4) var(--space-4) 0;
+  }
+
+  .panel-body {
+    padding: var(--space-3) var(--space-4) var(--space-4);
+  }
+}

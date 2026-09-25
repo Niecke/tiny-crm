@@ -19,7 +19,8 @@ function RootLayout() {
       <Outlet />
       {import.meta.env.DEV && (
         <>
-          <ReactQueryDevtools buttonPosition="bottom-left" />
+          {/* Top right: bottom left would cover the sidebar's sign-out button. */}
+          <ReactQueryDevtools buttonPosition="top-right" />
           <TanStackRouterDevtools position="bottom-right" />
         </>
       )}
