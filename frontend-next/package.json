@@ -7,13 +7,18 @@
     "dev": "vite",
     "build": "vite build && tsc -b",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "api:schema": "cd ../backend && uv run python scripts/export_openapi.py > ../frontend-next/openapi.json",
+    "api:types": "openapi-typescript openapi.json -o src/api/schema.d.ts",
+    "api:generate": "npm run api:schema && npm run api:types"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
     "@tanstack/react-query": "^5.103.2",
     "@tanstack/react-router": "^1.170.39",
+    "openapi-fetch": "^0.17.0",
     "react": "^19.2.8",
+    "react-aria-components": "^1.21.1",
     "react-dom": "^19.2.8",
     "react-hook-form": "^7.88.0",
     "zod": "^4.6.5"
@@ -26,8 +31,14 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
+    "openapi-typescript": "^7.13.0",
     "oxlint": "^1.81.0",
     "typescript": "~6.0.2",
     "vite": "^8.3.0"
+  },
+  "overrides": {
+    "openapi-typescript": {
+      "typescript": "$typescript"
+    }
   }
 }

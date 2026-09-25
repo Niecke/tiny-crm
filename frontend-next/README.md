@@ -5,7 +5,9 @@ served under `/next/` until a single cutover commit — see
 [#122](https://github.com/Niecke/tiny-crm/issues/122).
 
 Vite + React + TypeScript, TanStack Query for server state, TanStack Router
-(file-based, `src/routes/`), react-hook-form + zod for forms.
+(file-based, `src/routes/`), react-hook-form + zod for forms, React Aria
+Components for interactive controls. Why each was chosen, and the cutover
+criteria, are in [`FRONTEND.md`](../FRONTEND.md).
 
 ## Develop
 
@@ -19,6 +21,17 @@ npm run lint
 The API URL comes from `/next/config.json` at runtime, with the same content
 as the Flutter app's `/config.json`. Without one (plain `npm run dev`) it falls back to
 `http://localhost:8000`, i.e. the backend from `compose.yml`.
+
+## API types
+
+Generated, never written by hand. After a backend change to the API:
+
+```sh
+npm run api:generate   # needs `uv` — exports the schema from ../backend
+```
+
+Commit `openapi.json` and `src/api/schema.d.ts` with the change; CI fails when
+they are out of date. Details in [`FRONTEND.md`](../FRONTEND.md).
 
 ## Container
 

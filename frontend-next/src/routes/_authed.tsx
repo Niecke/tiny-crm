@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
-import { ApiError } from '../api'
+import { ApiError } from '../api/client'
 import { meQuery } from '../auth'
 import { AppShell } from '../components/AppShell'
 import { clearToken, getToken } from '../token'
@@ -12,7 +12,7 @@ export const Route = createFileRoute('/_authed')({
     if (!getToken()) throw toLogin
 
     try {
-      await context.queryClient.ensureQueryData(meQuery(context.config.apiUrl))
+      await context.queryClient.ensureQueryData(meQuery(context.api))
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         clearToken()

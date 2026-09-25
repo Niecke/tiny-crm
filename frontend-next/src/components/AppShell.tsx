@@ -1,8 +1,9 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, type LinkProps, useRouteContext, useRouter } from '@tanstack/react-router'
-import type { ReactNode } from 'react'
+import { Link, type LinkProps, useLocation, useRouteContext, useRouter } from '@tanstack/react-router'
+import { type ReactNode, useEffect, useRef } from 'react'
 import { meQuery } from '../auth'
 import { clearToken } from '../token'
+import { Button } from './ui/Button'
 
 // Every screen the Flutter app has, in its order. `to` is set once a screen is
 // ported; until then the entry stays visible but inert, so the nav doubles as
@@ -10,7 +11,7 @@ import { clearToken } from '../token'
 const nav: { label: string; to?: LinkProps['to'] }[] = [
   { label: 'Dashboard', to: '/' },
   { label: 'Inbox' },
-  { label: 'Organizations' },
+  { label: 'Organizations', to: '/organizations' },
   { label: 'Deals' },
   { label: 'Projects' },
   { label: 'Interactions' },
@@ -21,10 +22,21 @@ const nav: { label: string; to?: LinkProps['to'] }[] = [
 ]
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { config } = useRouteContext({ from: '/_authed' })
-  const { data: me } = useQuery(meQuery(config.apiUrl))
+  const { api } = useRouteContext({ from: '/_authed' })
+  const { data: me } = useQuery(meQuery(api))
   const queryClient = useQueryClient()
   const router = useRouter()
+  const navRef = useRef<HTMLElement>(null)
+  const pathname = useLocation({ select: (l) => l.pathname })
+
+  // On a phone the nav is one scrolling row, and the current entry can sit
+  // off-screen. 'nearest' leaves it alone when it is already visible, which on
+  // the desktop sidebar it always is.
+  useEffect(() => {
+    navRef.current
+      ?.querySelector('[data-status="active"]')
+      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [pathname])
 
   // The JWT is stateless, so there is nothing to revoke server-side: dropping
   // the token is the logout. The cache goes last, after the protected page
@@ -39,7 +51,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="shell">
       <aside className="sidebar">
         <div className="brand">tinyCRM</div>
-        <nav className="nav" aria-label="Main">
+        <nav className="nav" aria-label="Main" ref={navRef}>
           {nav.map((item) =>
             item.to ? (
               // Active matching is by prefix, so / needs to be exact or it
@@ -66,9 +78,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
             <div>React preview · #122</div>
           </div>
-          <button className="button button-quiet" type="button" onClick={logout}>
+          <Button variant="quiet" onPress={logout}>
             Sign out
-          </button>
+          </Button>
         </div>
       </aside>
       <main className="main">{children}</main>

@@ -1,30 +1,20 @@
 import { queryOptions, useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
+import { type Api, unwrap } from '../../api/client'
 
 // Which build is running and whether it can reach its database. Both endpoints
 // are unauthenticated, so this page still answers when the login is broken.
-type Version = { version: string; build_timestamp: string }
-
-const versionQuery = (apiUrl: string) =>
+const versionQuery = (api: Api) =>
   queryOptions({
-    queryKey: ['version', apiUrl],
-    queryFn: async (): Promise<Version> => {
-      const res = await fetch(`${apiUrl}/version`)
-      if (!res.ok) throw new Error(`GET /version → ${res.status}`)
-      return res.json()
-    },
+    queryKey: ['version'],
+    queryFn: () => unwrap(api.GET('/version')),
   })
 
-type Health = { status: string; db: string; timestamp: string }
-
-const healthQuery = (apiUrl: string) =>
+// A degraded backend answers 503, which lands in the error branch.
+const healthQuery = (api: Api) =>
   queryOptions({
-    queryKey: ['health', apiUrl],
-    queryFn: async (): Promise<Health> => {
-      const res = await fetch(`${apiUrl}/health`)
-      if (!res.ok) throw new Error(`GET /health -> ${res.status}`)
-      return res.json()
-    },
+    queryKey: ['health'],
+    queryFn: () => unwrap(api.GET('/health')),
   })
 
 export const Route = createFileRoute('/_authed/system')({
@@ -32,13 +22,13 @@ export const Route = createFileRoute('/_authed/system')({
 })
 
 function SystemPage() {
-  const { config } = Route.useRouteContext()
-  const { data, error, isPending } = useQuery(versionQuery(config.apiUrl))
+  const { api, config } = Route.useRouteContext()
+  const { data, error, isPending } = useQuery(versionQuery(api))
   const {
     data: health,
     error: healthError,
     isPending: healthPending,
-  } = useQuery(healthQuery(config.apiUrl))
+  } = useQuery(healthQuery(api))
 
   return (
     <div className="page">
