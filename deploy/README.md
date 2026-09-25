@@ -134,9 +134,20 @@ right after the first merge — the HelmRelease reports not-ready until they exi
 3. **Basic auth** for the frontend. htpasswd lines under the key `users`:
 
    ```bash
+   # htpasswd is in httpd-tools (Fedora) / apache2-utils (Debian)
+   PW="$(openssl rand -base64 18)"; echo "staging password: $PW"
    kubectl -n tinycrm-staging create secret generic tinycrm-staging-basic-auth \
-     --from-literal=users="$(htpasswd -nbB staging "$(openssl rand -base64 18)")"
+     --from-literal=users="$(htpasswd -nbB staging "$PW" | head -1)" \
+     --dry-run=client -o yaml | kubectl apply -f -
+   unset PW
    ```
+
+   The Secret holds only the bcrypt hash, so put the printed password in the
+   password manager — it cannot be read back. Re-running the block replaces it.
+   The user name is `staging`.
+
+   Until this Secret exists, Traefik cannot load the basic-auth middleware and
+   drops the frontend route: `/` answers 404 while `/api/health` still works.
 
    Only the frontend sits behind it. `/api` keeps its own JWT auth — both use
    the `Authorization` header, so basic auth on the API would reject every
