@@ -262,48 +262,64 @@ a {
   font-size: 0.9em;
 }
 
-/* ---------- Stat tiles ---------- */
+/* ---------- Dashboard ---------- */
 
-/* Fixed column counts that divide six, rather than auto-fill: an auto-fill row
-   of five leaves one tile stranded on a line of its own. */
-.stats {
+/* Today's list takes the width; the queues sit beside it on a desktop and
+   above it on a phone, where they are the quick summary. */
+.dashboard {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-4);
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: var(--space-5);
+  align-items: start;
 }
 
-@media (min-width: 1180px) {
-  .stats {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-  }
+.today {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
 }
 
-.stat {
+.today-group {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-  padding: var(--space-4) var(--space-5);
 }
 
-.stat-label {
-  font-size: 0.85rem;
+.today-group h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.95rem;
+}
+
+/* A clear day is the good outcome; it gets room, not an apology. */
+.today-clear {
+  padding: var(--space-6) 0;
+  text-align: center;
   color: var(--color-text-muted);
 }
 
-.stat-value {
-  font-size: 1.9rem;
+.late {
+  color: var(--color-danger);
+  white-space: nowrap;
+}
+
+.queues {
+  padding: var(--space-2) var(--space-5);
+}
+
+.queue {
+  align-items: center;
+}
+
+.queue-count {
+  font-size: 1.5rem;
   font-weight: 600;
-  line-height: 1.1;
   font-variant-numeric: tabular-nums;
-}
-
-.stat-hint {
-  font-size: 0.8rem;
   color: var(--color-text-muted);
 }
 
-/* Something waiting: the number takes the warning colour, the tile stays calm. */
-.stat[data-tone='warning'] .stat-value {
+.queue[data-tone='warning'] .queue-count {
   color: var(--color-warning);
 }
 
@@ -802,8 +818,12 @@ textarea.input {
     white-space: nowrap;
   }
 
-  .stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .dashboard {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .queues {
+    order: -1;
   }
 
   /* The facts column moves above the tabs, and the table drops the column

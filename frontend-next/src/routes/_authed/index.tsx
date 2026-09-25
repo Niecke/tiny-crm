@@ -1,38 +1,24 @@
 import { queryOptions, useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
+import type { ReactNode } from 'react'
 import { type Api, unwrap } from '../../api/client'
+import type { BriefingInteraction, BriefingRead, BriefingTask } from '../../api/types'
 
-// Every list endpoint answers with a Page of {items, total}; limit=1 turns it
-// into a count without shipping rows nobody renders. The fuller metric set is
-// #138 (DASHBOARD.md) — this is just the at-a-glance row.
-const first = { params: { query: { limit: 1 } } }
-
-// Each call is unwrapped on its own: the five pages are different types, and
-// only their `total` is shared.
-const total = async (request: Promise<{ data?: { total: number }; error?: unknown; response: Response }>) =>
-  (await unwrap(request)).total
-
-const counts = {
-  contacts: (api: Api) => total(api.GET('/contacts/', first)),
-  organizations: (api: Api) => total(api.GET('/organizations/', first)),
-  // Done tasks are left out by default.
-  tasks: (api: Api) => total(api.GET('/tasks/', first)),
-  deals: (api: Api) => total(api.GET('/deals/', { params: { query: { limit: 1, status: 'open' } } })),
-  projects: (api: Api) => total(api.GET('/projects/', first)),
-}
-
-type CountKey = keyof typeof counts
-
-const countQuery = (api: Api, key: CountKey) =>
+// The morning briefing, as data (GET /briefing). The same function builds the
+// 07:00 Slack message, so this page and that message agree on what today is
+// and what is late — the day counts come from the server, in its timezone.
+const briefingQuery = (api: Api) =>
   queryOptions({
-    queryKey: ['count', key],
-    queryFn: () => counts[key](api),
+    queryKey: ['briefing'],
+    queryFn: () => unwrap(api.GET('/briefing/')),
+    // "Today" moves on its own; refetch when the tab comes back into view.
+    refetchOnWindowFocus: true,
   })
 
-const inboxQuery = (api: Api) =>
+const openDealsQuery = (api: Api) =>
   queryOptions({
-    queryKey: ['captures', 'count'],
-    queryFn: () => unwrap(api.GET('/captures/count')),
+    queryKey: ['count', 'deals', 'open'],
+    queryFn: async () => (await unwrap(api.GET('/deals/', { params: { query: { limit: 1, status: 'open' } } }))).total,
   })
 
 export const Route = createFileRoute('/_authed/')({
@@ -41,66 +27,211 @@ export const Route = createFileRoute('/_authed/')({
 
 function Dashboard() {
   const { api } = Route.useRouteContext()
-  const inbox = useQuery(inboxQuery(api))
-
-  const inboxHint =
-    inbox.data?.oldest_days == null
-      ? undefined
-      : inbox.data.oldest_days === 0
-        ? 'oldest from today'
-        : `oldest ${inbox.data.oldest_days} d`
+  const briefing = useQuery(briefingQuery(api))
 
   return (
     <div className="page">
       <header className="page-header">
-        <h1>Dashboard</h1>
-        <p>Where things stand.</p>
+        <h1>Today</h1>
+        {briefing.data && <p>{formatDay(briefing.data.date)}</p>}
       </header>
 
-      <section className="stats" aria-label="Counts">
-        <Stat
-          label="Inbox"
-          value={inbox.data?.new}
-          error={inbox.error}
-          hint={inboxHint}
-          tone={inbox.data?.new ? 'warning' : undefined}
-        />
-        <CountStat label="Contacts" count="contacts" />
-        <CountStat label="Organizations" count="organizations" />
-        <CountStat label="Open tasks" count="tasks" />
-        <CountStat label="Open deals" count="deals" />
-        <CountStat label="Projects" count="projects" />
-      </section>
+      <div className="dashboard">
+        <section className="panel" aria-label="Today">
+          <div className="panel-body">
+            {briefing.isPending ? (
+              <p className="muted">Loading…</p>
+            ) : briefing.error ? (
+              <p className="form-error">{briefing.error.message}</p>
+            ) : (
+              <TodayList briefing={briefing.data} />
+            )}
+          </div>
+        </section>
+
+        <Queues briefing={briefing.data} />
+      </div>
     </div>
   )
 }
 
-function CountStat({ label, count }: { label: string; count: CountKey }) {
-  const { api } = Route.useRouteContext()
-  const { data, error } = useQuery(countQuery(api, count))
-  return <Stat label={label} value={data} error={error} />
-}
+// Your own commitments for the day: tasks, what is planned, and the entries
+// that were planned and never confirmed.
+function TodayList({ briefing }: { briefing: BriefingRead }) {
+  const { overdue_tasks, tasks_today, interactions_today, unconfirmed_interactions, timezone } = briefing
+  const tasks = [...overdue_tasks, ...tasks_today]
 
-function Stat({
-  label,
-  value,
-  error,
-  hint,
-  tone,
-}: {
-  label: string
-  value: number | undefined
-  error: Error | null
-  hint?: string
-  tone?: 'warning'
-}) {
+  if (tasks.length === 0 && interactions_today.length === 0 && unconfirmed_interactions.length === 0) {
+    return <p className="today-clear">Nothing due today.</p>
+  }
+
   return (
-    <div className="panel stat" data-tone={tone}>
-      <span className="stat-label">{label}</span>
-      <span className="stat-value" title={error?.message}>
-        {error ? '!' : value === undefined ? '–' : value}
-      </span>
-      {hint && <span className="stat-hint">{hint}</span>}
+    <div className="today">
+      {tasks.length > 0 && (
+        <Group title="Tasks" count={tasks.length}>
+          {tasks.map((t) => (
+            <TaskRow key={t.id} task={t} />
+          ))}
+        </Group>
+      )}
+
+      {interactions_today.length > 0 && (
+        <Group title="Planned today" count={interactions_today.length}>
+          {interactions_today.map((i) => (
+            <InteractionRow key={i.id} interaction={i} when={formatTime(i.occurred_at, timezone)} />
+          ))}
+        </Group>
+      )}
+
+      {unconfirmed_interactions.length > 0 && (
+        <Group
+          title="Not confirmed"
+          count={unconfirmed_interactions.length}
+          note="Planned, the time has passed, never marked as happened. Until they are, the log is wrong."
+        >
+          {unconfirmed_interactions.map((i) => (
+            <InteractionRow
+              key={i.id}
+              interaction={i}
+              when={formatShortDate(i.occurred_at, timezone)}
+              late={daysText(i.days_late, 'ago')}
+            />
+          ))}
+        </Group>
+      )}
     </div>
   )
 }
+
+function Group({ title, count, note, children }: { title: string; count: number; note?: string; children: ReactNode }) {
+  return (
+    <section className="today-group">
+      <h2>
+        {title} <span className="tab-count">{count}</span>
+      </h2>
+      {note && <p className="muted small">{note}</p>}
+      <ul className="rows">{children}</ul>
+    </section>
+  )
+}
+
+function TaskRow({ task }: { task: BriefingTask }) {
+  const about = [task.contact_name, task.deal_title, task.repeats && 'repeats'].filter(Boolean).join(' · ')
+  return (
+    <li>
+      <span className="row-main">
+        <span>
+          {task.title}
+          {task.priority >= 2 && (
+            <>
+              {' '}
+              <span className="badge" data-tone="warning">
+                high
+              </span>
+            </>
+          )}
+        </span>
+        {about && <span className="row-meta">{about}</span>}
+      </span>
+      {task.days_late > 0 ? (
+        <span className="row-side late">{daysText(task.days_late, 'late')}</span>
+      ) : (
+        <span className="row-side muted">today</span>
+      )}
+    </li>
+  )
+}
+
+function InteractionRow({
+  interaction,
+  when,
+  late,
+}: {
+  interaction: BriefingInteraction
+  when: string
+  late?: string
+}) {
+  const meta = [
+    when,
+    interaction.kind,
+    interaction.with_names.length > 0 && `with ${interaction.with_names.join(', ')}`,
+    interaction.duration_minutes && `${interaction.duration_minutes} min`,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+  return (
+    <li>
+      <span className="row-main">
+        <span>{interaction.subject}</span>
+        <span className="row-meta">{meta}</span>
+      </span>
+      {late && <span className="row-side late">{late}</span>}
+    </li>
+  )
+}
+
+// Queues worked elsewhere: counted here, not listed. Amber when something is
+// waiting, grey when it is clear.
+function Queues({ briefing }: { briefing: BriefingRead | undefined }) {
+  const { api } = Route.useRouteContext()
+  const openDeals = useQuery(openDealsQuery(api))
+
+  const captures = briefing?.captures_waiting
+  const oldest = captures?.reduce((max, c) => Math.max(max, c.days_waiting), 0)
+  const watches = briefing?.watches_due
+  const neverSwept = watches?.filter((w) => w.never_swept).length
+
+  return (
+    <aside className="panel queues" aria-label="Waiting">
+      <ul className="rows">
+        <Queue
+          label="Inbox"
+          count={captures?.length}
+          hint={oldest ? `oldest waiting ${daysText(oldest)}` : undefined}
+          alert
+        />
+        <Queue
+          label="Sources to sweep"
+          count={watches?.length}
+          hint={neverSwept ? `${neverSwept} never swept` : undefined}
+          alert
+        />
+        <Queue label="Open deals" count={openDeals.data} />
+      </ul>
+    </aside>
+  )
+}
+
+function Queue({ label, count, hint, alert }: { label: string; count: number | undefined; hint?: string; alert?: boolean }) {
+  return (
+    <li className="queue" data-tone={alert && count ? 'warning' : undefined}>
+      <span className="row-main">
+        <span>{label}</span>
+        {hint && <span className="row-meta">{hint}</span>}
+      </span>
+      <span className="queue-count">{count ?? '–'}</span>
+    </li>
+  )
+}
+
+function daysText(days: number, suffix?: string): string {
+  const text = days === 1 ? '1 day' : `${days} days`
+  return suffix ? `${text} ${suffix}` : text
+}
+
+// The briefing's own date and timezone, so "today" and the times shown are
+// the operator's — the same ones the Slack message printed.
+function formatDay(isoDate: string): string {
+  // Noon, so no timezone offset can move the date across midnight.
+  return new Date(`${isoDate}T12:00:00`).toLocaleDateString(undefined, {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  })
+}
+
+const formatTime = (iso: string, timeZone: string) =>
+  new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', timeZone })
+
+const formatShortDate = (iso: string, timeZone: string) =>
+  new Date(iso).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', timeZone })

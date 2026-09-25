@@ -91,6 +91,11 @@ spec:
             # one address. k3s allocates pods from 10.42.0.0/16 by default.
             - name: FORWARDED_ALLOW_IPS
               value: {{ .Values.backend.forwardedAllowIps | quote }}
+            # GET /briefing (the dashboard's "Today") must agree with the Slack
+            # briefing about what today is, so both read the same value — also
+            # when the briefing CronJob itself is switched off.
+            - name: BRIEFING_TIMEZONE
+              value: {{ .Values.briefing.timeZone | quote }}
           # readiness only. /health runs SELECT 1 and returns 503 when the
           # database is unreachable — correct for pulling a pod out of the
           # Service, wrong for liveness, where it would restart every backend

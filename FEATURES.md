@@ -389,7 +389,8 @@ queueing yesterday's briefing on top of this morning's.
 23:59 local, which is 21:59Z in summer, so a UTC "today" puts a task due
 tonight in tomorrow's message. `DayWindow` is local midnight to local midnight
 — 23 or 25 hours long across a DST switch — and `days_late` counts calendar
-days. `BRIEFING_TIMEZONE` must equal the CronJob's `timeZone`.
+days. `BRIEFING_TIMEZONE` must equal the CronJob's `timeZone`; the chart sets
+both from `briefing.timeZone`, on the backend Deployment as well as the CronJob.
 
 Watches appear as "due today", not "due now": a source due at 15:00 belongs in
 the 07:00 message. Paused sources never appear.
@@ -409,6 +410,15 @@ uv run python scripts/send_briefing.py             # needs SLACK_WEBHOOK_URL
 
 Off by default in the chart (`briefing.enabled`): a CronJob that fails every
 morning is worse than none.
+
+**The same briefing, as data: `GET /briefing`.** The React dashboard's "Today"
+section renders it rather than assembling the day from the list endpoints —
+those have no due-date or confirmation filters, and would need their own idea
+of where today starts. Every list is complete (the Slack message caps its
+sections), and each item carries the day count the briefing computed in
+`BRIEFING_TIMEZONE`, so the page and the 07:00 message cannot disagree about
+what is late. `app/routers/briefing.py`; the clock is a dependency
+(`current_time`) so tests pin it.
 
 ---
 

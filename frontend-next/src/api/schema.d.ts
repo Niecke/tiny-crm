@@ -549,6 +549,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/briefing/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Briefing
+         * @description What wants attention today: the morning briefing, as data.
+         *
+         *     Every list is complete — the Slack message caps its sections, this does
+         *     not, so the client decides how much to show and can say how much it left
+         *     out.
+         */
+        get: operations["get_briefing_briefing__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/jwt/login": {
         parameters: {
             query?: never;
@@ -753,6 +777,120 @@ export interface components {
              * @default []
              */
             project_ids: string;
+        };
+        /** BriefingCapture */
+        BriefingCapture: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Display Name */
+            display_name: string;
+            /** Url */
+            url: string | null;
+            /** Note */
+            note: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Days Waiting */
+            days_waiting: number;
+        };
+        /** BriefingInteraction */
+        BriefingInteraction: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "call" | "meeting" | "email" | "note" | "other";
+            /** Subject */
+            subject: string;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Duration Minutes */
+            duration_minutes: number | null;
+            /** With Names */
+            with_names: string[];
+            /** Days Late */
+            days_late: number;
+        };
+        /** BriefingRead */
+        BriefingRead: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Timezone */
+            timezone: string;
+            /** Overdue Tasks */
+            overdue_tasks: components["schemas"]["BriefingTask"][];
+            /** Tasks Today */
+            tasks_today: components["schemas"]["BriefingTask"][];
+            /** Interactions Today */
+            interactions_today: components["schemas"]["BriefingInteraction"][];
+            /** Unconfirmed Interactions */
+            unconfirmed_interactions: components["schemas"]["BriefingInteraction"][];
+            /** Watches Due */
+            watches_due: components["schemas"]["BriefingWatch"][];
+            /** Captures Waiting */
+            captures_waiting: components["schemas"]["BriefingCapture"][];
+        };
+        /** BriefingTask */
+        BriefingTask: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /** Due Date */
+            due_date: string | null;
+            /** Priority */
+            priority: number;
+            /** Contact Name */
+            contact_name: string | null;
+            /** Deal Title */
+            deal_title: string | null;
+            /** Repeats */
+            repeats: boolean;
+            /** Days Late */
+            days_late: number;
+        };
+        /** BriefingWatch */
+        BriefingWatch: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Url */
+            url: string;
+            /** Organization Name */
+            organization_name: string | null;
+            /**
+             * Next Due At
+             * Format: date-time
+             */
+            next_due_at: string;
+            /** Never Swept */
+            never_swept: boolean;
+            /** Days Late */
+            days_late: number;
         };
         /**
          * CaptureContact
@@ -3995,6 +4133,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_briefing_briefing__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BriefingRead"];
                 };
             };
         };

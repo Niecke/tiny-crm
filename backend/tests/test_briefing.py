@@ -16,11 +16,13 @@ import io
 import urllib.error
 import urllib.request
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
 import pytest
+from httpx2 import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.auth.users import User
@@ -35,11 +37,14 @@ from app.briefing import (
     render_slack,
     send_briefings,
 )
+from app.config import settings
+from app.main import app
 from app.models.capture import Capture
 from app.models.contact import Contact
 from app.models.interaction import Interaction
 from app.models.task import Task
 from app.models.watch import Watch
+from app.routers.briefing import current_time
 from tests.conftest import Account
 
 BERLIN = ZoneInfo("Europe/Berlin")
@@ -535,3 +540,120 @@ def test_the_window_survives_a_dst_switch() -> None:
     # ignores the offsets, which is exactly the trap the window avoids.
     window = DayWindow.containing(datetime(2026, 10, 25, 7, 0, tzinfo=BERLIN), BERLIN)
     assert window.end.astimezone(UTC) - window.start.astimezone(UTC) == timedelta(hours=25)
+
+
+# --- The endpoint ------------------------------------------------------------
+#
+# GET /briefing serves the same gather_briefing() to the dashboard. What it
+# picks up is covered above; these prove the wiring: whose rows, which day,
+# and that the day counts come from the operator's calendar, not the client's.
+
+
+@pytest.fixture
+def pinned_clock(monkeypatch: pytest.MonkeyPatch) -> Callable[[datetime], None]:
+    """Pin the endpoint's clock and timezone; returns a setter for the time."""
+    monkeypatch.setattr(settings, "briefing_timezone", "Europe/Berlin")
+
+    def pin(moment: datetime) -> None:
+        app.dependency_overrides[current_time] = lambda: moment
+
+    pin(NOW)
+    return pin
+
+
+async def test_the_briefing_endpoint_needs_a_login(client: AsyncClient) -> None:
+    response = await client.get("/briefing/")
+    assert response.status_code == 401
+
+
+async def test_the_endpoint_serves_todays_briefing_with_its_day_counts(
+    session_factory: async_sessionmaker[AsyncSession],
+    client: AsyncClient,
+    alice: Account,
+    pinned_clock: Callable[[datetime], None],
+) -> None:
+    contact = Contact(user_id=alice.id, name="Maria")
+    await _seed(
+        session_factory,
+        _task(alice, "Slipped", berlin("2026-09-02T23:59"), priority=2),
+        _task(alice, "Due tonight", berlin("2026-09-04T23:59"), recurrence_rule="weekly"),
+        _interaction(
+            alice, "Kickoff", berlin("2026-09-04T10:00"), kind="meeting", contacts=[contact]
+        ),
+        _interaction(alice, "Forgotten follow-up", berlin("2026-09-01T11:00")),
+        _watch(alice, "karriere", berlin("2026-09-04T15:00")),
+        _capture(alice, "Jane Doe", berlin("2026-08-20T09:00"), url="https://example.com/jane"),
+    )
+
+    response = await client.get("/briefing/", headers=alice.headers)
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["date"] == "2026-09-04"
+    assert body["timezone"] == "Europe/Berlin"
+
+    [slipped] = body["overdue_tasks"]
+    assert (slipped["title"], slipped["days_late"], slipped["priority"]) == ("Slipped", 2, 2)
+    [tonight] = body["tasks_today"]
+    assert (tonight["title"], tonight["days_late"], tonight["repeats"]) == ("Due tonight", 0, True)
+
+    [kickoff] = body["interactions_today"]
+    assert (kickoff["subject"], kickoff["kind"], kickoff["with_names"]) == (
+        "Kickoff",
+        "meeting",
+        ["Maria"],
+    )
+    [forgotten] = body["unconfirmed_interactions"]
+    assert (forgotten["subject"], forgotten["days_late"]) == ("Forgotten follow-up", 3)
+
+    [watch] = body["watches_due"]
+    assert (watch["name"], watch["never_swept"], watch["days_late"]) == ("karriere", True, 0)
+
+    [capture] = body["captures_waiting"]
+    assert (capture["display_name"], capture["days_waiting"]) == ("Jane Doe", 15)
+
+
+async def test_the_endpoints_today_is_the_operators_not_utcs(
+    session_factory: async_sessionmaker[AsyncSession],
+    client: AsyncClient,
+    alice: Account,
+    pinned_clock: Callable[[datetime], None],
+) -> None:
+    # 22:30Z on the 4th is already 00:30 on the 5th in Berlin: the task due
+    # on the 4th has become one day late, though UTC still calls it today.
+    pinned_clock(datetime(2026, 9, 4, 22, 30, tzinfo=UTC))
+    await _seed(session_factory, _task(alice, "Due on the 4th", berlin("2026-09-04T23:59")))
+
+    body = (await client.get("/briefing/", headers=alice.headers)).json()
+
+    assert body["date"] == "2026-09-05"
+    assert body["tasks_today"] == []
+    assert [(t["title"], t["days_late"]) for t in body["overdue_tasks"]] == [("Due on the 4th", 1)]
+
+
+async def test_the_endpoint_shows_nobody_elses_day(
+    session_factory: async_sessionmaker[AsyncSession],
+    client: AsyncClient,
+    alice: Account,
+    bob: Account,
+    pinned_clock: Callable[[datetime], None],
+) -> None:
+    await _seed(
+        session_factory,
+        _task(alice, "Alice's overdue", berlin("2026-09-01T23:59")),
+        _interaction(alice, "Alice's meeting", berlin("2026-09-04T10:00")),
+        _watch(alice, "alices", berlin("2026-09-01T09:00")),
+        _capture(alice, "Alice's capture", berlin("2026-09-01T09:00")),
+    )
+
+    body = (await client.get("/briefing/", headers=bob.headers)).json()
+
+    for section in (
+        "overdue_tasks",
+        "tasks_today",
+        "interactions_today",
+        "unconfirmed_interactions",
+        "watches_due",
+        "captures_waiting",
+    ):
+        assert body[section] == [], section
