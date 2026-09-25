@@ -1,0 +1,35 @@
+# Static file server inside the frontend-next container. The ingress routes
+# /next/* here with the prefix intact and everything else to the Flutter image;
+# TLS, basic auth and noindex all happen in front of it.
+:8080 {
+	root * /srv
+
+	# Only reachable directly (compose, port-forward): the app lives under /next.
+	redir / /next/
+
+	# Vite puts a content hash in every filename under assets/, so a changed
+	# file is a new URL and these can be cached for good. No SPA fallback here:
+	# a chunk from an older build that no longer exists must be a 404, not
+	# index.html served as JavaScript.
+	handle /next/assets/* {
+		header Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
+	# index.html, config.json and version.json keep their names across builds,
+	# so they always revalidate — the same reasoning as the Flutter Caddyfile.
+	# Unknown paths fall back to index.html so deep links survive a reload.
+	handle {
+		header Cache-Control "no-cache"
+		try_files {path} /next/index.html
+		file_server
+	}
+
+	# A missing asset must not inherit the year-long header above. During a
+	# rolling update the new index.html can ask the old pod for a chunk it does
+	# not have yet; cached as immutable, that 404 would outlive the rollout.
+	handle_errors {
+		header Cache-Control "no-store"
+		respond "{err.status_code} {err.status_text}"
+	}
+}

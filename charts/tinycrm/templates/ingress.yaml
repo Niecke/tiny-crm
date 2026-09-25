@@ -96,6 +96,18 @@ spec:
                 name: {{ $fullName }}-frontend
                 port:
                   number: 8080
+          {{- if include "tinycrm.frontendNext.enabled" . }}
+          # The React client (#122). In this Ingress, not its own, so basic
+          # auth and noindex cover it too; the longer rule wins over / the same
+          # way /api does. Prefix intact — the image serves from /srv/next.
+          - path: /next
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $fullName }}-frontend-next
+                port:
+                  number: 8080
+          {{- end }}
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress

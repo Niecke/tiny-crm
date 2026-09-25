@@ -81,6 +81,14 @@ spec:
         limits:
           memory: 64Mi
 
+    # The React client at /next (#122). Staging only until the cutover.
+    frontendNext:
+      enabled: true
+      image:
+        # Written by promote.yml like the tags above. Empty until the first
+        # Deploy commit after this landed; the chart skips the client until then.
+        tag: ""
+
     # Neither has anything to do on disposable data: the backup would copy it
     # off-site next to production's archives, and the briefing would post
     # staging's tasks into the real Slack channel.

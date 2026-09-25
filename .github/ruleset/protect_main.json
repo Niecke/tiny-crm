@@ -40,9 +40,11 @@
         "required_status_checks": [
           { "context": "Backend tests", "integration_id": 15368 },
           { "context": "Frontend tests", "integration_id": 15368 },
+          { "context": "Frontend next checks", "integration_id": 15368 },
           { "context": "Test report", "integration_id": 15368 },
           { "context": "Build backend", "integration_id": 15368 },
           { "context": "Build frontend", "integration_id": 15368 },
+          { "context": "Build frontend next", "integration_id": 15368 },
           { "context": "Build backup", "integration_id": 15368 },
           { "context": "Integration test", "integration_id": 15368 },
           { "context": "commitlint", "integration_id": 15368 }

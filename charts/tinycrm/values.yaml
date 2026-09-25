@@ -102,6 +102,26 @@ frontend:
     limits:
       memory: 128Mi
 
+# The React client replacing the Flutter one (#122), served at /next/* beside it
+# until the cutover. Off by default: production stays Flutter-only until the
+# release workflow (#114) carries a frontend-next tag too. It reads the same
+# config.json ConfigMap as the Flutter frontend.
+frontendNext:
+  enabled: false
+  image:
+    repository: ghcr.io/niecke/tiny-crm/frontend-next
+    tag: ""
+    pullPolicy: IfNotPresent
+  replicas: 1
+
+  # Caddy serving static files, like the Flutter image.
+  resources:
+    requests:
+      cpu: 5m
+      memory: 16Mi
+    limits:
+      memory: 64Mi
+
 # ---------------------------------------------------------------------------
 # The morning briefing: overdue tasks, today's plan and the sources due to be
 # swept, posted to Slack so they are visible without an open browser tab.

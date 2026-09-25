@@ -44,7 +44,7 @@ uv run alembic revision --autogenerate -m "add phone to contacts"
 Run the backend locally
 ```bash
 cd backend
-uv run uvicorn app.main:app --reload--log-config log_config.json
+uv run uvicorn app.main:app --reload --log-config log_config.json
 ```
 
 Run flutter in debug mode locally
@@ -188,17 +188,21 @@ Work happens on `feat/*` branches; `main` is what ships. The pipeline workflows:
 1. **Backend tests** (`ruff check`, `ruff format --check`, `pytest` against a Postgres service
    container) and **Frontend tests** (`flutter analyze`, `flutter test`, run in the same
    Flutter image digest the frontend Dockerfile builds with). Both upload their JUnit/JSON
-   report and coverage file.
+   report and coverage file. **Frontend next checks** lints and type-checks the React
+   client in `frontend-next/` (#122) with `npm run lint` and `npm run build`; it has no
+   test suite yet.
 2. **Test report** — renders both suites into one table (passed/failed/skipped, line
    coverage, duration) via `ci/pr_report.py`, writes it to the job summary and keeps a single
    updated comment on the PR, so results are readable without opening the run. Runs even when
    a suite failed, and lists the failing test names.
-3. **Build backend** / **Build frontend** — only if both test jobs pass. Images are pushed
+3. **Build backend** / **Build frontend** / **Build frontend next** / **Build backup** —
+   only if the test and check jobs pass. Images are pushed
    as `ci-<short-sha-of-the-PR-head>`; the PR head sha, not the ephemeral merge commit, is
    also baked in as `GIT_COMMIT`.
 4. **Integration test** — starts those exact images with Postgres and the S3 fixture from
-   `compose.ci.yml` and runs `ci/smoke.sh`: health, matching versions across both images,
-   the Flutter bundle and its SPA fallback, admin creation, login, a 401 for anonymous
+   `compose.ci.yml` and runs `ci/smoke.sh`: health, matching versions across the backend
+   and both frontends, the Flutter bundle and its SPA fallback, the React bundle under
+   `/next` with its fallback and a real 404 for missing assets, admin creation, login, a 401 for anonymous
    requests, a contact round-trip through Postgres and a document round-trip through S3.
    The backend runs with `ENVIRONMENT=production` and generated secrets, so the run also
    proves the production startup guard passes on a properly configured instance.
@@ -264,6 +268,7 @@ IMAGE_TAG=ci-abc1234 ci/smoke.sh
 # against locally built images, next to a running dev stack
 podman build --build-arg GIT_COMMIT=local -t localhost/tinycrm-ci/backend:test ./backend
 podman build --build-arg GIT_COMMIT=local -t localhost/tinycrm-ci/frontend:test ./frontend
+podman build --build-arg GIT_COMMIT=local -t localhost/tinycrm-ci/frontend-next:test ./frontend-next
 COMPOSE_CMD=podman-compose PULL_POLICY=never \
   REGISTRY=localhost/tinycrm-ci IMAGE_TAG=test EXPECTED_COMMIT=local \
   BACKEND_PORT=8100 FRONTEND_PORT=8180 ci/smoke.sh
