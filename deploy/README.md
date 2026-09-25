@@ -6,13 +6,24 @@ unpublished.
 
 ```
 merge to main
-  ├─ promote.yml           retags the tested image digest, commits the sha
-  │                        into deploy/flux/helmrelease.yaml
+  ├─ promote.yml           retags the tested image digest, commits sha-<short>
+  │                        into deploy/flux/staging/helmrelease.yaml
   └─ source-controller     fetches the commit
        ├─ kustomize-ctrl   applies deploy/flux/ — so the committed tag
-       │                   actually reaches the HelmRelease object
-       └─ helm-controller  re-renders charts/tinycrm, upgrades the release
+       │                   actually reaches the HelmRelease objects
+       └─ helm-controller  re-renders charts/tinycrm, upgrades the releases
 ```
+
+Two environments on the one k3s node, one HelmRelease each:
+
+| | Namespace | Host | Image tag written by |
+|---|---|---|---|
+| `deploy/flux/staging/` | `tinycrm-staging` | `crm-staging.niecke-it.de` | `promote.yml`, every merge |
+| `deploy/flux/prod/` | `tinycrm` | `crm.niecke-it.de` | frozen until the release workflow (#114 step 4) |
+
+`deploy/flux/base/` holds the shared GitRepository and the Flux Kustomization.
+The entry point stays `deploy/flux/kustomization.yaml`, the path that
+Kustomization reads.
 
 The kustomize step is not optional. A HelmRelease is a cluster object; editing
 its manifest in git changes nothing until something applies it. Without that
@@ -24,7 +35,7 @@ Two things trigger a redeploy, and both are just commits on `main`:
 - a chart change under `charts/tinycrm/` — picked up because the HelmRelease
   sets `reconcileStrategy: Revision`, so Flux keys off the git commit rather
   than `Chart.yaml`'s version
-- a new image — `promote.yml` writes the short sha into the HelmRelease
+- a new image — `promote.yml` writes `sha-<short>` into the staging HelmRelease
 
 ## One-time cluster setup
 
@@ -91,21 +102,66 @@ kubectl -n tinycrm patch gitrepository tinycrm --type=merge \
 flux -n tinycrm resume kustomization tinycrm-flux
 ```
 
+## Staging setup
+
+Flux creates the `tinycrm-staging` namespace and the `tinycrm-staging`
+PriorityClass itself. Three things it cannot create, all by hand, before or
+right after the first merge — the HelmRelease reports not-ready until they exist:
+
+1. **Object storage.** A bucket `niecke-tinycrm-documents-staging` with
+   versioning on, in a **separate Hetzner project** — a Hetzner key reaches every
+   bucket in its project. Create that project's key the same way as production's
+   (infrastructure repo, MANUAL-STEPS.md §9).
+2. **The credentials Secret**, same shape as production's, all values new:
+
+   ```bash
+   cat > /tmp/values.yaml <<EOF
+   postgres:
+     password: $(openssl rand -base64 24)
+   s3:
+     # the key from the staging Hetzner project
+     accessKey: ...
+     secretKey: ...
+   backend:
+     jwtSecret: $(openssl rand -hex 32)
+   EOF
+
+   kubectl -n tinycrm-staging create secret generic tinycrm-values \
+     --from-file=values.yaml=/tmp/values.yaml
+   shred -u /tmp/values.yaml
+   ```
+
+3. **Basic auth** for the frontend. htpasswd lines under the key `users`:
+
+   ```bash
+   kubectl -n tinycrm-staging create secret generic tinycrm-staging-basic-auth \
+     --from-literal=users="$(htpasswd -nbB staging "$(openssl rand -base64 18)")"
+   ```
+
+   Only the frontend sits behind it. `/api` keeps its own JWT auth — both use
+   the `Authorization` header, so basic auth on the API would reject every
+   logged-in request.
+
+The staging stack has no backup and no briefing CronJob, runs at a negative
+priority so the kubelet evicts it before production, and is sized to about
+250 Mi of real memory. Its first admin comes from `create_admin.py` exactly as in
+production, with `-n tinycrm-staging`.
+
 ## Repository settings this depends on
 
-`promote.yml` pushes a commit to `main`. Branch protection must allow it —
-either exempt the GitHub Actions app, or allow the push from the `promote`
-workflow. Without this the promote job fails at the push step, images are tagged
-but the deployed sha never moves, and the cluster silently keeps running the
-previous release.
+`promote.yml` pushes a commit to `main`, which the `protect_main` ruleset only
+allows for deploy keys. The push therefore goes over SSH with the `DEPLOY_KEY`
+secret — a write deploy key on this repository. Without it the promote job fails
+at the push step, images are tagged but the deployed sha never moves, and
+staging silently keeps running the previous build.
 
-The push uses `GITHUB_TOKEN`, and GitHub does not re-trigger workflows for
-commits made with it, so promote cannot loop back into itself.
+Unlike a `GITHUB_TOKEN` push, a deploy-key push does trigger workflows. promote
+skips its own `Deploy <sha> to staging` commits with a job-level `if:`.
 
 ## Cutover
 
 Phase 7's DNS flip pairs with editing one line in
-`deploy/flux/helmrelease.yaml`:
+`deploy/flux/prod/helmrelease.yaml`:
 
 ```yaml
     ingress:
@@ -163,7 +219,7 @@ shred -u /tmp/values.yaml
 ```
 
 Then set `briefing.enabled: true` under `values:` in
-`deploy/flux/helmrelease.yaml` and merge. Doing it in the other order renders
+`deploy/flux/prod/helmrelease.yaml` and merge. Doing it in the other order renders
 a template error — `briefing.slackWebhookUrl is required` — and Flux leaves
 the previous release running, which is the intended failure.
 

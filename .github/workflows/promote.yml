@@ -140,13 +140,16 @@ jobs:
       # to land in git. Nothing else moves it: the chart has no default tag, and
       # an unchanged manifest neither rolls the pods nor re-pulls the image.
       #
+      # Staging only. Production (deploy/flux/prod/) is written by the release
+      # workflow from a vX.Y.Z tag, never by a merge to main (#114).
+      #
       # The push goes over the deploy key from the checkout step. It does
       # re-trigger promote; the job-level `if:` skips that run.
-      - name: Record the deployed tag for Flux
+      - name: Record the staging tag for Flux
         if: steps.images.outputs.exists == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE: deploy/flux/helmrelease.yaml
+          RELEASE: deploy/flux/staging/helmrelease.yaml
         run: |
           set -euo pipefail
           short="${GITHUB_SHA:0:7}"
@@ -165,7 +168,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add "$RELEASE"
-          git commit -m "Deploy $short
+          git commit -m "Deploy $short to staging
 
           Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
           git push origin HEAD:main

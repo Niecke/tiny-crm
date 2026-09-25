@@ -1,6 +1,11 @@
 nameOverride: ""
 fullnameOverride: ""
 
+# PriorityClass for every pod the chart creates, the CNPG instance included.
+# Empty in production. Staging sets a negative one so that, when the shared
+# node runs short of memory, the kubelet evicts staging pods before production.
+priorityClassName: ""
+
 # ---------------------------------------------------------------------------
 # Database — a CloudNativePG Cluster, not a StatefulSet the chart owns.
 # ---------------------------------------------------------------------------
@@ -30,6 +35,10 @@ postgres:
     limits:
       memory: 512Mi
 
+  # postgresql.conf overrides, passed to CloudNativePG as strings. Empty keeps
+  # the operator's defaults; staging lowers shared_buffers to fit its limit.
+  parameters: {}
+
 # ---------------------------------------------------------------------------
 # Document store
 # ---------------------------------------------------------------------------
@@ -56,7 +65,7 @@ backend:
   image:
     repository: ghcr.io/niecke/tiny-crm/backend
     # No default. Flux sets this to the promoted sha-<short> tag (see
-    # deploy/flux/helmrelease.yaml); rendering without it fails on purpose.
+    # deploy/flux/{staging,prod}/helmrelease.yaml); rendering without it fails on purpose.
     tag: ""
     pullPolicy: IfNotPresent
   replicas: 1
@@ -184,3 +193,12 @@ ingress:
     enabled: true
     # cert-manager ClusterIssuer, installed as a cluster add-on.
     clusterIssuer: letsencrypt
+
+  # X-Robots-Tag: noindex on every response. For non-production hosts.
+  noindex: false
+
+  # Basic auth in front of the frontend (not /api — see templates/ingress.yaml).
+  # The name of a Secret in the release namespace holding htpasswd lines under
+  # the key `users`. Empty turns it off.
+  basicAuth:
+    secretName: ""

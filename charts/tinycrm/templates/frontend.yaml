@@ -53,6 +53,9 @@ spec:
         # has to roll the pods itself.
         checksum/config: {{ .Values.ingress.host | sha256sum }}
     spec:
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
       containers:
         - name: frontend
           image: {{ include "tinycrm.image" (list "frontend" .Values.frontend.image) | quote }}

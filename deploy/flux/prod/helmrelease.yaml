@@ -42,7 +42,9 @@ spec:
       host: crm.niecke-it.de
     backend:
       image:
-        # Managed by .github/workflows/promote.yml — do not edit by hand.
+        # Frozen. promote.yml now writes deploy/flux/staging/ only; this file
+        # moves when release.yml lands (#114 step 4) and writes the release
+        # tag here. Until then production changes only through an edited PR.
         tag: sha-3984d89
     frontend:
       image:

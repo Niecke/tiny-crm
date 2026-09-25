@@ -16,7 +16,7 @@ spec:
     kind: GitRepository
     name: tinycrm
   # Objects removed from git are removed from the cluster. That includes the
-  # HelmRelease: deleting helmrelease.yaml uninstalls the app. Intended, but
+  # HelmRelease: deleting prod/helmrelease.yaml uninstalls the app. Intended, but
   # worth knowing before pruning a file that looks unused.
   prune: true
   wait: false

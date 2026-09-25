@@ -54,6 +54,9 @@ spec:
         app.kubernetes.io/component: migrate
     spec:
       restartPolicy: Never
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
       containers:
         - name: alembic
           image: {{ include "tinycrm.image" (list "backend" .Values.backend.image) | quote }}

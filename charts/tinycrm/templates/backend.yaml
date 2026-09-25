@@ -59,6 +59,9 @@ spec:
         # rotated password would leave the running pods on the old one.
         checksum/credentials: {{ printf "%s|%s|%s" .Values.postgres.password $jwt $s3SecretKey | sha256sum }}
     spec:
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
       containers:
         - name: backend
           image: {{ include "tinycrm.image" (list "backend" .Values.backend.image) | quote }}
