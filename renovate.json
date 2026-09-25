@@ -69,6 +69,13 @@
       "semanticCommitType": "fix"
     },
     {
+      "description": "The React client (#122) runs on staging only until the cutover, so nothing in frontend-next/ ships in a release yet: its updates stay chore(deps) instead of cutting patch releases. Move frontend-next/Dockerfile into the rule above and delete this one at the cutover.",
+      "matchFileNames": [
+        "frontend-next/**"
+      ],
+      "semanticCommitType": "chore"
+    },
+    {
       "description": "Backend runtime dependencies ship in the image too. Dev dependency groups stay chore(deps). pubspec `dependencies` already get fix from config:recommended.",
       "matchManagers": [
         "pep621"

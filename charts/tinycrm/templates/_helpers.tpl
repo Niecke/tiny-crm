@@ -60,3 +60,15 @@ tag happens to point at. Call with (list "backend" .Values.backend.image).
 {{- $tag := required (printf "%s.image.tag is required — set it to a promoted tag such as sha-<short>" $name) $image.tag -}}
 {{- printf "%s:%s" $image.repository $tag -}}
 {{- end -}}
+
+{{/*
+Whether the React client (#122) renders at all: switched on *and* given a tag.
+The tag condition breaks with tinycrm.image's rule of failing on an empty tag,
+on purpose: promote.yml writes the tag in the Deploy commit that follows a
+merge, so the merge commit itself reaches Flux with enabled=true and no tag
+yet. Skipping the React client for that one revision lets the rest of the
+release upgrade normally instead of failing to render.
+*/}}
+{{- define "tinycrm.frontendNext.enabled" -}}
+{{- if and .Values.frontendNext.enabled .Values.frontendNext.image.tag -}}true{{- end -}}
+{{- end -}}

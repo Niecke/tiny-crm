@@ -158,6 +158,20 @@ priority so the kubelet evicts it before production, and is sized to about
 250 Mi of real memory. Its first admin comes from `create_admin.py` exactly as in
 production, with `-n tinycrm-staging`.
 
+### The React client at `/next`
+
+Staging also runs the React client (#122) from the `frontend-next` image, at
+`https://crm-staging.niecke-it.de/next/`. It is a path on the Flutter app's
+own Ingress, so the same basic auth and `noindex` apply, and it reads the
+same `config.json` ConfigMap (mounted at `/srv/next/config.json`).
+
+`frontendNext.enabled` is `false` in the chart and set only in the staging
+HelmRelease; production gets it with the cutover. `promote.yml` writes its tag
+alongside the others. With the flag on but no tag yet, the chart leaves the
+client out instead of failing the render. That covers the merge commit that
+introduces it, which reaches Flux before the Deploy commit that writes the
+first tag.
+
 ## Repository settings this depends on
 
 `promote.yml` pushes a commit to `main`, which the `protect_main` ruleset only
@@ -268,6 +282,8 @@ helm upgrade --install tinycrm ./charts/tinycrm \
   --set backend.image.tag=sha-<short> \
   --set frontend.image.tag=sha-<short> \
   --set backup.image.tag=sha-<short>
+  # optional, the React client at /next:
+  #   --set frontendNext.enabled=true --set frontendNext.image.tag=sha-<short>
 ```
 
 The chart has no default image tag, so leaving these out fails the render.

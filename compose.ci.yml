@@ -112,3 +112,12 @@ services:
       - "${FRONTEND_PORT:-8080}:8080"
     depends_on:
       - backend
+
+  # The React client (#122). Its own port here; in the cluster the ingress puts
+  # it at /next on the same host as the Flutter app.
+  frontend-next:
+    image: ${REGISTRY:-ghcr.io/niecke/tiny-crm}/frontend-next:${IMAGE_TAG:?set IMAGE_TAG}
+    ports:
+      - "${FRONTEND_NEXT_PORT:-8081}:8080"
+    depends_on:
+      - backend

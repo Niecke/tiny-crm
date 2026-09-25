@@ -1,0 +1,80 @@
+{{- if include "tinycrm.frontendNext.enabled" . -}}
+# The React client (#122). Its own Deployment rather than a second directory in
+# the Flutter image, so either one can roll, fail or be removed without the
+# other — and the cutover is an ingress change, not a rebuild.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "tinycrm.fullname" . }}-frontend-next
+  labels:
+    {{- include "tinycrm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend-next
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "tinycrm.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend-next
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "tinycrm.fullname" . }}-frontend-next
+  labels:
+    {{- include "tinycrm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend-next
+spec:
+  replicas: {{ .Values.frontendNext.replicas }}
+  selector:
+    matchLabels:
+      {{- include "tinycrm.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: frontend-next
+  template:
+    metadata:
+      labels:
+        {{- include "tinycrm.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: frontend-next
+      annotations:
+        # Same trigger as the Flutter frontend: config.json is mounted, so a
+        # host change has to roll the pods itself.
+        checksum/config: {{ .Values.ingress.host | sha256sum }}
+    spec:
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+      containers:
+        - name: frontend-next
+          image: {{ include "tinycrm.image" (list "frontendNext" .Values.frontendNext.image) | quote }}
+          imagePullPolicy: {{ .Values.frontendNext.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+          volumeMounts:
+            # The Flutter frontend's ConfigMap: both clients need the same API
+            # URL. Mounted under /next because that is where this app asks.
+            - name: config
+              mountPath: /srv/next/config.json
+              subPath: config.json
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /next/
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /next/
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.frontendNext.resources | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "tinycrm.fullname" . }}-frontend
+{{- end }}

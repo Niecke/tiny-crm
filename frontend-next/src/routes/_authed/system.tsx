@@ -44,8 +44,22 @@ function SystemPage() {
     <div className="page">
       <header className="page-header">
         <h1>System</h1>
-        <p>The backend this app talks to.</p>
+        <p>Which builds are running, and whether they can reach each other.</p>
       </header>
+
+      <section className="panel">
+        <div className="panel-header">
+          <h2>Frontend</h2>
+        </div>
+        <div className="panel-body">
+          <ul className="rows">
+            <li>
+              <span className="label">Version</span>
+              <span className="mono">{import.meta.env.VITE_GIT_COMMIT ?? 'dev'}</span>
+            </li>
+          </ul>
+        </div>
+      </section>
 
       <section className="panel">
         <div className="panel-header">

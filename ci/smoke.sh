@@ -24,10 +24,12 @@ COMPOSE_CMD="${COMPOSE_CMD:-docker compose}"
 PULL_POLICY="${PULL_POLICY:-always}"
 export BACKEND_PORT="${BACKEND_PORT:-8000}"
 export FRONTEND_PORT="${FRONTEND_PORT:-8080}"
+export FRONTEND_NEXT_PORT="${FRONTEND_NEXT_PORT:-8081}"
 
 COMPOSE="$COMPOSE_CMD -p tinycrm-ci -f compose.ci.yml"
 API="http://localhost:$BACKEND_PORT"
 WEB="http://localhost:$FRONTEND_PORT"
+WEB_NEXT="http://localhost:$FRONTEND_NEXT_PORT"
 EMAIL="ci@example.com"
 PASSWORD="ci-password-$(openssl rand -hex 6)"
 
@@ -53,13 +55,17 @@ health=$(curl -fsS "$API/health")
 [ "$(echo "$health" | json "['status']")" = "ok" ] || fail "backend unhealthy: $health"
 [ "$(echo "$health" | json "['db']")" = "ok" ] || fail "backend cannot reach the database: $health"
 
-step "both images report the commit they were built from"
+step "all three serving images report the commit they were built from"
+wait_for frontend-next "$WEB_NEXT/next/version.json" 30
 backend_version=$(curl -fsS "$API/version" | json "['version']")
 frontend_version=$(curl -fsS "$WEB/version.json" | json "['version']")
+frontend_next_version=$(curl -fsS "$WEB_NEXT/next/version.json" | json "['version']")
 [ -n "$backend_version" ] && [ "$backend_version" != "unknown" ] \
   || fail "backend reports version '$backend_version'"
 [ "$backend_version" = "$frontend_version" ] \
   || fail "version mismatch: backend $backend_version, frontend $frontend_version"
+[ "$backend_version" = "$frontend_next_version" ] \
+  || fail "version mismatch: backend $backend_version, frontend-next $frontend_next_version"
 if [ -n "${EXPECTED_COMMIT:-}" ]; then
   [ "$backend_version" = "$EXPECTED_COMMIT" ] \
     || fail "images report $backend_version, expected $EXPECTED_COMMIT"
@@ -69,6 +75,17 @@ step "frontend serves the Flutter bundle"
 curl -fsS "$WEB/" | grep -q 'flutter_bootstrap.js' || fail "index.html is not the Flutter app"
 # Unknown paths fall back to index.html so deep links work after a reload.
 curl -fsS "$WEB/interactions" | grep -q 'flutter_bootstrap.js' || fail "SPA fallback is broken"
+
+step "frontend-next serves the React bundle under /next"
+curl -fsS "$WEB_NEXT/next/" | grep -q '<div id="root">' || fail "/next/ is not the React app"
+curl -fsS "$WEB_NEXT/next/system" | grep -q '<div id="root">' || fail "/next SPA fallback is broken"
+# Hashed bundles are cached for a year, so a missing one must be a plain 404 —
+# the SPA fallback answering it with index.html would break the page instead.
+asset=$(curl -fsS "$WEB_NEXT/next/" | grep -o '/next/assets/[^"]*\.js' | head -n 1)
+[ -n "$asset" ] || fail "index.html references no bundle under /next/assets/"
+curl -fsS -o /dev/null "$WEB_NEXT$asset" || fail "bundle $asset is not served"
+[ "$(curl -s -o /dev/null -w '%{http_code}' "$WEB_NEXT/next/assets/missing.js")" = "404" ] \
+  || fail "a missing asset should be 404"
 
 step "migrations ran and the admin CLI works"
 $COMPOSE exec -T -e PYTHONPATH=/app backend python scripts/create_admin.py "$EMAIL" "$PASSWORD" \
