@@ -46,6 +46,9 @@ spec:
             app.kubernetes.io/component: backup
         spec:
           restartPolicy: Never
+          {{- with .Values.priorityClassName }}
+          priorityClassName: {{ . | quote }}
+          {{- end }}
           containers:
             - name: backup
               image: {{ include "tinycrm.image" (list "backup" .Values.backup.image) | quote }}

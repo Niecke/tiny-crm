@@ -56,6 +56,9 @@ spec:
             app.kubernetes.io/component: briefing
         spec:
           restartPolicy: Never
+          {{- with .Values.priorityClassName }}
+          priorityClassName: {{ . | quote }}
+          {{- end }}
           containers:
             - name: briefing
               # The same image the API runs: the script imports the models, so

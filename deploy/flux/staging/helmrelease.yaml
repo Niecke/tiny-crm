@@ -1,0 +1,92 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: tinycrm
+  namespace: tinycrm-staging
+spec:
+  interval: 5m
+  chart:
+    spec:
+      chart: ./charts/tinycrm
+      # The one GitRepository, in the production namespace. Staging reads the
+      # chart from the same commit, so template changes reach it on merge.
+      sourceRef:
+        kind: GitRepository
+        name: tinycrm
+        namespace: tinycrm
+      reconcileStrategy: Revision
+  driftDetection:
+    mode: enabled
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+  # Its own credentials Secret in tinycrm-staging — its own postgres password,
+  # JWT secret and object-storage key. See deploy/README.md.
+  valuesFrom:
+    - kind: Secret
+      name: tinycrm-values
+      valuesKey: values.yaml
+  # Staging shares the CX23 with production (2 vCPU / 4 GB). Everything below is
+  # sized so the whole stack stays around 250 Mi of real use, and so it is what
+  # gets evicted when memory runs short.
+  values:
+    priorityClassName: tinycrm-staging
+
+    ingress:
+      host: crm-staging.niecke-it.de
+      noindex: true
+      basicAuth:
+        secretName: tinycrm-staging-basic-auth
+
+    # A separate bucket in a separate Hetzner project: Hetzner keys reach every
+    # bucket in their project, so a staging key in the production project could
+    # read and delete production documents.
+    s3:
+      bucket: niecke-tinycrm-documents-staging
+
+    postgres:
+      storage:
+        size: 2Gi
+      parameters:
+        shared_buffers: 32MB
+      resources:
+        requests:
+          cpu: 50m
+          memory: 96Mi
+        limits:
+          memory: 256Mi
+
+    backend:
+      image:
+        # Managed by .github/workflows/promote.yml — do not edit by hand.
+        tag: sha-3984d89
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          memory: 256Mi
+
+    frontend:
+      image:
+        tag: sha-3984d89
+      resources:
+        requests:
+          cpu: 5m
+          memory: 16Mi
+        limits:
+          memory: 64Mi
+
+    # Neither has anything to do on disposable data: the backup would copy it
+    # off-site next to production's archives, and the briefing would post
+    # staging's tasks into the real Slack channel.
+    briefing:
+      enabled: false
+    backup:
+      enabled: false
+      image:
+        tag: sha-3984d89

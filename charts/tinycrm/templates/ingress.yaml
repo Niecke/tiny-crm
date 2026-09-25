@@ -15,6 +15,47 @@ spec:
     prefixes:
       - /api
 ---
+{{- /*
+Extra Traefik middlewares, off by default. Staging turns both on so a
+non-production copy neither shows up in search results nor opens to anyone who
+guesses the hostname.
+*/}}
+{{- $frontendMiddlewares := list }}
+{{- $apiMiddlewares := list (printf "%s-%s-strip-api@kubernetescrd" .Release.Namespace $fullName) }}
+{{- if .Values.ingress.noindex }}
+{{- $ref := printf "%s-%s-noindex@kubernetescrd" .Release.Namespace $fullName }}
+{{- $frontendMiddlewares = append $frontendMiddlewares $ref }}
+{{- $apiMiddlewares = append $apiMiddlewares $ref }}
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ $fullName }}-noindex
+  labels:
+    {{- include "tinycrm.labels" . | nindent 4 }}
+spec:
+  headers:
+    customResponseHeaders:
+      X-Robots-Tag: "noindex, nofollow"
+---
+{{- end }}
+{{- with .Values.ingress.basicAuth.secretName }}
+{{- $frontendMiddlewares = append $frontendMiddlewares (printf "%s-%s-basic-auth@kubernetescrd" $.Release.Namespace $fullName) }}
+# The frontend only. The API already authenticates every request with its own
+# JWT in the Authorization header — the same header basic auth needs — so a
+# basic-auth gate on /api would reject every logged-in call.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ $fullName }}-basic-auth
+  labels:
+    {{- include "tinycrm.labels" $ | nindent 4 }}
+spec:
+  basicAuth:
+    # htpasswd lines under the key `users`, created by hand — deploy/README.md.
+    secret: {{ . }}
+    removeHeader: true
+---
+{{- end }}
 # Two Ingress objects, not one with two paths: Traefik's router.middlewares
 # annotation applies to every route in the Ingress it sits on, so a single
 # object would strip /api from the frontend's routes as well.
@@ -32,6 +73,9 @@ metadata:
   annotations:
     {{- if .Values.ingress.tls.enabled }}
     cert-manager.io/cluster-issuer: {{ .Values.ingress.tls.clusterIssuer | quote }}
+    {{- end }}
+    {{- with $frontendMiddlewares }}
+    traefik.ingress.kubernetes.io/router.middlewares: {{ join "," . }}
     {{- end }}
 spec:
   ingressClassName: {{ .Values.ingress.className }}
@@ -61,7 +105,7 @@ metadata:
     {{- include "tinycrm.labels" . | nindent 4 }}
     app.kubernetes.io/component: backend
   annotations:
-    traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-%s-strip-api@kubernetescrd" .Release.Namespace $fullName }}
+    traefik.ingress.kubernetes.io/router.middlewares: {{ join "," $apiMiddlewares }}
 spec:
   ingressClassName: {{ .Values.ingress.className }}
   {{- if .Values.ingress.tls.enabled }}

@@ -39,6 +39,18 @@ spec:
   resources:
     {{- toYaml .Values.postgres.resources | nindent 4 }}
 
+  {{- with .Values.priorityClassName }}
+  priorityClassName: {{ . | quote }}
+  {{- end }}
+
+  {{- with .Values.postgres.parameters }}
+  postgresql:
+    parameters:
+      {{- range $key, $value := . }}
+      {{ $key }}: {{ $value | quote }}
+      {{- end }}
+  {{- end }}
+
   # With one instance there is no replica to promote, so an update is a restart
   # either way. Unsupervised keeps it from waiting for a switchover that cannot
   # happen.

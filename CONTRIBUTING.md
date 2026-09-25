@@ -70,5 +70,5 @@ messages and code comments still resolve.
 | Client | Flutter web, Riverpod 3, go_router 17, dio, flutter_secure_storage | Hand-written models; being replaced, see #122 |
 | Scheduling | Kubernetes CronJobs on the backup and backend images | Off-site backup; weekday morning briefing to Slack. No scheduler inside the API |
 | CI/CD | GitHub Actions → GHCR, Renovate | Test → build → integration test → promote-by-digest. Versioning is #114 |
-| Deploy | Flux (pull-based), Helm chart in `charts/tinycrm/` | Merging to `main` is the deploy |
+| Deploy | Flux (pull-based), Helm chart in `charts/tinycrm/` | Merging to `main` deploys staging; production follows release tags (#114) |
 | Serving | Caddy inside the frontend image, Podman/Docker Compose | `compose.full.yml` = db + s3 + backend + frontend |
