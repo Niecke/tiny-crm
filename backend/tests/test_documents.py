@@ -1,7 +1,7 @@
 """Documents through the API, with the object store faked in memory.
 
 Only the S3 calls are replaced — routing, ownership, the size cap and the
-database row all run for real. The genuine MinIO round-trip is ci/smoke.sh.
+database row all run for real. The genuine S3 round-trip is ci/smoke.sh.
 """
 
 from collections.abc import AsyncIterator, Iterator

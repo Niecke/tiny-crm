@@ -66,9 +66,9 @@ messages and code comments still resolve.
 | API | FastAPI + uvicorn, SQLAlchemy 2.0 async, Pydantic v2, Alembic | JSON logging via `log_config.json` |
 | Database | PostgreSQL 18 + asyncpg | Tags use Postgres-native `ARRAY(String)` |
 | Auth | fastapi-users, JWT bearer, admin created via `scripts/create_admin.py` | No register / verify / reset routers mounted |
-| Blob store | S3-compatible via aioboto3, MinIO locally | Bucket versioning checked at boot |
+| Blob store | S3-compatible via aioboto3, Versity Gateway locally, Hetzner Object Storage in production | Bucket versioning checked at boot |
 | Client | Flutter web, Riverpod 3, go_router 17, dio, flutter_secure_storage | Hand-written models; being replaced, see #122 |
 | Scheduling | Kubernetes CronJobs on the backup and backend images | Off-site backup; weekday morning briefing to Slack. No scheduler inside the API |
 | CI/CD | GitHub Actions → GHCR, Renovate | Test → build → integration test → promote-by-digest. Versioning is #114 |
 | Deploy | Flux (pull-based), Helm chart in `charts/tinycrm/` | Merging to `main` is the deploy |
-| Serving | Caddy inside the frontend image, Podman/Docker Compose | `compose.full.yml` = db + minio + backend + frontend |
+| Serving | Caddy inside the frontend image, Podman/Docker Compose | `compose.full.yml` = db + s3 + backend + frontend |

@@ -39,7 +39,7 @@ services:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
     environment:
       DATABASE_URL: postgresql+asyncpg://crm:crm@db:5432/crm
-      S3_ENDPOINT_URL: http://minio:9000
+      S3_ENDPOINT_URL: http://s3:7070
       # Caddy proxies /api/* to this service from the container network, so the
       # peer address is Caddy's, not the user's. Without this, uvicorn discards
       # X-Forwarded-For (it only trusts 127.0.0.1 by default) and the login
@@ -52,51 +52,53 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      minio:
-        condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
-
-  frontend:
-    build:
-      context: ./frontend
-      args:
-        GIT_COMMIT: ${GIT_COMMIT:-dev}
-    ports:
-      - "8080:8080"
-    depends_on:
-      - backend
-
-  minio:
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
-    command: server /data --console-address :9001
+      # S3 fixture. Versity Gateway (Apache-2.0) in posix mode: one static binary
+  # that stores objects as files and supports bucket versioning, so the backend's
+  # startup check passes the way it does against Hetzner in production. Replaced
+  # MinIO, which stopped publishing images (#112).
+  s3:
+    image: docker.io/versity/versitygw:v1.8.0@sha256:97e7d5a35ab758eb1761a9e717644fafc614c5f6026c05482bd1fb77205193a1
+    # The entrypoint builds the command from VGW_* variables; the directories
+    # have to exist before the gateway starts.
+    entrypoint: ["/bin/sh", "-ec", "mkdir -p /data/buckets /data/versions && exec /usr/local/bin/docker-entrypoint.sh"]
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      ROOT_ACCESS_KEY: minioadmin
+      ROOT_SECRET_KEY: minioadmin
+      VGW_BACKEND: posix
+      VGW_BACKEND_ARG: /data/buckets
+      VGW_VERSIONING_DIR: /data/versions
+      VGW_HEALTH: /health
+      VGW_QUIET: "true"
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      # 9000 on the host so backend/.env.example's S3_ENDPOINT_URL keeps working.
+      - "9000:7070"
     volumes:
-      - minio_data:/data
+      - s3_data:/data
     healthcheck:
-      test: ["CMD-SHELL", "mc ready local || exit 1"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:7070/health"]
       interval: 5s
       timeout: 5s
       retries: 10
 
-  minio-init:
-    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
+  # Creates the bucket and turns versioning on. Both steps are idempotent.
+  s3-init:
+    image: docker.io/rclone/rclone:1.75.1@sha256:45401ad7410db1d67ffdb58e19059ad20b0d8e0285a60e38bbec55cc1019c7a5
     depends_on:
-      minio:
+      s3:
         condition: service_healthy
     restart: "no"
-    entrypoint: >
-      /bin/sh -c "
-        mc alias set local http://minio:9000 minioadmin minioadmin &&
-        mc mb --ignore-existing local/tinycrm-documents &&
-        mc version enable local/tinycrm-documents
-      "
+    environment:
+      RCLONE_CONFIG_S3_TYPE: s3
+      RCLONE_CONFIG_S3_PROVIDER: Other
+      RCLONE_CONFIG_S3_ENDPOINT: http://s3:7070
+      RCLONE_CONFIG_S3_ACCESS_KEY_ID: minioadmin
+      RCLONE_CONFIG_S3_SECRET_ACCESS_KEY: minioadmin
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        rclone mkdir s3:tinycrm-documents
+        rclone backend versioning s3:tinycrm-documents Enabled
 
 volumes:
   postgres_data:
-  minio_data:
+  s3_data:

@@ -430,7 +430,7 @@ morning is worse than none.
 - **Insecure-default guard.** `check_secure_defaults()` runs in the lifespan
   hook. Development warns per problem; **production logs each at ERROR and
   aborts startup with exit code 3**. Covers the placeholder JWT secret,
-  `CORS_ORIGINS=["*"]` and the `minioadmin` MinIO credentials.
+  `CORS_ORIGINS=["*"]` and the `minioadmin` demo S3 credentials.
   The guard is inert unless `ENVIRONMENT=production` is set.
 - **SQL echo is off by default** — `echo=True` logs every statement with its
   bound parameters, i.e. contact names, emails and notes.
@@ -450,7 +450,7 @@ All via env or `backend/.env` (see `.env.example`).
 | `JWT_SECRET` | placeholder | `openssl rand -hex 32` |
 | `JWT_LIFETIME_SECONDS` | 270 days | keeps the Android PWA logged in |
 | `LOGIN_MAX_FAILURES` / `LOGIN_FAILURE_WINDOW_SECONDS` | 10 / 300 | failed logins only |
-| `S3_ENDPOINT_URL` / `S3_ACCESS_KEY` / `S3_SECRET_KEY` / `S3_BUCKET` / `S3_REGION` | MinIO locally | bucket versioning is checked at boot |
+| `S3_ENDPOINT_URL` / `S3_ACCESS_KEY` / `S3_SECRET_KEY` / `S3_BUCKET` / `S3_REGION` | Versity Gateway locally, Hetzner Object Storage in production | bucket versioning is checked at boot |
 | `SLACK_WEBHOOK_URL` | unset | without it a real briefing send exits 2 |
 | `BRIEFING_TIMEZONE` | `Europe/Berlin` | must match the CronJob's `timeZone` |
 | `APP_URL` | unset | the "Open tinyCRM" link in the briefing |
@@ -472,7 +472,7 @@ the frontend polls it to prompt a reload after a deploy.
 - **Frontend: 11 test files** (`cd frontend && flutter test`) covering the
   hand-written models, money and date formatting, and error text.
   `widget_test.dart` is browser-only — add `--platform chrome`.
-- **`ci/smoke.sh`** drives the real built images against Postgres and MinIO:
+- **`ci/smoke.sh`** drives the real built images against Postgres and the S3 fixture:
   health, matching versions, the Flutter bundle and its SPA fallback, admin
   creation, login, a 401 for anonymous requests, contact / document / deal /
   watch round-trips, and the briefing script's `--dry-run` inside the image.
@@ -496,7 +496,7 @@ the frontend polls it to prompt a reload after a deploy.
   service in compose), never from the backend image's `CMD` — under a rolling
   update every starting replica would race the same migration.
 - **Backups**: Hetzner server snapshots (seven rolling) plus a daily CronJob
-  writing one `tiny-crm-<TS>.tar` — a brotli'd `pg_dump` plus the raw MinIO
+  writing one `tiny-crm-<TS>.tar` — a brotli'd `pg_dump` plus the raw document
   objects — to Google Cloud Storage through its S3 endpoint. Restore rehearsed
   2026-09-05 into a throwaway kind cluster; procedure in the infrastructure
   repo's `scripts/niecke-it/RESTORE.md`. **A failed backup run is still
