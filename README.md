@@ -181,7 +181,7 @@ needs a destination per user first.
 
 ## CI/CD
 
-Work happens on `dev`; `main` is what ships. Two workflows:
+Work happens on `feat/*` branches; `main` is what ships. The pipeline workflows:
 
 **`.github/workflows/ci.yml`** — on a pull request into `main`:
 
@@ -210,9 +210,33 @@ covered from the first push. `workflow_dispatch` runs the two test jobs on deman
 run has no PR head to tag images with, so it stops there).
 
 **`.github/workflows/promote.yml`** — on merge to `main`, resolves the merged PR's head sha
-and re-tags the already-tested images with `<short-main-sha>` and `latest` via
+and re-tags the already-tested images with `sha-<short-main-sha>` via
 `docker buildx imagetools create`. Nothing is rebuilt, so the digest that passed the
 integration test is the digest that deploys.
+
+### Versions and releases
+
+Pull requests merge as **squashes**, and the **pull request title** is the commit that
+lands on `main`. It must be a [conventional commit](https://www.conventionalcommits.org/)
+— `.github/workflows/commitlint.yml` checks it on every title edit:
+
+| Pull request title | Release | `1.4.2` becomes |
+|---|---|---|
+| `fix: promote skips missing backup image` | patch | `1.4.3` |
+| `feat: morning briefing cronjob` | minor | `1.5.0` |
+| `feat!: drop the v1 contacts endpoint` | major | `2.0.0` |
+| `chore(deps): bump postgres digest` | none | `1.4.2` |
+| `docs: rewrite the deploy README` | none | `1.4.2` |
+
+Allowed types: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`,
+`revert`, `style`, `test`. Renovate's `chore(deps):` / `fix(deps):` titles already fit.
+
+**`.github/workflows/release-please.yml`** keeps one release pull request open against
+`main`. It bumps a single version for the whole product — `version.txt`,
+`backend/pyproject.toml` and `uv.lock`, `frontend/pubspec.yaml`, and both `version` and
+`appVersion` in `charts/tinycrm/Chart.yaml` — and prepends the changes to `CHANGELOG.md`.
+Merging it tags `vX.Y.Z` and publishes the GitHub Release. Never bump those versions by
+hand; the files are listed in `release-please-config.json`.
 
 `main` is protected in GitHub → Settings → Branches: `Backend tests`, `Frontend tests`,
 `Build backend`, `Build frontend` and `Integration test` are required checks, and direct

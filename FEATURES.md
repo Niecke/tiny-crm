@@ -486,8 +486,9 @@ the frontend polls it to prompt a reload after a deploy.
   `compose.ci.yml` and `ci/smoke.sh`. A PR comment carries pass/fail counts,
   failing test names and coverage.
 - **Promote** (`.github/workflows/promote.yml`, on merge to `main`): re-tags
-  the *same digest* that passed the integration test to `<short-main-sha>` and
-  `latest`. Nothing is rebuilt, so nothing can drift between test and release.
+  the *same digest* that passed the integration test to `sha-<short-main-sha>`.
+  Nothing is rebuilt, so nothing can drift between test and release. There is
+  no `latest` tag, and the chart has no default image tag.
 - **Deploy**: Flux, pull-based. `deploy/flux/` + `charts/tinycrm/`. Merging to
   `main` is the deploy; no cluster credentials live in GitHub. Rollback is
   `helm -n tinycrm rollback tinycrm`, and a failed upgrade rolls itself back

@@ -48,7 +48,7 @@ spec:
           restartPolicy: Never
           containers:
             - name: backup
-              image: "{{ .Values.backup.image.repository }}:{{ .Values.backup.image.tag }}"
+              image: {{ include "tinycrm.image" (list "backup" .Values.backup.image) | quote }}
               imagePullPolicy: {{ .Values.backup.image.pullPolicy }}
               envFrom:
                 - secretRef:

@@ -3,10 +3,11 @@ name: tinycrm
 description: tinyCRM — Flutter web frontend, FastAPI backend, S3 document store and a CloudNativePG database
 type: application
 
-# Chart version. Bump on chart changes; appVersion tracks nothing because the
-# image tags are set per deploy (--set backend.image.tag=<sha>).
-version: 0.1.0
-appVersion: "latest"
+# Both set by release-please from release-please-config.json — one version for
+# the whole product, do not bump by hand. appVersion names the release, not the
+# image: the image tags are still set per deploy (image.tag=sha-<short>).
+version: 0.0.0 # x-release-please-version
+appVersion: "0.0.0" # x-release-please-version
 
 # The CloudNativePG operator and cert-manager are cluster-scoped and shared, so
 # they are installed once by hand rather than being subcharts here. `helm

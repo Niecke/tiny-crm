@@ -60,7 +60,7 @@ spec:
             - name: briefing
               # The same image the API runs: the script imports the models, so
               # the two can never disagree about what "overdue" means.
-              image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+              image: {{ include "tinycrm.image" (list "backend" .Values.backend.image) | quote }}
               imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
               command: ["python", "scripts/send_briefing.py"]
               envFrom:

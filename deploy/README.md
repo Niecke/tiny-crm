@@ -197,8 +197,13 @@ For a k3d cluster, or to test the chart before merging:
 helm upgrade --install tinycrm ./charts/tinycrm \
   -n tinycrm --create-namespace \
   -f charts/tinycrm/values-crm-new.yaml \
-  -f values-secrets.yaml
+  -f values-secrets.yaml \
+  --set backend.image.tag=sha-<short> \
+  --set frontend.image.tag=sha-<short> \
+  --set backup.image.tag=sha-<short>
 ```
+
+The chart has no default image tag, so leaving these out fails the render.
 
 `values-secrets.yaml` is gitignored. `values-crm-new.yaml` exists so a manual
 install does not default to the live hostname — cert-manager would fail http-01
