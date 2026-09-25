@@ -8,8 +8,9 @@ name: CI
 # twice. Open the PR as a draft as soon as work starts and dev commits are
 # covered from the first push. workflow_dispatch runs the tests on demand.
 #
-# Branch protection on main should require: Backend tests, Frontend tests,
-# Build backend, Build frontend, Integration test.
+# The tests, the test report, the three builds and the integration test are
+# required checks in .github/ruleset/protect_main.json — add new gating jobs
+# there too.
 on:
   pull_request:
     branches: [main]

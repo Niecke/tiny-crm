@@ -1,0 +1,53 @@
+{
+  "name": "protect_main",
+  "target": "branch",
+  "enforcement": "active",
+  "conditions": {
+    "ref_name": {
+      "include": ["refs/heads/main"],
+      "exclude": []
+    }
+  },
+  "bypass_actors": [
+    {
+      "actor_id": null,
+      "actor_type": "DeployKey",
+      "bypass_mode": "always"
+    }
+  ],
+  "rules": [
+    { "type": "deletion" },
+    { "type": "non_fast_forward" },
+    { "type": "required_linear_history" },
+    {
+      "type": "pull_request",
+      "parameters": {
+        "required_approving_review_count": 0,
+        "dismiss_stale_reviews_on_push": false,
+        "required_reviewers": [],
+        "require_code_owner_review": false,
+        "require_last_push_approval": false,
+        "required_review_thread_resolution": false,
+        "require_extra_approval_for_unattributed_changes": true,
+        "allowed_merge_methods": ["squash"]
+      }
+    },
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": true,
+        "do_not_enforce_on_create": false,
+        "required_status_checks": [
+          { "context": "Backend tests", "integration_id": 15368 },
+          { "context": "Frontend tests", "integration_id": 15368 },
+          { "context": "Test report", "integration_id": 15368 },
+          { "context": "Build backend", "integration_id": 15368 },
+          { "context": "Build frontend", "integration_id": 15368 },
+          { "context": "Build backup", "integration_id": 15368 },
+          { "context": "Integration test", "integration_id": 15368 },
+          { "context": "commitlint", "integration_id": 15368 }
+        ]
+      }
+    }
+  ]
+}

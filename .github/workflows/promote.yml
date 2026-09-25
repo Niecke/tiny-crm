@@ -13,9 +13,9 @@ on:
         required: true
 
 permissions:
-  # write, because the promoted sha is committed back to main for Flux to pick
-  # up. Branch protection on main must allow this push.
-  contents: write
+  # read: the promoted sha is committed back to main over SSH with the
+  # DEPLOY_KEY deploy key, not with GITHUB_TOKEN — see the checkout step.
+  contents: read
   packages: write
   pull-requests: read
 
@@ -31,12 +31,25 @@ env:
 jobs:
   promote:
     name: Retag CI images
+    # This workflow's own Deploy commit is a push to main too, and unlike a
+    # GITHUB_TOKEN push, a deploy-key push does trigger workflows. It has no
+    # pull request and no images, so skip it rather than fail on it.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      !(github.event.head_commit.author.email == '41898282+github-actions[bot]@users.noreply.github.com' &&
+        startsWith(github.event.head_commit.message, 'Deploy '))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      # The protect_main ruleset only lets pull requests into main. Personal
+      # repositories cannot exempt the GitHub Actions app from a ruleset, but
+      # they can exempt deploy keys — so the checkout, and with it the push in
+      # the last step, go over SSH with DEPLOY_KEY: a deploy key on this
+      # repository with write access.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
 
       # The merge commit is a new sha, so main cannot name the CI images
       # directly: they are tagged with the sha of the PR head that was tested.
@@ -127,8 +140,8 @@ jobs:
       # to land in git. Nothing else moves it: the chart has no default tag, and
       # an unchanged manifest neither rolls the pods nor re-pulls the image.
       #
-      # The push uses GITHUB_TOKEN, and GitHub does not re-trigger workflows for
-      # commits made with it — so this cannot loop back into promote.
+      # The push goes over the deploy key from the checkout step. It does
+      # re-trigger promote; the job-level `if:` skips that run.
       - name: Record the deployed tag for Flux
         if: steps.images.outputs.exists == 'true'
         env:
