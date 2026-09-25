@@ -35,19 +35,16 @@ spec:
   # gets evicted when memory runs short.
   values:
     priorityClassName: tinycrm-staging
-
     ingress:
       host: crm-staging.niecke-it.de
       noindex: true
       basicAuth:
         secretName: tinycrm-staging-basic-auth
-
     # A separate bucket in a separate Hetzner project: Hetzner keys reach every
     # bucket in their project, so a staging key in the production project could
     # read and delete production documents.
     s3:
       bucket: niecke-tinycrm-documents-staging
-
     postgres:
       storage:
         size: 2Gi
@@ -59,36 +56,32 @@ spec:
           memory: 96Mi
         limits:
           memory: 256Mi
-
     backend:
       image:
         # Managed by .github/workflows/promote.yml — do not edit by hand.
-        tag: sha-3984d89
+        tag: sha-2926776
       resources:
         requests:
           cpu: 50m
           memory: 128Mi
         limits:
           memory: 256Mi
-
     frontend:
       image:
-        tag: sha-3984d89
+        tag: sha-2926776
       resources:
         requests:
           cpu: 5m
           memory: 16Mi
         limits:
           memory: 64Mi
-
     # The React client at /next (#122). Staging only until the cutover.
     frontendNext:
       enabled: true
       image:
         # Written by promote.yml like the tags above. Empty until the first
         # Deploy commit after this landed; the chart skips the client until then.
-        tag: ""
-
+        tag: "sha-2926776"
     # Neither has anything to do on disposable data: the backup would copy it
     # off-site next to production's archives, and the briefing would post
     # staging's tasks into the real Slack channel.
@@ -97,4 +90,4 @@ spec:
     backup:
       enabled: false
       image:
-        tag: sha-3984d89
+        tag: sha-2926776
