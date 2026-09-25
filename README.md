@@ -241,11 +241,19 @@ CI actions, compose files and dev dependencies stay `chore(deps)` and do not.
 Merging it tags `vX.Y.Z` and publishes the GitHub Release. Never bump those versions by
 hand; the files are listed in `release-please-config.json`.
 
-`main` is protected in GitHub → Settings → Branches: `Backend tests`, `Frontend tests`,
-`Build backend`, `Build frontend` and `Integration test` are required checks, and direct
-pushes are disallowed — a commit that never went through a PR has no image to promote.
-Adding a job to `ci.yml` means adding it to that list, or it can go red without blocking a
-merge.
+`main` is protected by the `protect_main` ruleset, kept in
+[`.github/ruleset/protect_main.json`](.github/ruleset/protect_main.json): squash merges
+only, linear history, no force pushes or deletion, and every job in `ci.yml` plus
+`commitlint` is a required check. Direct pushes are disallowed — a commit that never went
+through a PR has no image to promote. The one bypass is deploy keys: promote pushes
+its `Deploy <sha>` commit over SSH with the `DEPLOY_KEY` secret, because a personal
+repository cannot exempt the GitHub Actions app from a ruleset. Adding a job to `ci.yml` means adding it to that
+file, or it can go red without blocking a merge. The file is not applied automatically;
+after changing it:
+
+```bash
+gh api -X PUT repos/Niecke/tiny-crm/rulesets/22081158 --input .github/ruleset/protect_main.json
+```
 
 ### Running the integration test locally
 
