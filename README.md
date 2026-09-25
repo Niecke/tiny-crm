@@ -230,6 +230,9 @@ lands on `main`. It must be a [conventional commit](https://www.conventionalcomm
 
 Allowed types: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`,
 `revert`, `style`, `test`. Renovate's `chore(deps):` / `fix(deps):` titles already fit.
+Anything that ships inside an image — the Dockerfile base images, the backend's
+`[project] dependencies`, pubspec `dependencies` — is `fix(deps)` and cuts a patch release;
+CI actions, compose files and dev dependencies stay `chore(deps)` and do not.
 
 **`.github/workflows/release-please.yml`** keeps one release pull request open against
 `main`. It bumps a single version for the whole product — `version.txt`,

@@ -58,6 +58,25 @@
         "pinDigest"
       ],
       "minimumReleaseAge": null
+    },
+    {
+      "description": "Base images ship inside the release images, so updating them is a fix(deps): it cuts a patch release instead of waiting for the next feat or fix.",
+      "matchFileNames": [
+        "backend/Dockerfile",
+        "frontend/Dockerfile",
+        "backup/Dockerfile"
+      ],
+      "semanticCommitType": "fix"
+    },
+    {
+      "description": "Backend runtime dependencies ship in the image too. Dev dependency groups stay chore(deps). pubspec `dependencies` already get fix from config:recommended.",
+      "matchManagers": [
+        "pep621"
+      ],
+      "matchDepTypes": [
+        "project.dependencies"
+      ],
+      "semanticCommitType": "fix"
     }
   ]
 }
