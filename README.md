@@ -44,7 +44,7 @@ uv run alembic revision --autogenerate -m "add phone to contacts"
 Run the backend locally
 ```bash
 cd backend
-uv run uvicorn app.main:app --reload--log-config log_config.json
+uv run uvicorn app.main:app --reload --log-config log_config.json
 ```
 
 Run flutter in debug mode locally
