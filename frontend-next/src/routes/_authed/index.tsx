@@ -1,26 +1,38 @@
 import { queryOptions, useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { apiFetch } from '../../api'
+import { type Api, unwrap } from '../../api/client'
 
-// Every list endpoint answers with Page{items, total}; limit=1 turns it into a
-// count without shipping rows nobody renders. The fuller metric set is #138
-// (DASHBOARD.md) — this is just the at-a-glance row.
-const countQuery = (apiUrl: string, path: string, params: Record<string, string> = {}) =>
+// Every list endpoint answers with a Page of {items, total}; limit=1 turns it
+// into a count without shipping rows nobody renders. The fuller metric set is
+// #138 (DASHBOARD.md) — this is just the at-a-glance row.
+const first = { params: { query: { limit: 1 } } }
+
+// Each call is unwrapped on its own: the five pages are different types, and
+// only their `total` is shared.
+const total = async (request: Promise<{ data?: { total: number }; error?: unknown; response: Response }>) =>
+  (await unwrap(request)).total
+
+const counts = {
+  contacts: (api: Api) => total(api.GET('/contacts/', first)),
+  organizations: (api: Api) => total(api.GET('/organizations/', first)),
+  // Done tasks are left out by default.
+  tasks: (api: Api) => total(api.GET('/tasks/', first)),
+  deals: (api: Api) => total(api.GET('/deals/', { params: { query: { limit: 1, status: 'open' } } })),
+  projects: (api: Api) => total(api.GET('/projects/', first)),
+}
+
+type CountKey = keyof typeof counts
+
+const countQuery = (api: Api, key: CountKey) =>
   queryOptions({
-    queryKey: ['count', path, params],
-    queryFn: async () => {
-      const qs = new URLSearchParams({ ...params, limit: '1' })
-      const page = await apiFetch<{ total: number }>(apiUrl, `${path}?${qs}`)
-      return page.total
-    },
+    queryKey: ['count', key],
+    queryFn: () => counts[key](api),
   })
 
-type CaptureCount = { new: number; oldest_days: number | null }
-
-const inboxQuery = (apiUrl: string) =>
+const inboxQuery = (api: Api) =>
   queryOptions({
     queryKey: ['captures', 'count'],
-    queryFn: () => apiFetch<CaptureCount>(apiUrl, '/captures/count'),
+    queryFn: () => unwrap(api.GET('/captures/count')),
   })
 
 export const Route = createFileRoute('/_authed/')({
@@ -28,8 +40,8 @@ export const Route = createFileRoute('/_authed/')({
 })
 
 function Dashboard() {
-  const { config } = Route.useRouteContext()
-  const inbox = useQuery(inboxQuery(config.apiUrl))
+  const { api } = Route.useRouteContext()
+  const inbox = useQuery(inboxQuery(api))
 
   const inboxHint =
     inbox.data?.oldest_days == null
@@ -53,19 +65,19 @@ function Dashboard() {
           hint={inboxHint}
           tone={inbox.data?.new ? 'warning' : undefined}
         />
-        <CountStat label="Contacts" path="/contacts/" />
-        <CountStat label="Organizations" path="/organizations/" />
-        <CountStat label="Open tasks" path="/tasks/" />
-        <CountStat label="Open deals" path="/deals/" params={{ status: 'open' }} />
-        <CountStat label="Projects" path="/projects/" />
+        <CountStat label="Contacts" count="contacts" />
+        <CountStat label="Organizations" count="organizations" />
+        <CountStat label="Open tasks" count="tasks" />
+        <CountStat label="Open deals" count="deals" />
+        <CountStat label="Projects" count="projects" />
       </section>
     </div>
   )
 }
 
-function CountStat({ label, path, params }: { label: string; path: string; params?: Record<string, string> }) {
-  const { config } = Route.useRouteContext()
-  const { data, error } = useQuery(countQuery(config.apiUrl, path, params))
+function CountStat({ label, count }: { label: string; count: CountKey }) {
+  const { api } = Route.useRouteContext()
+  const { data, error } = useQuery(countQuery(api, count))
   return <Stat label={label} value={data} error={error} />
 }
 

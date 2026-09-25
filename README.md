@@ -189,7 +189,8 @@ Work happens on `feat/*` branches; `main` is what ships. The pipeline workflows:
    container) and **Frontend tests** (`flutter analyze`, `flutter test`, run in the same
    Flutter image digest the frontend Dockerfile builds with). Both upload their JUnit/JSON
    report and coverage file. **Frontend next checks** lints and type-checks the React
-   client in `frontend-next/` (#122) with `npm run lint` and `npm run build`; it has no
+   client in `frontend-next/` (#122) with `npm run lint` and `npm run build`, and fails
+   when its generated API types no longer match the backend's OpenAPI schema; it has no
    test suite yet.
 2. **Test report** — renders both suites into one table (passed/failed/skipped, line
    coverage, duration) via `ci/pr_report.py`, writes it to the job summary and keeps a single

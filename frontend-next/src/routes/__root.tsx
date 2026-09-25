@@ -2,9 +2,11 @@ import type { QueryClient } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { createRootRouteWithContext, Outlet } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
+import type { Api } from '../api/client'
 import type { AppConfig } from '../config'
 
 export type RouterContext = {
+  api: Api
   config: AppConfig
   queryClient: QueryClient
 }

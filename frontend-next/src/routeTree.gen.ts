@@ -12,7 +12,12 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
+import { Route as AuthedOrganizationsRouteRouteImport } from './routes/_authed/organizations/route'
 import { Route as AuthedSystemRouteImport } from './routes/_authed/system'
+import { Route as AuthedOrganizationsIndexRouteImport } from './routes/_authed/organizations/index'
+import { Route as AuthedOrganizationsNewRouteImport } from './routes/_authed/organizations/new'
+import { Route as AuthedOrganizationsOrganizationIdIndexRouteImport } from './routes/_authed/organizations/$organizationId/index'
+import { Route as AuthedOrganizationsOrganizationIdEditRouteImport } from './routes/_authed/organizations/$organizationId/edit'
 
 const AuthedRoute = AuthedRouteImport.update({
   id: '/_authed',
@@ -28,35 +33,103 @@ const AuthedIndexRoute = AuthedIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedOrganizationsRouteRoute =
+  AuthedOrganizationsRouteRouteImport.update({
+    id: '/organizations',
+    path: '/organizations',
+    getParentRoute: () => AuthedRoute,
+  } as any)
 const AuthedSystemRoute = AuthedSystemRouteImport.update({
   id: '/system',
   path: '/system',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedOrganizationsIndexRoute =
+  AuthedOrganizationsIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthedOrganizationsRouteRoute,
+  } as any)
+const AuthedOrganizationsNewRoute = AuthedOrganizationsNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => AuthedOrganizationsRouteRoute,
+} as any)
+const AuthedOrganizationsOrganizationIdIndexRoute =
+  AuthedOrganizationsOrganizationIdIndexRouteImport.update({
+    id: '/$organizationId/',
+    path: '/$organizationId/',
+    getParentRoute: () => AuthedOrganizationsRouteRoute,
+  } as any)
+const AuthedOrganizationsOrganizationIdEditRoute =
+  AuthedOrganizationsOrganizationIdEditRouteImport.update({
+    id: '/$organizationId/edit',
+    path: '/$organizationId/edit',
+    getParentRoute: () => AuthedOrganizationsRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthedIndexRoute
   '/login': typeof LoginRoute
+  '/organizations': typeof AuthedOrganizationsRouteRouteWithChildren
   '/system': typeof AuthedSystemRoute
+  '/organizations/new': typeof AuthedOrganizationsNewRoute
+  '/organizations/': typeof AuthedOrganizationsIndexRoute
+  '/organizations/$organizationId/edit': typeof AuthedOrganizationsOrganizationIdEditRoute
+  '/organizations/$organizationId/': typeof AuthedOrganizationsOrganizationIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/system': typeof AuthedSystemRoute
   '/': typeof AuthedIndexRoute
+  '/organizations/new': typeof AuthedOrganizationsNewRoute
+  '/organizations': typeof AuthedOrganizationsIndexRoute
+  '/organizations/$organizationId/edit': typeof AuthedOrganizationsOrganizationIdEditRoute
+  '/organizations/$organizationId': typeof AuthedOrganizationsOrganizationIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authed': typeof AuthedRouteWithChildren
   '/login': typeof LoginRoute
+  '/_authed/organizations': typeof AuthedOrganizationsRouteRouteWithChildren
   '/_authed/system': typeof AuthedSystemRoute
   '/_authed/': typeof AuthedIndexRoute
+  '/_authed/organizations/new': typeof AuthedOrganizationsNewRoute
+  '/_authed/organizations/': typeof AuthedOrganizationsIndexRoute
+  '/_authed/organizations/$organizationId/edit': typeof AuthedOrganizationsOrganizationIdEditRoute
+  '/_authed/organizations/$organizationId/': typeof AuthedOrganizationsOrganizationIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/system'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/organizations'
+    | '/system'
+    | '/organizations/new'
+    | '/organizations/'
+    | '/organizations/$organizationId/edit'
+    | '/organizations/$organizationId/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/login' | '/system' | '/'
-  id: '__root__' | '/_authed' | '/login' | '/_authed/system' | '/_authed/'
+  to:
+    | '/login'
+    | '/system'
+    | '/'
+    | '/organizations/new'
+    | '/organizations'
+    | '/organizations/$organizationId/edit'
+    | '/organizations/$organizationId'
+  id:
+    | '__root__'
+    | '/_authed'
+    | '/login'
+    | '/_authed/organizations'
+    | '/_authed/system'
+    | '/_authed/'
+    | '/_authed/organizations/new'
+    | '/_authed/organizations/'
+    | '/_authed/organizations/$organizationId/edit'
+    | '/_authed/organizations/$organizationId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -87,6 +160,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/organizations': {
+      id: '/_authed/organizations'
+      path: '/organizations'
+      fullPath: '/organizations'
+      preLoaderRoute: typeof AuthedOrganizationsRouteRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/system': {
       id: '/_authed/system'
       path: '/system'
@@ -94,15 +174,67 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedSystemRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/organizations/': {
+      id: '/_authed/organizations/'
+      path: '/'
+      fullPath: '/organizations/'
+      preLoaderRoute: typeof AuthedOrganizationsIndexRouteImport
+      parentRoute: typeof AuthedOrganizationsRouteRoute
+    }
+    '/_authed/organizations/new': {
+      id: '/_authed/organizations/new'
+      path: '/new'
+      fullPath: '/organizations/new'
+      preLoaderRoute: typeof AuthedOrganizationsNewRouteImport
+      parentRoute: typeof AuthedOrganizationsRouteRoute
+    }
+    '/_authed/organizations/$organizationId/': {
+      id: '/_authed/organizations/$organizationId/'
+      path: '/$organizationId'
+      fullPath: '/organizations/$organizationId/'
+      preLoaderRoute: typeof AuthedOrganizationsOrganizationIdIndexRouteImport
+      parentRoute: typeof AuthedOrganizationsRouteRoute
+    }
+    '/_authed/organizations/$organizationId/edit': {
+      id: '/_authed/organizations/$organizationId/edit'
+      path: '/$organizationId/edit'
+      fullPath: '/organizations/$organizationId/edit'
+      preLoaderRoute: typeof AuthedOrganizationsOrganizationIdEditRouteImport
+      parentRoute: typeof AuthedOrganizationsRouteRoute
+    }
   }
 }
 
+interface AuthedOrganizationsRouteRouteChildren {
+  AuthedOrganizationsNewRoute: typeof AuthedOrganizationsNewRoute
+  AuthedOrganizationsIndexRoute: typeof AuthedOrganizationsIndexRoute
+  AuthedOrganizationsOrganizationIdEditRoute: typeof AuthedOrganizationsOrganizationIdEditRoute
+  AuthedOrganizationsOrganizationIdIndexRoute: typeof AuthedOrganizationsOrganizationIdIndexRoute
+}
+
+const AuthedOrganizationsRouteRouteChildren: AuthedOrganizationsRouteRouteChildren =
+  {
+    AuthedOrganizationsNewRoute: AuthedOrganizationsNewRoute,
+    AuthedOrganizationsIndexRoute: AuthedOrganizationsIndexRoute,
+    AuthedOrganizationsOrganizationIdEditRoute:
+      AuthedOrganizationsOrganizationIdEditRoute,
+    AuthedOrganizationsOrganizationIdIndexRoute:
+      AuthedOrganizationsOrganizationIdIndexRoute,
+  }
+
+const AuthedOrganizationsRouteRouteWithChildren =
+  AuthedOrganizationsRouteRoute._addFileChildren(
+    AuthedOrganizationsRouteRouteChildren,
+  )
+
 interface AuthedRouteChildren {
+  AuthedOrganizationsRouteRoute: typeof AuthedOrganizationsRouteRouteWithChildren
   AuthedSystemRoute: typeof AuthedSystemRoute
   AuthedIndexRoute: typeof AuthedIndexRoute
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
+  AuthedOrganizationsRouteRoute: AuthedOrganizationsRouteRouteWithChildren,
   AuthedSystemRoute: AuthedSystemRoute,
   AuthedIndexRoute: AuthedIndexRoute,
 }

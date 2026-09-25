@@ -205,9 +205,10 @@ jobs:
           retention-days: 7
 
   # The React client (#122). No test suite yet, so the gate is what `npm run
-  # build` enforces — the TypeScript type-check — plus the linter. Node comes
-  # from setup-node rather than the Dockerfile's image: JavaScript actions such
-  # as checkout cannot run inside an Alpine container.
+  # build` enforces — the TypeScript type-check — plus the linter, and that its
+  # generated API types match the backend. Node comes from setup-node rather
+  # than the Dockerfile's image: JavaScript actions such as checkout cannot run
+  # inside an Alpine container.
   frontend-next-checks:
     name: Frontend next checks
     needs: changes
@@ -227,6 +228,29 @@ jobs:
       - name: Install locked dependencies
         working-directory: frontend-next
         run: npm ci
+
+      # The schema is exported from the backend's code, so this needs its
+      # Python environment — but no database: importing the app is enough.
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Sync backend dependencies
+        working-directory: backend
+        run: uv sync --frozen
+
+      # A backend change that alters the API must regenerate the client in the
+      # same pull request. Otherwise the type-check below passes against the old
+      # schema and the break only shows at runtime.
+      - name: Generated API types are up to date
+        working-directory: frontend-next
+        run: |
+          npm run api:generate
+          if ! git diff --exit-code -- openapi.json src/api/schema.d.ts; then
+            echo "::error::frontend-next/openapi.json or src/api/schema.d.ts is out of date. Run \`npm run api:generate\` in frontend-next/ and commit the result."
+            exit 1
+          fi
 
       - name: Lint
         working-directory: frontend-next

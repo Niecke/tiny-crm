@@ -53,7 +53,8 @@ to live in the plan's "suggested order":
 must exist before the cutover.
 
 **Design documents** stay in the repo when a spec is too long to read in an
-issue body: [DASHBOARD.md](DASHBOARD.md) is the metric catalogue for #138. The
+issue body: [DASHBOARD.md](DASHBOARD.md) is the metric catalogue for #138, and
+[FRONTEND.md](FRONTEND.md) records the React client's decisions for #122. The
 issue is the work; the document is the detail.
 
 Historical task IDs (`T15`, `T36`, …) are kept in issue titles so older commit
@@ -67,7 +68,7 @@ messages and code comments still resolve.
 | Database | PostgreSQL 18 + asyncpg | Tags use Postgres-native `ARRAY(String)` |
 | Auth | fastapi-users, JWT bearer, admin created via `scripts/create_admin.py` | No register / verify / reset routers mounted |
 | Blob store | S3-compatible via aioboto3, Versity Gateway locally, Hetzner Object Storage in production | Bucket versioning checked at boot |
-| Client | Flutter web, Riverpod 3, go_router 17, dio, flutter_secure_storage | Hand-written models; being replaced, see #122 |
+| Client | Flutter web, Riverpod 3, go_router 17, dio, flutter_secure_storage | Hand-written models; being replaced, see #122 and [FRONTEND.md](FRONTEND.md) |
 | Scheduling | Kubernetes CronJobs on the backup and backend images | Off-site backup; weekday morning briefing to Slack. No scheduler inside the API |
 | CI/CD | GitHub Actions → GHCR, Renovate | Test → build → integration test → promote-by-digest. Versioning is #114 |
 | Deploy | Flux (pull-based), Helm chart in `charts/tinycrm/` | Merging to `main` deploys staging; production follows release tags (#114) |

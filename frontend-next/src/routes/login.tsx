@@ -3,7 +3,9 @@ import { useMutation } from '@tanstack/react-query'
 import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
-import { ApiError } from '../api'
+import { ApiError } from '../api/client'
+import { Button } from '../components/ui/Button'
+import { FormTextField } from '../components/ui/FormTextField'
 import { login } from '../auth'
 import { getToken, setToken } from '../token'
 
@@ -44,18 +46,17 @@ function errorText(err: unknown): string {
 }
 
 function LoginPage() {
-  const { config } = Route.useRouteContext()
+  const { api } = Route.useRouteContext()
   const search = Route.useSearch()
   const router = useRouter()
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<FormValues>({ resolver: zodResolver(formSchema) })
+  const { control, handleSubmit } = useForm<FormValues, unknown, FormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: { email: '', password: '' },
+  })
 
   const mutation = useMutation({
-    mutationFn: (values: FormValues) => login(config.apiUrl, values.email, values.password),
+    mutationFn: (values: FormValues) => login(api, values.email, values.password),
     onSuccess: async (token) => {
       setToken(token)
       await router.navigate({ to: search.redirect ?? '/', replace: true })
@@ -70,30 +71,21 @@ function LoginPage() {
           <p>Sign in to continue.</p>
         </div>
 
-        <label className="field">
-          <span className="field-label">Email</span>
-          <input
-            className="input"
-            type="email"
-            autoComplete="username"
-            autoFocus
-            aria-invalid={errors.email ? true : undefined}
-            {...register('email')}
-          />
-          {errors.email && <span className="field-error">{errors.email.message}</span>}
-        </label>
-
-        <label className="field">
-          <span className="field-label">Password</span>
-          <input
-            className="input"
-            type="password"
-            autoComplete="current-password"
-            aria-invalid={errors.password ? true : undefined}
-            {...register('password')}
-          />
-          {errors.password && <span className="field-error">{errors.password.message}</span>}
-        </label>
+        <FormTextField
+          control={control}
+          name="email"
+          label="Email"
+          type="email"
+          autoComplete="username"
+          autoFocus
+        />
+        <FormTextField
+          control={control}
+          name="password"
+          label="Password"
+          type="password"
+          autoComplete="current-password"
+        />
 
         {mutation.isError && (
           <p className="form-error" role="alert">
@@ -101,9 +93,9 @@ function LoginPage() {
           </p>
         )}
 
-        <button className="button" type="submit" disabled={mutation.isPending}>
+        <Button type="submit" isDisabled={mutation.isPending}>
           {mutation.isPending ? 'Signing in…' : 'Sign in'}
-        </button>
+        </Button>
       </form>
     </div>
   )
