@@ -43,10 +43,10 @@ spec:
     backend:
       image:
         # Managed by .github/workflows/promote.yml — do not edit by hand.
-        tag: sha-6661eb4
+        tag: sha-3984d89
     frontend:
       image:
-        tag: sha-6661eb4
+        tag: sha-3984d89
     backup:
       image:
-        tag: sha-6661eb4
+        tag: sha-3984d89
