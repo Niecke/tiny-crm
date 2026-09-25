@@ -45,10 +45,12 @@ spec:
         # Managed by .github/workflows/promote.yml — do not edit by hand.
         # promote writes sha-<short>; the bare 9da0aab below predates that and
         # is replaced by the next merge that builds images.
-        tag: 9da0aab
+        tag: c70318f
     frontend:
       image:
-        tag: 9da0aab
+        tag: c70318f
     backup:
       image:
-        tag: 9da0aab
+        # No image at 077ae28 — that promote predates this one existing. promote
+        # sets all three to the merge sha on the next release.
+        tag: c70318f

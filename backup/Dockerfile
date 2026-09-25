@@ -1,19 +1,17 @@
-# Backup runner: pg_dump, mc and brotli in one place.
+# Backup runner: pg_dump, rclone and brotli in one place.
 #
 # Based on the CloudNativePG postgres image rather than a plain Debian, because
 # pg_dump refuses to dump a server newer than itself — the major version here
 # has to track the one the Cluster runs.
 FROM ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie@sha256:172f3273cdd8d0214c5afaccdc4c1cfa3d4e2d67bc335d999c4fd1258ce54ebb
 
-# mc from the official image, the same way the backend Dockerfile takes uv from
-# the astral image. Pinned by digest; there is no other supported way to get a
-# specific mc build.
+# rclone from the official image, the same way the backend Dockerfile takes uv
+# from the astral image. Pinned by digest. The binary is statically linked, so
+# lifting it out of the Alpine image into this Debian one is safe.
 #
-# quay.io, not Docker Hub: MinIO withdrew minio/mc and minio/minio from Hub and
-# archived the upstream repo, so the Hub pin stopped resolving mid-build. The
-# digest is unchanged — quay serves the same artifact. Public builds are frozen,
-# so this is a stopgap; see the issue on moving documents to Hetzner S3.
-COPY --from=quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727 /usr/bin/mc /usr/local/bin/mc
+# rclone replaced mc once MinIO withdrew its images from Docker Hub and then
+# quay.io (#112).
+COPY --from=docker.io/rclone/rclone:1.75.1@sha256:45401ad7410db1d67ffdb58e19059ad20b0d8e0285a60e38bbec55cc1019c7a5 /usr/local/bin/rclone /usr/local/bin/rclone
 
 USER root
 RUN apt-get update \
@@ -21,7 +19,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY backup.sh /usr/local/bin/backup.sh
-RUN chmod 0755 /usr/local/bin/backup.sh /usr/local/bin/mc
+RUN chmod 0755 /usr/local/bin/backup.sh /usr/local/bin/rclone
 
 # Back to the image's unprivileged postgres user.
 USER 26

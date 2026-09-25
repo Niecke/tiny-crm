@@ -25,7 +25,7 @@ uv sync                       # ← this is your "pip install"
 
 ### Run service
 
-Run the database server and MinIO
+Run the database server and the local S3 fixture (Versity Gateway)
 ```bash
 podman-compose up -d
 ```
@@ -142,7 +142,7 @@ change, delete, list, and anonymous access — table-driven in
 `tests/test_cross_user_isolation.py`, add a row when a router is added), CRUD round-trips
 and validation per router, the deal pricing and stage rules, task recurrence, the watch
 sweep and its cadence, the briefing windows, the login and password-change flows, and the
-pure helpers. S3 is faked in memory for the document tests; the real MinIO round-trip is
+pure helpers. S3 is faked in memory for the document tests; the real S3 round-trip is
 `ci/smoke.sh`. `uv run mypy app tests` must also be clean — it is a CI gate.
 
 ## The morning briefing
@@ -196,10 +196,10 @@ Work happens on `feat/*` branches; `main` is what ships. The pipeline workflows:
 3. **Build backend** / **Build frontend** — only if both test jobs pass. Images are pushed
    as `ci-<short-sha-of-the-PR-head>`; the PR head sha, not the ephemeral merge commit, is
    also baked in as `GIT_COMMIT`.
-4. **Integration test** — starts those exact images with Postgres and MinIO from
+4. **Integration test** — starts those exact images with Postgres and the S3 fixture from
    `compose.ci.yml` and runs `ci/smoke.sh`: health, matching versions across both images,
    the Flutter bundle and its SPA fallback, admin creation, login, a 401 for anonymous
-   requests, a contact round-trip through Postgres and a document round-trip through MinIO.
+   requests, a contact round-trip through Postgres and a document round-trip through S3.
    The backend runs with `ENVIRONMENT=production` and generated secrets, so the run also
    proves the production startup guard passes on a properly configured instance.
 

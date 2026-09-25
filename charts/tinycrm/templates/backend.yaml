@@ -1,5 +1,7 @@
 {{- $jwt := required "backend.jwtSecret is required — generate one with `openssl rand -hex 32`" .Values.backend.jwtSecret }}
 {{- $dbUrl := include "tinycrm.databaseUrl" . }}
+{{- $s3AccessKey := required "s3.accessKey is required — the tinycrm-backend key from the Hetzner Cloud Console" .Values.s3.accessKey }}
+{{- $s3SecretKey := required "s3.secretKey is required — the tinycrm-backend key from the Hetzner Cloud Console" .Values.s3.secretKey }}
 apiVersion: v1
 kind: Secret
 metadata:
@@ -14,8 +16,8 @@ stringData:
   # the operator invent one.
   DATABASE_URL: {{ $dbUrl | quote }}
   JWT_SECRET: {{ $jwt | quote }}
-  S3_ACCESS_KEY: {{ .Values.minio.rootUser | quote }}
-  S3_SECRET_KEY: {{ .Values.minio.rootPassword | quote }}
+  S3_ACCESS_KEY: {{ $s3AccessKey | quote }}
+  S3_SECRET_KEY: {{ $s3SecretKey | quote }}
 ---
 apiVersion: v1
 kind: Service
@@ -55,7 +57,7 @@ spec:
       annotations:
         # Helm does not roll pods when only a referenced Secret changes, so a
         # rotated password would leave the running pods on the old one.
-        checksum/credentials: {{ printf "%s|%s|%s" .Values.postgres.password $jwt .Values.minio.rootPassword | sha256sum }}
+        checksum/credentials: {{ printf "%s|%s|%s" .Values.postgres.password $jwt $s3SecretKey | sha256sum }}
     spec:
       containers:
         - name: backend
@@ -75,11 +77,11 @@ spec:
             - name: CORS_ORIGINS
               value: {{ printf "[\"https://%s\"]" .Values.ingress.host | quote }}
             - name: S3_ENDPOINT_URL
-              value: {{ include "tinycrm.minioEndpoint" . | quote }}
+              value: {{ .Values.s3.endpoint | quote }}
             - name: S3_BUCKET
-              value: {{ .Values.minio.bucket | quote }}
+              value: {{ .Values.s3.bucket | quote }}
             - name: S3_REGION
-              value: {{ .Values.backend.s3Region | quote }}
+              value: {{ .Values.s3.region | quote }}
             # Traefik is the peer, so uvicorn sees the ingress pod's address on
             # every request. Without trusting the pod network it discards
             # X-Forwarded-For and the login throttle buckets every user under

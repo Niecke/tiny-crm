@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Integration test for the built images: starts backend + frontend + Postgres +
-# MinIO from compose.ci.yml and drives one real workflow through the API.
+# the S3 fixture from compose.ci.yml and drives one real workflow through the API.
 #
 #   IMAGE_TAG=ci-abc1234 ci/smoke.sh
 #
@@ -202,7 +202,7 @@ orphan=$(curl -fsS "$API/tasks/$task_id" "${auth[@]}")
 [ "$(echo "$orphan" | json "['title']")" = "Call CI Smoke back" ] \
   || fail "the task itself should have survived the contact delete"
 
-step "a document round-trips through MinIO, filed against its deal"
+step "a document round-trips through S3, filed against its deal"
 printf 'tinyCRM integration test\n' > /tmp/ci-smoke.txt
 document=$(curl -fsS -X POST "$API/documents/" "${auth[@]}" \
   -F "title=CI Smoke" -F "tags=[]" -F "deal_ids=[\"$deal_id\"]" \

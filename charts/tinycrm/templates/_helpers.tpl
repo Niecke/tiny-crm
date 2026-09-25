@@ -60,11 +60,3 @@ tag happens to point at. Call with (list "backend" .Values.backend.image).
 {{- $tag := required (printf "%s.image.tag is required — set it to a promoted tag such as sha-<short>" $name) $image.tag -}}
 {{- printf "%s:%s" $image.repository $tag -}}
 {{- end -}}
-
-{{- define "tinycrm.minioFullname" -}}
-{{- printf "%s-minio" (include "tinycrm.fullname" .) -}}
-{{- end -}}
-
-{{- define "tinycrm.minioEndpoint" -}}
-{{- printf "http://%s:9000" (include "tinycrm.minioFullname" .) -}}
-{{- end -}}
