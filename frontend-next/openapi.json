@@ -3397,6 +3397,33 @@
         }
       }
     },
+    "/briefing/": {
+      "get": {
+        "tags": [
+          "briefing"
+        ],
+        "summary": "Get Briefing",
+        "description": "What wants attention today: the morning briefing, as data.\n\nEvery list is complete — the Slack message caps its sections, this does\nnot, so the client decides how much to show and can say how much it left\nout.",
+        "operationId": "get_briefing_briefing__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BriefingRead"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/auth/jwt/login": {
       "post": {
         "tags": [
@@ -4044,6 +4071,312 @@
           "title"
         ],
         "title": "Body_upload_document_documents__post"
+      },
+      "BriefingCapture": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "days_waiting": {
+            "type": "integer",
+            "title": "Days Waiting"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "display_name",
+          "url",
+          "note",
+          "created_at",
+          "days_waiting"
+        ],
+        "title": "BriefingCapture"
+      },
+      "BriefingInteraction": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "call",
+              "meeting",
+              "email",
+              "note",
+              "other"
+            ],
+            "title": "Kind"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Occurred At"
+          },
+          "duration_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Minutes"
+          },
+          "with_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "With Names"
+          },
+          "days_late": {
+            "type": "integer",
+            "title": "Days Late"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "subject",
+          "occurred_at",
+          "duration_minutes",
+          "with_names",
+          "days_late"
+        ],
+        "title": "BriefingInteraction"
+      },
+      "BriefingRead": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          },
+          "overdue_tasks": {
+            "items": {
+              "$ref": "#/components/schemas/BriefingTask"
+            },
+            "type": "array",
+            "title": "Overdue Tasks"
+          },
+          "tasks_today": {
+            "items": {
+              "$ref": "#/components/schemas/BriefingTask"
+            },
+            "type": "array",
+            "title": "Tasks Today"
+          },
+          "interactions_today": {
+            "items": {
+              "$ref": "#/components/schemas/BriefingInteraction"
+            },
+            "type": "array",
+            "title": "Interactions Today"
+          },
+          "unconfirmed_interactions": {
+            "items": {
+              "$ref": "#/components/schemas/BriefingInteraction"
+            },
+            "type": "array",
+            "title": "Unconfirmed Interactions"
+          },
+          "watches_due": {
+            "items": {
+              "$ref": "#/components/schemas/BriefingWatch"
+            },
+            "type": "array",
+            "title": "Watches Due"
+          },
+          "captures_waiting": {
+            "items": {
+              "$ref": "#/components/schemas/BriefingCapture"
+            },
+            "type": "array",
+            "title": "Captures Waiting"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "timezone",
+          "overdue_tasks",
+          "tasks_today",
+          "interactions_today",
+          "unconfirmed_interactions",
+          "watches_due",
+          "captures_waiting"
+        ],
+        "title": "BriefingRead"
+      },
+      "BriefingTask": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "due_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Date"
+          },
+          "priority": {
+            "type": "integer",
+            "title": "Priority"
+          },
+          "contact_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Name"
+          },
+          "deal_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deal Title"
+          },
+          "repeats": {
+            "type": "boolean",
+            "title": "Repeats"
+          },
+          "days_late": {
+            "type": "integer",
+            "title": "Days Late"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "due_date",
+          "priority",
+          "contact_name",
+          "deal_title",
+          "repeats",
+          "days_late"
+        ],
+        "title": "BriefingTask"
+      },
+      "BriefingWatch": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "organization_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Name"
+          },
+          "next_due_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Next Due At"
+          },
+          "never_swept": {
+            "type": "boolean",
+            "title": "Never Swept"
+          },
+          "days_late": {
+            "type": "integer",
+            "title": "Days Late"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "url",
+          "organization_name",
+          "next_due_at",
+          "never_swept",
+          "days_late"
+        ],
+        "title": "BriefingWatch"
       },
       "CaptureContact": {
         "properties": {

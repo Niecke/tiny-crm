@@ -14,6 +14,7 @@ from app.db import get_session
 from app.logging_config import configure_logging
 from app.ratelimit import count_failed_logins, enforce_login_rate_limit
 from app.routers import (
+    briefing,
     captures,
     contacts,
     deals,
@@ -97,6 +98,7 @@ app.include_router(documents.router)
 app.include_router(projects.router)
 app.include_router(interactions.router)
 app.include_router(watches.router)
+app.include_router(briefing.router)
 # The throttle covers logout as well as login. That is deliberate: both are the
 # credential surface, and the budget is generous enough that no real session
 # hits it.

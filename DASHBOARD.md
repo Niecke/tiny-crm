@@ -171,6 +171,11 @@ Notes on the shape:
   loaded into Python. `count_rows` ([db.py](backend/app/db.py)) already
   establishes the pattern. The whole endpoint should be a handful of queries
   executed concurrently, not a loop over deals.
+- **Today's lists are not this endpoint's job.** Overdue tasks, today's plan,
+  unconfirmed interactions, sources due and waiting captures come from
+  `GET /briefing` — the morning briefing as data, which the React dashboard
+  already renders. Group D may *count* the same things, but it must count them
+  with `gather_briefing`'s queries, not a second implementation.
 - **`user_id` scoping on every single query.** There is one operator, so a
   missing filter will never be noticed in use — which is exactly why it has to be
   caught by a test that creates a second user's rows and asserts they are absent

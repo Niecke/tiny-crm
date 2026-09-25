@@ -7,3 +7,6 @@ type Schemas = components['schemas']
 
 export type OrganizationRead = Schemas['OrganizationRead']
 export type OrganizationCreate = Schemas['OrganizationCreate']
+export type BriefingRead = Schemas['BriefingRead']
+export type BriefingTask = Schemas['BriefingTask']
+export type BriefingInteraction = Schemas['BriefingInteraction']
