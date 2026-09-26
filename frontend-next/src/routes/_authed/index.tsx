@@ -3,6 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { type Api, unwrap } from '../../api/client'
 import type { BriefingInteraction, BriefingRead, BriefingTask } from '../../api/types'
+import { PriorityBadge } from '../../components/PriorityBadge'
 
 // The morning briefing, as data (GET /briefing). The same function builds the
 // 07:00 Slack message, so this page and that message agree on what today is
@@ -122,12 +123,10 @@ function TaskRow({ task }: { task: BriefingTask }) {
       <span className="row-main">
         <span>
           {task.title}
-          {task.priority >= 2 && (
+          {task.priority > 0 && (
             <>
               {' '}
-              <span className="badge" data-tone="warning">
-                high
-              </span>
+              <PriorityBadge priority={task.priority} />
             </>
           )}
         </span>

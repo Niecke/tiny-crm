@@ -13,7 +13,6 @@ import {
   contactDocumentsQuery,
   contactInteractionsQuery,
   contactQuery,
-  contactTasksQuery,
   deleteContact,
   freelancerAnswer,
   invalidateContacts,
@@ -22,7 +21,10 @@ import {
   relationOptions,
   sourceOptions,
 } from '../../../../contacts'
-import { formatBytes, formatDate, formatDateTime, formatDay } from '../../../../format'
+import { formatBytes, formatDate, formatDateTime, formatDay, localDay } from '../../../../format'
+import { linkedTasksQuery, useToggleDone } from '../../../../tasks'
+import { TaskList } from '../../../../components/TaskList'
+import { Checkbox } from '../../../../components/ui/Checkbox'
 
 const tabs = ['tasks', 'interactions', 'documents'] as const
 type TabId = (typeof tabs)[number]
@@ -45,7 +47,9 @@ function ContactDetail() {
   const queryClient = useQueryClient()
   const contact = useQuery(contactQuery(api, contactId))
   // All three load up front: each tab label shows its count.
-  const tasks = useQuery(contactTasksQuery(api, contactId))
+  const [showDone, setShowDone] = useState(false)
+  const tasks = useQuery(linkedTasksQuery(api, { contact_id: contactId }, showDone))
+  const { toggle, pendingId, error: toggleError, repeated } = useToggleDone(api)
   const interactions = useQuery(contactInteractionsQuery(api, contactId))
   const documents = useQuery(contactDocumentsQuery(api, contactId))
   const [now] = useState(() => Date.now())
@@ -150,17 +154,37 @@ function ContactDetail() {
           </TabList>
 
           <TabPanel id="tasks" className="panel-body">
-            <AddNotReady label="Add task" />
-            <Rows query={tasks} empty="Nothing outstanding.">
-              {(t) => (
-                <li key={t.id}>
-                  <span className="row-main">
-                    <span>{t.title}</span>
-                    {t.due_date && <span className="row-meta">Due {formatDate(t.due_date)}</span>}
-                  </span>
-                </li>
-              )}
-            </Rows>
+            <div className="tab-toolbar">
+              <Checkbox isSelected={showDone} onChange={setShowDone}>
+                Show done
+              </Checkbox>
+              <Link
+                to="/tasks/new"
+                search={{ contactId, contactName: c.name }}
+                className="button button-quiet"
+              >
+                Add task
+              </Link>
+            </div>
+            {repeated && (
+              <p className="notice" role="status">
+                Repeated: “{repeated.title}” is due again {formatDay(localDay(repeated.due))}.
+              </p>
+            )}
+            {toggleError && (
+              <p className="form-error" role="alert">
+                Could not update the task: {toggleError.message}
+              </p>
+            )}
+            {tasks.isPending ? (
+              <p className="muted">Loading…</p>
+            ) : tasks.error ? (
+              <p className="form-error">{tasks.error.message}</p>
+            ) : tasks.data.items.length === 0 ? (
+              <p className="muted">{showDone ? 'No tasks about this contact.' : 'Nothing outstanding.'}</p>
+            ) : (
+              <TaskList tasks={tasks.data.items} onToggle={toggle} pendingId={pendingId} hideAbout="contact" now={now} />
+            )}
           </TabPanel>
 
           <TabPanel id="interactions" className="panel-body">

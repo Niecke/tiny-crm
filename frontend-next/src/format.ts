@@ -54,3 +54,18 @@ export const splitTags = (text: string) =>
     .split(',')
     .map((t) => t.trim())
     .filter(Boolean)
+
+// The calendar day a moment falls on here, as YYYY-MM-DD. A task's due date is
+// a moment (23:59 local on the day), and its UTC date is the next day anywhere
+// west of Greenwich.
+export function localDay(iso: string): string {
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+// The moment a day's deadline falls on: 23:59 local, so a task stays "today"
+// until midnight. As the API wants it, an ISO string in UTC.
+export function endOfLocalDay(isoDate: string): string {
+  const [y, m, d] = isoDate.split('-').map(Number)
+  return new Date(y, m - 1, d, 23, 59).toISOString()
+}
