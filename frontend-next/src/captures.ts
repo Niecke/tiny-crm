@@ -50,20 +50,3 @@ export async function invalidateAfterCapture(queryClient: QueryClient, converted
   if (converted) keys.push(['contacts'], ['organizations'], ['count'], ['interactions'])
   await Promise.all(keys.map((queryKey) => queryClient.invalidateQueries({ queryKey })))
 }
-
-// Pickers in the triage form. Contacts search by name, organizations by name
-// or domain; ten suggestions is plenty for a dropdown.
-export const contactOptionsQuery = (api: Api, search: string) =>
-  queryOptions({
-    queryKey: ['contacts', 'options', search],
-    queryFn: () => unwrap(api.GET('/contacts/', { params: { query: { search: search || undefined, limit: 10 } } })),
-    placeholderData: keepPreviousData,
-  })
-
-export const organizationOptionsQuery = (api: Api, search: string) =>
-  queryOptions({
-    queryKey: ['organizations', 'options', search],
-    queryFn: () =>
-      unwrap(api.GET('/organizations/', { params: { query: { search: search || undefined, limit: 10 } } })),
-    placeholderData: keepPreviousData,
-  })

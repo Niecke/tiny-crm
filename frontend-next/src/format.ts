@@ -39,3 +39,18 @@ export function daysSince(iso: string, now: Date = new Date()): number {
   const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
   return Math.max(0, Math.round((startOfDay(now) - startOfDay(then)) / 86_400_000))
 }
+
+// A date without a time ("2026-09-26", a birthday or a project's start), in
+// the browser's locale. Parsed as local midnight: `new Date("2026-09-26")` is
+// UTC midnight, which is the day before anywhere west of Greenwich.
+export function formatDay(isoDate: string): string {
+  const [y, m, d] = isoDate.slice(0, 10).split('-').map(Number)
+  return dateFormat.format(new Date(y, m - 1, d))
+}
+
+// Tags as typed in a form: comma-separated, trimmed, blanks dropped.
+export const splitTags = (text: string) =>
+  text
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean)
