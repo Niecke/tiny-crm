@@ -14,6 +14,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
 import { Route as AuthedCaptureRouteImport } from './routes/_authed/capture'
 import { Route as AuthedContactsRouteRouteImport } from './routes/_authed/contacts/route'
+import { Route as AuthedDealsRouteRouteImport } from './routes/_authed/deals/route'
 import { Route as AuthedDocumentsRouteRouteImport } from './routes/_authed/documents/route'
 import { Route as AuthedInboxRouteRouteImport } from './routes/_authed/inbox/route'
 import { Route as AuthedInteractionsRouteRouteImport } from './routes/_authed/interactions/route'
@@ -24,6 +25,8 @@ import { Route as AuthedAccountIndexRouteImport } from './routes/_authed/account
 import { Route as AuthedAccountPasswordRouteImport } from './routes/_authed/account/password'
 import { Route as AuthedContactsIndexRouteImport } from './routes/_authed/contacts/index'
 import { Route as AuthedContactsNewRouteImport } from './routes/_authed/contacts/new'
+import { Route as AuthedDealsIndexRouteImport } from './routes/_authed/deals/index'
+import { Route as AuthedDealsNewRouteImport } from './routes/_authed/deals/new'
 import { Route as AuthedDocumentsIndexRouteImport } from './routes/_authed/documents/index'
 import { Route as AuthedDocumentsDocumentIdRouteImport } from './routes/_authed/documents/$documentId'
 import { Route as AuthedDocumentsNewRouteImport } from './routes/_authed/documents/new'
@@ -39,6 +42,8 @@ import { Route as AuthedTasksTaskIdRouteImport } from './routes/_authed/tasks/$t
 import { Route as AuthedTasksNewRouteImport } from './routes/_authed/tasks/new'
 import { Route as AuthedContactsContactIdIndexRouteImport } from './routes/_authed/contacts/$contactId/index'
 import { Route as AuthedContactsContactIdEditRouteImport } from './routes/_authed/contacts/$contactId/edit'
+import { Route as AuthedDealsDealIdIndexRouteImport } from './routes/_authed/deals/$dealId/index'
+import { Route as AuthedDealsDealIdEditRouteImport } from './routes/_authed/deals/$dealId/edit'
 import { Route as AuthedOrganizationsOrganizationIdIndexRouteImport } from './routes/_authed/organizations/$organizationId/index'
 import { Route as AuthedOrganizationsOrganizationIdEditRouteImport } from './routes/_authed/organizations/$organizationId/edit'
 
@@ -64,6 +69,11 @@ const AuthedCaptureRoute = AuthedCaptureRouteImport.update({
 const AuthedContactsRouteRoute = AuthedContactsRouteRouteImport.update({
   id: '/contacts',
   path: '/contacts',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedDealsRouteRoute = AuthedDealsRouteRouteImport.update({
+  id: '/deals',
+  path: '/deals',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedDocumentsRouteRoute = AuthedDocumentsRouteRouteImport.update({
@@ -116,6 +126,16 @@ const AuthedContactsNewRoute = AuthedContactsNewRouteImport.update({
   id: '/new',
   path: '/new',
   getParentRoute: () => AuthedContactsRouteRoute,
+} as any)
+const AuthedDealsIndexRoute = AuthedDealsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthedDealsRouteRoute,
+} as any)
+const AuthedDealsNewRoute = AuthedDealsNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => AuthedDealsRouteRoute,
 } as any)
 const AuthedDocumentsIndexRoute = AuthedDocumentsIndexRouteImport.update({
   id: '/',
@@ -197,6 +217,16 @@ const AuthedContactsContactIdEditRoute =
     path: '/$contactId/edit',
     getParentRoute: () => AuthedContactsRouteRoute,
   } as any)
+const AuthedDealsDealIdIndexRoute = AuthedDealsDealIdIndexRouteImport.update({
+  id: '/$dealId/',
+  path: '/$dealId/',
+  getParentRoute: () => AuthedDealsRouteRoute,
+} as any)
+const AuthedDealsDealIdEditRoute = AuthedDealsDealIdEditRouteImport.update({
+  id: '/$dealId/edit',
+  path: '/$dealId/edit',
+  getParentRoute: () => AuthedDealsRouteRoute,
+} as any)
 const AuthedOrganizationsOrganizationIdIndexRoute =
   AuthedOrganizationsOrganizationIdIndexRouteImport.update({
     id: '/$organizationId/',
@@ -214,6 +244,7 @@ export interface FileRoutesByFullPath {
   '/': typeof AuthedIndexRoute
   '/login': typeof LoginRoute
   '/contacts': typeof AuthedContactsRouteRouteWithChildren
+  '/deals': typeof AuthedDealsRouteRouteWithChildren
   '/documents': typeof AuthedDocumentsRouteRouteWithChildren
   '/inbox': typeof AuthedInboxRouteRouteWithChildren
   '/interactions': typeof AuthedInteractionsRouteRouteWithChildren
@@ -223,6 +254,7 @@ export interface FileRoutesByFullPath {
   '/system': typeof AuthedSystemRoute
   '/account/password': typeof AuthedAccountPasswordRoute
   '/contacts/new': typeof AuthedContactsNewRoute
+  '/deals/new': typeof AuthedDealsNewRoute
   '/documents/$documentId': typeof AuthedDocumentsDocumentIdRoute
   '/documents/new': typeof AuthedDocumentsNewRoute
   '/inbox/$captureId': typeof AuthedInboxCaptureIdRoute
@@ -233,14 +265,17 @@ export interface FileRoutesByFullPath {
   '/tasks/new': typeof AuthedTasksNewRoute
   '/account/': typeof AuthedAccountIndexRoute
   '/contacts/': typeof AuthedContactsIndexRoute
+  '/deals/': typeof AuthedDealsIndexRoute
   '/documents/': typeof AuthedDocumentsIndexRoute
   '/inbox/': typeof AuthedInboxIndexRoute
   '/interactions/': typeof AuthedInteractionsIndexRoute
   '/organizations/': typeof AuthedOrganizationsIndexRoute
   '/tasks/': typeof AuthedTasksIndexRoute
   '/contacts/$contactId/edit': typeof AuthedContactsContactIdEditRoute
+  '/deals/$dealId/edit': typeof AuthedDealsDealIdEditRoute
   '/organizations/$organizationId/edit': typeof AuthedOrganizationsOrganizationIdEditRoute
   '/contacts/$contactId/': typeof AuthedContactsContactIdIndexRoute
+  '/deals/$dealId/': typeof AuthedDealsDealIdIndexRoute
   '/organizations/$organizationId/': typeof AuthedOrganizationsOrganizationIdIndexRoute
 }
 export interface FileRoutesByTo {
@@ -250,6 +285,7 @@ export interface FileRoutesByTo {
   '/': typeof AuthedIndexRoute
   '/account/password': typeof AuthedAccountPasswordRoute
   '/contacts/new': typeof AuthedContactsNewRoute
+  '/deals/new': typeof AuthedDealsNewRoute
   '/documents/$documentId': typeof AuthedDocumentsDocumentIdRoute
   '/documents/new': typeof AuthedDocumentsNewRoute
   '/inbox/$captureId': typeof AuthedInboxCaptureIdRoute
@@ -260,14 +296,17 @@ export interface FileRoutesByTo {
   '/tasks/new': typeof AuthedTasksNewRoute
   '/account': typeof AuthedAccountIndexRoute
   '/contacts': typeof AuthedContactsIndexRoute
+  '/deals': typeof AuthedDealsIndexRoute
   '/documents': typeof AuthedDocumentsIndexRoute
   '/inbox': typeof AuthedInboxIndexRoute
   '/interactions': typeof AuthedInteractionsIndexRoute
   '/organizations': typeof AuthedOrganizationsIndexRoute
   '/tasks': typeof AuthedTasksIndexRoute
   '/contacts/$contactId/edit': typeof AuthedContactsContactIdEditRoute
+  '/deals/$dealId/edit': typeof AuthedDealsDealIdEditRoute
   '/organizations/$organizationId/edit': typeof AuthedOrganizationsOrganizationIdEditRoute
   '/contacts/$contactId': typeof AuthedContactsContactIdIndexRoute
+  '/deals/$dealId': typeof AuthedDealsDealIdIndexRoute
   '/organizations/$organizationId': typeof AuthedOrganizationsOrganizationIdIndexRoute
 }
 export interface FileRoutesById {
@@ -275,6 +314,7 @@ export interface FileRoutesById {
   '/_authed': typeof AuthedRouteWithChildren
   '/login': typeof LoginRoute
   '/_authed/contacts': typeof AuthedContactsRouteRouteWithChildren
+  '/_authed/deals': typeof AuthedDealsRouteRouteWithChildren
   '/_authed/documents': typeof AuthedDocumentsRouteRouteWithChildren
   '/_authed/inbox': typeof AuthedInboxRouteRouteWithChildren
   '/_authed/interactions': typeof AuthedInteractionsRouteRouteWithChildren
@@ -285,6 +325,7 @@ export interface FileRoutesById {
   '/_authed/': typeof AuthedIndexRoute
   '/_authed/account/password': typeof AuthedAccountPasswordRoute
   '/_authed/contacts/new': typeof AuthedContactsNewRoute
+  '/_authed/deals/new': typeof AuthedDealsNewRoute
   '/_authed/documents/$documentId': typeof AuthedDocumentsDocumentIdRoute
   '/_authed/documents/new': typeof AuthedDocumentsNewRoute
   '/_authed/inbox/$captureId': typeof AuthedInboxCaptureIdRoute
@@ -295,14 +336,17 @@ export interface FileRoutesById {
   '/_authed/tasks/new': typeof AuthedTasksNewRoute
   '/_authed/account/': typeof AuthedAccountIndexRoute
   '/_authed/contacts/': typeof AuthedContactsIndexRoute
+  '/_authed/deals/': typeof AuthedDealsIndexRoute
   '/_authed/documents/': typeof AuthedDocumentsIndexRoute
   '/_authed/inbox/': typeof AuthedInboxIndexRoute
   '/_authed/interactions/': typeof AuthedInteractionsIndexRoute
   '/_authed/organizations/': typeof AuthedOrganizationsIndexRoute
   '/_authed/tasks/': typeof AuthedTasksIndexRoute
   '/_authed/contacts/$contactId/edit': typeof AuthedContactsContactIdEditRoute
+  '/_authed/deals/$dealId/edit': typeof AuthedDealsDealIdEditRoute
   '/_authed/organizations/$organizationId/edit': typeof AuthedOrganizationsOrganizationIdEditRoute
   '/_authed/contacts/$contactId/': typeof AuthedContactsContactIdIndexRoute
+  '/_authed/deals/$dealId/': typeof AuthedDealsDealIdIndexRoute
   '/_authed/organizations/$organizationId/': typeof AuthedOrganizationsOrganizationIdIndexRoute
 }
 export interface FileRouteTypes {
@@ -311,6 +355,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/contacts'
+    | '/deals'
     | '/documents'
     | '/inbox'
     | '/interactions'
@@ -320,6 +365,7 @@ export interface FileRouteTypes {
     | '/system'
     | '/account/password'
     | '/contacts/new'
+    | '/deals/new'
     | '/documents/$documentId'
     | '/documents/new'
     | '/inbox/$captureId'
@@ -330,14 +376,17 @@ export interface FileRouteTypes {
     | '/tasks/new'
     | '/account/'
     | '/contacts/'
+    | '/deals/'
     | '/documents/'
     | '/inbox/'
     | '/interactions/'
     | '/organizations/'
     | '/tasks/'
     | '/contacts/$contactId/edit'
+    | '/deals/$dealId/edit'
     | '/organizations/$organizationId/edit'
     | '/contacts/$contactId/'
+    | '/deals/$dealId/'
     | '/organizations/$organizationId/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -347,6 +396,7 @@ export interface FileRouteTypes {
     | '/'
     | '/account/password'
     | '/contacts/new'
+    | '/deals/new'
     | '/documents/$documentId'
     | '/documents/new'
     | '/inbox/$captureId'
@@ -357,20 +407,24 @@ export interface FileRouteTypes {
     | '/tasks/new'
     | '/account'
     | '/contacts'
+    | '/deals'
     | '/documents'
     | '/inbox'
     | '/interactions'
     | '/organizations'
     | '/tasks'
     | '/contacts/$contactId/edit'
+    | '/deals/$dealId/edit'
     | '/organizations/$organizationId/edit'
     | '/contacts/$contactId'
+    | '/deals/$dealId'
     | '/organizations/$organizationId'
   id:
     | '__root__'
     | '/_authed'
     | '/login'
     | '/_authed/contacts'
+    | '/_authed/deals'
     | '/_authed/documents'
     | '/_authed/inbox'
     | '/_authed/interactions'
@@ -381,6 +435,7 @@ export interface FileRouteTypes {
     | '/_authed/'
     | '/_authed/account/password'
     | '/_authed/contacts/new'
+    | '/_authed/deals/new'
     | '/_authed/documents/$documentId'
     | '/_authed/documents/new'
     | '/_authed/inbox/$captureId'
@@ -391,14 +446,17 @@ export interface FileRouteTypes {
     | '/_authed/tasks/new'
     | '/_authed/account/'
     | '/_authed/contacts/'
+    | '/_authed/deals/'
     | '/_authed/documents/'
     | '/_authed/inbox/'
     | '/_authed/interactions/'
     | '/_authed/organizations/'
     | '/_authed/tasks/'
     | '/_authed/contacts/$contactId/edit'
+    | '/_authed/deals/$dealId/edit'
     | '/_authed/organizations/$organizationId/edit'
     | '/_authed/contacts/$contactId/'
+    | '/_authed/deals/$dealId/'
     | '/_authed/organizations/$organizationId/'
   fileRoutesById: FileRoutesById
 }
@@ -442,6 +500,13 @@ declare module '@tanstack/react-router' {
       path: '/contacts'
       fullPath: '/contacts'
       preLoaderRoute: typeof AuthedContactsRouteRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/deals': {
+      id: '/_authed/deals'
+      path: '/deals'
+      fullPath: '/deals'
+      preLoaderRoute: typeof AuthedDealsRouteRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/documents': {
@@ -513,6 +578,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/contacts/new'
       preLoaderRoute: typeof AuthedContactsNewRouteImport
       parentRoute: typeof AuthedContactsRouteRoute
+    }
+    '/_authed/deals/': {
+      id: '/_authed/deals/'
+      path: '/'
+      fullPath: '/deals/'
+      preLoaderRoute: typeof AuthedDealsIndexRouteImport
+      parentRoute: typeof AuthedDealsRouteRoute
+    }
+    '/_authed/deals/new': {
+      id: '/_authed/deals/new'
+      path: '/new'
+      fullPath: '/deals/new'
+      preLoaderRoute: typeof AuthedDealsNewRouteImport
+      parentRoute: typeof AuthedDealsRouteRoute
     }
     '/_authed/documents/': {
       id: '/_authed/documents/'
@@ -619,6 +698,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedContactsContactIdEditRouteImport
       parentRoute: typeof AuthedContactsRouteRoute
     }
+    '/_authed/deals/$dealId/': {
+      id: '/_authed/deals/$dealId/'
+      path: '/$dealId'
+      fullPath: '/deals/$dealId/'
+      preLoaderRoute: typeof AuthedDealsDealIdIndexRouteImport
+      parentRoute: typeof AuthedDealsRouteRoute
+    }
+    '/_authed/deals/$dealId/edit': {
+      id: '/_authed/deals/$dealId/edit'
+      path: '/$dealId/edit'
+      fullPath: '/deals/$dealId/edit'
+      preLoaderRoute: typeof AuthedDealsDealIdEditRouteImport
+      parentRoute: typeof AuthedDealsRouteRoute
+    }
     '/_authed/organizations/$organizationId/': {
       id: '/_authed/organizations/$organizationId/'
       path: '/$organizationId'
@@ -652,6 +745,23 @@ const AuthedContactsRouteRouteChildren: AuthedContactsRouteRouteChildren = {
 
 const AuthedContactsRouteRouteWithChildren =
   AuthedContactsRouteRoute._addFileChildren(AuthedContactsRouteRouteChildren)
+
+interface AuthedDealsRouteRouteChildren {
+  AuthedDealsNewRoute: typeof AuthedDealsNewRoute
+  AuthedDealsIndexRoute: typeof AuthedDealsIndexRoute
+  AuthedDealsDealIdEditRoute: typeof AuthedDealsDealIdEditRoute
+  AuthedDealsDealIdIndexRoute: typeof AuthedDealsDealIdIndexRoute
+}
+
+const AuthedDealsRouteRouteChildren: AuthedDealsRouteRouteChildren = {
+  AuthedDealsNewRoute: AuthedDealsNewRoute,
+  AuthedDealsIndexRoute: AuthedDealsIndexRoute,
+  AuthedDealsDealIdEditRoute: AuthedDealsDealIdEditRoute,
+  AuthedDealsDealIdIndexRoute: AuthedDealsDealIdIndexRoute,
+}
+
+const AuthedDealsRouteRouteWithChildren =
+  AuthedDealsRouteRoute._addFileChildren(AuthedDealsRouteRouteChildren)
 
 interface AuthedDocumentsRouteRouteChildren {
   AuthedDocumentsDocumentIdRoute: typeof AuthedDocumentsDocumentIdRoute
@@ -738,6 +848,7 @@ const AuthedTasksRouteRouteWithChildren =
 
 interface AuthedRouteChildren {
   AuthedContactsRouteRoute: typeof AuthedContactsRouteRouteWithChildren
+  AuthedDealsRouteRoute: typeof AuthedDealsRouteRouteWithChildren
   AuthedDocumentsRouteRoute: typeof AuthedDocumentsRouteRouteWithChildren
   AuthedInboxRouteRoute: typeof AuthedInboxRouteRouteWithChildren
   AuthedInteractionsRouteRoute: typeof AuthedInteractionsRouteRouteWithChildren
@@ -752,6 +863,7 @@ interface AuthedRouteChildren {
 
 const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedContactsRouteRoute: AuthedContactsRouteRouteWithChildren,
+  AuthedDealsRouteRoute: AuthedDealsRouteRouteWithChildren,
   AuthedDocumentsRouteRoute: AuthedDocumentsRouteRouteWithChildren,
   AuthedInboxRouteRoute: AuthedInboxRouteRouteWithChildren,
   AuthedInteractionsRouteRoute: AuthedInteractionsRouteRouteWithChildren,
