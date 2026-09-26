@@ -1929,6 +1929,171 @@ textarea.input {
   box-shadow: 0 2px 6px rgb(58 51 42 / 0.08);
 }
 
+/* ---------- Deals ---------- */
+
+/* The board wants the whole width. */
+.page.page-wide {
+  max-width: none;
+}
+
+.board {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(230px, 1fr);
+  gap: var(--space-3);
+  overflow-x: auto;
+  padding-bottom: var(--space-2);
+  align-items: start;
+}
+
+.board-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius);
+  background: var(--color-sidebar);
+}
+
+.board-heading {
+  margin: 0;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.board-column[data-stage='won'] .board-heading,
+.board-column[data-stage='running'] .board-heading,
+.board-column[data-stage='completed'] .board-heading {
+  color: var(--color-success);
+}
+
+.board-column[data-stage='lost'] .board-heading {
+  color: var(--color-danger);
+}
+
+.board-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 4rem;
+  border-radius: var(--radius-sm);
+  outline: none;
+}
+
+.board-list[data-drop-target] {
+  box-shadow: inset 0 0 0 2px var(--color-accent);
+}
+
+.board-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  outline: none;
+}
+
+.board-card[data-focus-visible] {
+  box-shadow: var(--focus-ring);
+}
+
+.board-card[data-dragging] {
+  opacity: 0.5;
+}
+
+.board-card[data-pending] {
+  opacity: 0.7;
+}
+
+.board-card-body {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-1);
+}
+
+.board-card-body > .row-main {
+  flex: 1;
+  gap: 2px;
+}
+
+.board-title {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.board-value {
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.board-grip,
+.board-menu {
+  flex: none;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--color-text-muted);
+  cursor: grab;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.board-menu {
+  cursor: pointer;
+}
+
+.board-grip[data-focus-visible],
+.board-menu[data-focus-visible] {
+  box-shadow: var(--focus-ring);
+}
+
+.board-empty {
+  display: grid;
+  place-items: center;
+  min-height: 4rem;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.board-drop {
+  height: 2px;
+  margin: -1px 0;
+  border-radius: 1px;
+}
+
+.board-drop[data-drop-target] {
+  background: var(--color-accent);
+}
+
+.popover.menu-popover {
+  width: auto;
+  min-width: 12rem;
+}
+
+/* The deal's value and stage, at the top of its facts column. */
+.deal-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.deal-value {
+  display: flex;
+  flex-direction: column;
+}
+
+.deal-headline {
+  font-size: 1.3rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---------- Narrow screens ---------- */
 
 /* The sidebar gives way to a slim top bar whose menu button opens the nav as
