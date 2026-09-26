@@ -59,7 +59,7 @@ spec:
     backend:
       image:
         # Managed by .github/workflows/promote.yml — do not edit by hand.
-        tag: sha-eb13f9a
+        tag: sha-afdd17b
       resources:
         requests:
           cpu: 50m
@@ -68,7 +68,7 @@ spec:
           memory: 256Mi
     frontend:
       image:
-        tag: sha-eb13f9a
+        tag: sha-afdd17b
       resources:
         requests:
           cpu: 5m
@@ -81,7 +81,7 @@ spec:
       image:
         # Written by promote.yml like the tags above. Empty until the first
         # Deploy commit after this landed; the chart skips the client until then.
-        tag: "sha-eb13f9a"
+        tag: "sha-afdd17b"
     # Neither has anything to do on disposable data: the backup would copy it
     # off-site next to production's archives, and the briefing would post
     # staging's tasks into the real Slack channel.
@@ -90,4 +90,4 @@ spec:
     backup:
       enabled: false
       image:
-        tag: sha-eb13f9a
+        tag: sha-afdd17b
