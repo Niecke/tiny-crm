@@ -5,11 +5,12 @@ RUN npm ci
 COPY . .
 # Git commit of this build, passed in from CI. Baked into the bundle (shown on
 # the System page) and written to version.json, which the smoke test compares
-# against the backend's — the same contract the Flutter image keeps.
+# against the backend's — the same contract the Flutter image keeps. The build
+# time is baked in beside it, in the backend's format.
 ARG GIT_COMMIT=dev
 ENV VITE_GIT_COMMIT=$GIT_COMMIT
 RUN echo "{\"version\":\"$GIT_COMMIT\"}" > public/version.json && \
-    npm run build
+    VITE_BUILD_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ") npm run build
 
 # Static files only: Node exists in the build stage and nowhere after it. The
 # same Caddy digest as the Flutter image, so the two stay on one server version
