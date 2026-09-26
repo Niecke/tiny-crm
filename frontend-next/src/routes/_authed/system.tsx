@@ -8,13 +8,15 @@ import { useMediaQuery } from '../../useMediaQuery'
 
 const repoUrl = 'https://github.com/Niecke/tiny-crm'
 
-// This bundle's build, baked in by the Dockerfile. Both are unset on the dev
-// server, and a locally built image carries a placeholder ("dev", "unknown")
-// instead of a commit.
+// This bundle's build, baked in by the Dockerfile. All three are unset on the
+// dev server, and a locally built image carries a placeholder ("dev",
+// "unknown") instead of a commit and a version.
+const frontendVersion = import.meta.env.VITE_APP_VERSION
 const frontendCommit = import.meta.env.VITE_GIT_COMMIT
 const frontendBuilt = import.meta.env.VITE_BUILD_TIMESTAMP
 
 const isCommit = (value: string | undefined): value is string => !!value && /^[0-9a-f]{7,40}$/.test(value)
+const isRelease = (value: string | undefined): value is string => !!value && /^v\d+\.\d+\.\d+$/.test(value)
 
 // Which build is running and whether it can reach its database. Both endpoints
 // are unauthenticated, so this page still answers when the login is broken.
@@ -175,6 +177,9 @@ function SystemPage() {
           </div>
           <div className="panel-body">
             <ul className="rows">
+              <Row label="Version">
+                <Version version={frontendVersion} />
+              </Row>
               <Row label="Commit">
                 <Commit sha={frontendCommit} />
               </Row>
@@ -212,6 +217,15 @@ function SystemPage() {
               </Row>
               <Row label="Response time">
                 {health.isSuccess ? `${health.data.responseMs} ms` : <span className="muted">—</span>}
+              </Row>
+              <Row label="Version">
+                {version.isPending ? (
+                  <span className="muted">…</span>
+                ) : version.isError ? (
+                  <span className="muted">—</span>
+                ) : (
+                  <Version version={version.data.app_version} />
+                )}
               </Row>
               <Row label="Commit">
                 {version.isPending ? (
@@ -256,6 +270,20 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
       <span>{children}</span>
     </li>
   )
+}
+
+// The product version. A release links to its GitHub release; a build between
+// releases ("v0.1.0-abc1234") has no page of its own, and its commit is the
+// row below.
+function Version({ version }: { version: string | undefined }) {
+  if (isRelease(version)) {
+    return (
+      <a className="mono" href={`${repoUrl}/releases/tag/${version}`} target="_blank" rel="noreferrer">
+        {version}
+      </a>
+    )
+  }
+  return <span className={version && version !== 'dev' ? 'mono' : 'muted'}>{version ?? 'dev'}</span>
 }
 
 // A commit, short, linked to it on GitHub. A local build's placeholder is shown

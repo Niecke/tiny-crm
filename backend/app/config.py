@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     # Git commit of the running build, injected at image build time via the
     # GIT_COMMIT build arg (git isn't available inside the build container).
     git_commit: str = "unknown"
+    # The product version of the running build, from the APP_VERSION build arg:
+    # "v0.1.0" for a release, "v0.1.0-abc1234" for any other build (ci.yml).
+    app_version: str = "dev"
 
     # S3-compatible storage — set S3_ENDPOINT_URL for MinIO/Hetzner; leave unset for AWS
     s3_endpoint_url: str | None = None

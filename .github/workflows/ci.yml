@@ -91,12 +91,36 @@ jobs:
     outputs:
       commit: ${{ steps.id.outputs.commit }}
       tag: ${{ steps.id.outputs.tag }}
+      app_version: ${{ steps.id.outputs.app_version }}
     steps:
+      # version.txt as the PR head has it, not the merge commit: on the release
+      # pull request that is the version it is about to tag.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          sparse-checkout: version.txt
+          sparse-checkout-cone-mode: false
+
+      # The version the images report (System page, /version). Images are built
+      # once, on the pull request, and promote only retags them — so the release
+      # pull request's images are the ones that ship as that release, and they
+      # carry the plain vX.Y.Z. Every other build is the last release plus the
+      # commit it was built from.
       - id: id
+        env:
+          HEAD_REF: ${{ github.head_ref }}
         run: |
           commit="${{ github.event.pull_request.head.sha || github.sha }}"
           echo "commit=$commit" >> "$GITHUB_OUTPUT"
           echo "tag=ci-${commit:0:7}" >> "$GITHUB_OUTPUT"
+
+          version="v$(tr -d '[:space:]' < version.txt)"
+          case "$HEAD_REF" in
+            release-please--*) ;;
+            *) version="$version-${commit:0:7}" ;;
+          esac
+          echo "app_version=$version" >> "$GITHUB_OUTPUT"
+          echo "Images report version \`$version\`." >> "$GITHUB_STEP_SUMMARY"
 
   backend-tests:
     name: Backend tests
@@ -341,6 +365,7 @@ jobs:
           push: true
           build-args: |
             GIT_COMMIT=${{ needs.meta.outputs.commit }}
+            APP_VERSION=${{ needs.meta.outputs.app_version }}
           # image.source is what makes GHCR link the package to this repository.
           # Without it the package is owned by whoever pushed first and
           # GITHUB_TOKEN loses write access on the next run.
@@ -410,6 +435,7 @@ jobs:
           push: true
           build-args: |
             GIT_COMMIT=${{ needs.meta.outputs.commit }}
+            APP_VERSION=${{ needs.meta.outputs.app_version }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ needs.meta.outputs.commit }}

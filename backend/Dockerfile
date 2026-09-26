@@ -23,10 +23,12 @@ COPY scripts/ scripts/
 COPY log_config.json .
 
 # Version metadata. Kept late so the layers above stay cached across builds.
-# GIT_COMMIT is passed in (git isn't available here); the build timestamp is
-# recorded now so it reflects this exact image.
+# GIT_COMMIT and APP_VERSION are passed in (git isn't available here); the
+# build timestamp is recorded now so it reflects this exact image.
 ARG GIT_COMMIT=unknown
 ENV GIT_COMMIT=${GIT_COMMIT}
+ARG APP_VERSION=dev
+ENV APP_VERSION=${APP_VERSION}
 RUN date -u +"%Y-%m-%dT%H:%M:%SZ" > /app/build_timestamp.txt
 
 EXPOSE 8000

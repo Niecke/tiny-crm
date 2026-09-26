@@ -1,6 +1,6 @@
 """Build/version metadata surfaced by the /version endpoint.
 
-GIT_COMMIT is injected at image build time via the GIT_COMMIT build arg (git
+GIT_COMMIT and APP_VERSION are injected at image build time via build args (git
 isn't available inside the build container). The build timestamp is written to
 a file during the Docker build so it always reflects the actual image, even for
 locally built images. Both fall back to "unknown" in a plain dev checkout.
@@ -22,4 +22,5 @@ def _read_build_timestamp() -> str:
 
 
 GIT_COMMIT = settings.git_commit
+APP_VERSION = settings.app_version
 BUILD_TIMESTAMP = _read_build_timestamp()
