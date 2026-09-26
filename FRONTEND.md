@@ -305,9 +305,9 @@ auth is the part only a phone can prove.
   left, linked records in tabs on the right, the tab in `?tab=`.
 - **Lists** show how many rows they are not showing rather than stopping
   silently at the page limit.
-- **Not built yet** is visible, not hidden: nav entries for unported screens
-  are shown disabled, and actions that are not implemented are disabled
-  buttons with a note saying so.
+- **Not built yet** is visible, not hidden: actions that are not implemented
+  are disabled buttons with a note saying so. (The nav showed unported screens
+  disabled until the last of them landed; every entry is live now.)
 
 ## Cutover criteria
 

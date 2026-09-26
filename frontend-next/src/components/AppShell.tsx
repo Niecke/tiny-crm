@@ -4,14 +4,14 @@ import { type ReactNode, useState } from 'react'
 import { Dialog, Modal, ModalOverlay } from 'react-aria-components'
 import { meQuery } from '../auth'
 import { captureCountQuery } from '../captures'
+import { dueCountQuery } from '../watches'
 import { clearToken } from '../token'
 import { QuickCaptureButton } from './QuickCapture'
 import { Button } from './ui/Button'
 
-// Every screen the Flutter app has, in its order. `to` is set once a screen is
-// ported; until then the entry stays visible but inert, so the nav doubles as
-// the parity checklist.
-const nav: { label: string; to?: LinkProps['to'] }[] = [
+// Every screen of the app. Contacts and Tasks have entries of their own here;
+// the Flutter app reached them only from other screens.
+const nav: { label: string; to: LinkProps['to'] }[] = [
   { label: 'Dashboard', to: '/' },
   { label: 'Inbox', to: '/inbox' },
   { label: 'Organizations', to: '/organizations' },
@@ -21,7 +21,7 @@ const nav: { label: string; to?: LinkProps['to'] }[] = [
   { label: 'Projects', to: '/projects' },
   { label: 'Interactions', to: '/interactions' },
   { label: 'Documents', to: '/documents' },
-  { label: 'Watches' },
+  { label: 'Watches', to: '/watches' },
   { label: 'Account', to: '/account' },
   { label: 'System', to: '/system' },
 ]
@@ -36,6 +36,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   // else in the app would ever surface.
   const { data: inbox } = useQuery(captureCountQuery(api))
   const waiting = inbox?.new ?? 0
+  // Sources due for a sweep, on the Watches entry, for the same reason: a
+  // watch list nobody looks at is the failure it exists to prevent.
+  const { data: due = 0 } = useQuery(dueCountQuery(api))
   // The menu is open on the history entry it was opened on, and only there:
   // any navigation closes it — the back button too, which never goes through
   // a link in it, even back to an identical URL — without an effect to reset
@@ -69,7 +72,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <aside className="sidebar">
         <div className="brand">tinyCRM</div>
         <QuickCaptureButton className="quick-note-sidebar" />
-        <NavLinks waiting={waiting} />
+        <NavLinks waiting={waiting} due={due} />
         <Account />
       </aside>
 
@@ -84,7 +87,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 ×
               </Button>
             </div>
-            <NavLinks waiting={waiting} onNavigate={() => setMenuOpen(false)} />
+            <NavLinks waiting={waiting} due={due} onNavigate={() => setMenuOpen(false)} />
             <Account />
           </Dialog>
         </Modal>
@@ -96,35 +99,34 @@ export function AppShell({ children }: { children: ReactNode }) {
   )
 }
 
-function NavLinks({ waiting, onNavigate }: { waiting: number; onNavigate?: () => void }) {
+function NavLinks({ waiting, due, onNavigate }: { waiting: number; due: number; onNavigate?: () => void }) {
   return (
     <nav className="nav" aria-label="Main">
-      {nav.map((item) =>
-        item.to ? (
-          // Active matching is by prefix, so / needs to be exact or it would
-          // stay highlighted on every page.
-          <Link
-            key={item.label}
-            to={item.to}
-            activeOptions={{ exact: item.to === '/' }}
-            className="nav-link"
-            // Also closes the menu when the link is the page already open,
-            // which changes no pathname.
-            onClick={onNavigate}
-          >
-            {item.label}
-            {item.to === '/inbox' && waiting > 0 && (
-              <span className="nav-count" aria-label={`${waiting} waiting`}>
-                {waiting}
-              </span>
-            )}
-          </Link>
-        ) : (
-          <span key={item.label} className="nav-link" aria-disabled="true" title="Not ported yet">
-            {item.label}
-          </span>
-        ),
-      )}
+      {nav.map((item) => (
+        // Active matching is by prefix, so / needs to be exact or it would
+        // stay highlighted on every page.
+        <Link
+          key={item.label}
+          to={item.to}
+          activeOptions={{ exact: item.to === '/' }}
+          className="nav-link"
+          // Also closes the menu when the link is the page already open,
+          // which changes no pathname.
+          onClick={onNavigate}
+        >
+          {item.label}
+          {item.to === '/inbox' && waiting > 0 && (
+            <span className="nav-count" aria-label={`${waiting} waiting`}>
+              {waiting}
+            </span>
+          )}
+          {item.to === '/watches' && due > 0 && (
+            <span className="nav-count" aria-label={`${due} due`}>
+              {due}
+            </span>
+          )}
+        </Link>
+      ))}
     </nav>
   )
 }
