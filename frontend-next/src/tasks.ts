@@ -90,11 +90,13 @@ export const deleteTask = (api: Api, id: string) =>
   unwrap(api.DELETE('/tasks/{task_id}', { params: { path: { task_id: id } } }))
 
 // A task write changes every task list, the record pages' task tabs (all under
-// ['tasks']) and the dashboard briefing.
+// ['tasks']) and the dashboard briefing — and projects, since completing a
+// repeating task files its next instance under the same projects.
 export const invalidateTasks = (queryClient: QueryClient) =>
   Promise.all([
     queryClient.invalidateQueries({ queryKey: ['tasks'] }),
     queryClient.invalidateQueries({ queryKey: ['briefing'] }),
+    queryClient.invalidateQueries({ queryKey: ['projects'] }),
   ])
 
 // Ticking a task off, wherever it is listed. Completing a repeating task
@@ -116,3 +118,11 @@ export function useToggleDone(api: Api) {
   })
   return { toggle: mutation.mutate, pendingId: mutation.isPending ? mutation.variables?.id : undefined, error: mutation.error, repeated }
 }
+
+// Suggestions for a task picker, by title, open ones first.
+export const taskOptionsQuery = (api: Api, search: string) =>
+  queryOptions({
+    queryKey: ['tasks', 'options', search],
+    queryFn: () => unwrap(api.GET('/tasks/', { params: { query: { search: search || undefined, limit: 10 } } })),
+    placeholderData: keepPreviousData,
+  })
