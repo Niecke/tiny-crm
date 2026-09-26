@@ -53,8 +53,8 @@ function AccountPage() {
         <Link to="/account/password" className="button">
           Change password
         </Link>
-      </div>
-    </div>
+      </div >
+    </div >
   )
 }
 

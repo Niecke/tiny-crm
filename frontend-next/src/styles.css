@@ -330,6 +330,7 @@ a {
 }
 
 @media (prefers-reduced-motion: reduce) {
+
   .drawer,
   .drawer-overlay {
     animation: none !important;
@@ -361,7 +362,7 @@ a {
   padding: 0;
 }
 
-.rows > li {
+.rows>li {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
@@ -369,12 +370,12 @@ a {
   padding: var(--space-2) 0;
 }
 
-.rows > li > * {
+.rows>li>* {
   min-width: 0;
   overflow-wrap: anywhere;
 }
 
-.rows > li + li {
+.rows>li+li {
   border-top: 1px solid var(--color-border);
 }
 
@@ -532,7 +533,7 @@ a {
 }
 
 /* The same inset hairline as .rows: it starts inside the panel's padding. */
-.table-row + .table-row td {
+.table-row+.table-row td {
   border-top: 1px solid var(--color-border);
 }
 
@@ -744,7 +745,7 @@ a {
   margin: 0 var(--space-3);
 }
 
-.quick-note > span[aria-hidden] {
+.quick-note>span[aria-hidden] {
   font-size: 1.1rem;
   line-height: 1;
 }
@@ -788,7 +789,7 @@ a {
   cursor: pointer;
 }
 
-.capture-item + .capture-item {
+.capture-item+.capture-item {
   box-shadow: 0 -1px 0 var(--color-border);
 }
 
@@ -1122,7 +1123,7 @@ a {
   margin-bottom: var(--space-1);
 }
 
-.status-node + .status-node::before {
+.status-node+.status-node::before {
   content: '';
   position: absolute;
   top: 5px;
@@ -1518,7 +1519,7 @@ textarea.input {
   gap: var(--space-2);
 }
 
-.facts > .chips {
+.facts>.chips {
   margin-bottom: var(--space-4);
 }
 
@@ -1545,7 +1546,7 @@ textarea.input {
   gap: var(--space-1);
 }
 
-.field-with-action > .field {
+.field-with-action>.field {
   align-self: stretch;
 }
 
@@ -1592,11 +1593,11 @@ textarea.input {
   gap: var(--space-3);
 }
 
-.task-row > .row-main {
+.task-row>.row-main {
   flex: 1;
 }
 
-.task-row > .task-check {
+.task-row>.task-check {
   flex: none;
   margin-top: 1px;
 }
@@ -1664,11 +1665,11 @@ textarea.input {
   background: var(--color-surface);
 }
 
-.markdown > :first-child {
+.markdown> :first-child {
   margin-top: 0;
 }
 
-.markdown > :last-child {
+.markdown> :last-child {
   margin-bottom: 0;
 }
 
@@ -1697,6 +1698,7 @@ textarea.input {
    a slide-in panel; the phone is where the inbox gets triaged, so it has to
    work there from the start. */
 @media (max-width: 767px) {
+
   /* Two rows: the bar at its own height, the page taking the rest. Without
      the explicit rows the spare screen height is shared out, and the bar
      grows. */
@@ -1779,7 +1781,7 @@ textarea.input {
     box-shadow: 0 6px 16px rgb(58 51 42 / 0.25);
   }
 
-  .quick-note-fab > span[aria-hidden] {
+  .quick-note-fab>span[aria-hidden] {
     font-size: 1.6rem;
   }
 
