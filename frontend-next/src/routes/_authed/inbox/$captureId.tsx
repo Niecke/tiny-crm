@@ -9,20 +9,17 @@ import type { CaptureConvert, CaptureRead } from '../../../api/types'
 import {
   captureQuery,
   capturesQuery,
-  contactOptionsQuery,
   convertCapture,
   dismissCapture,
   invalidateAfterCapture,
-  organizationOptionsQuery,
 } from '../../../captures'
+import { ContactPicker, OrganizationPicker } from '../../../components/RecordPickers'
 import { Button } from '../../../components/ui/Button'
 import { Checkbox } from '../../../components/ui/Checkbox'
 import { FormTextField } from '../../../components/ui/FormTextField'
 import { Modal } from '../../../components/ui/Modal'
-import { SearchPicker } from '../../../components/ui/SearchPicker'
 import { Segmented } from '../../../components/ui/Segmented'
 import { daysSince, formatDate } from '../../../format'
-import { useDebounced } from '../../../useDebounced'
 
 export const Route = createFileRoute('/_authed/inbox/$captureId')({
   component: Triage,
@@ -395,63 +392,5 @@ function TriageForm({ capture, nextId }: { capture: CaptureRead; nextId: string 
         </div>
       </Modal>
     </form>
-  )
-}
-
-function ContactPicker({
-  value,
-  onChange,
-  errorMessage,
-}: {
-  value: string | null
-  onChange: (id: string | null) => void
-  errorMessage?: string
-}) {
-  const { api } = Route.useRouteContext()
-  const [text, setText] = useState('')
-  const search = useDebounced(text.trim())
-  const { data } = useQuery(contactOptionsQuery(api, search))
-  const options = (data?.items ?? []).map((c) => ({
-    id: c.id,
-    label: c.name,
-    description: [c.job_title, c.organization_name].filter(Boolean).join(' · ') || null,
-  }))
-  return (
-    <SearchPicker
-      label="Contact"
-      placeholder="Type a name"
-      options={options}
-      value={value}
-      onChange={onChange}
-      inputValue={text}
-      onInputChange={setText}
-      emptyText={search ? `No contact called “${search}”.` : 'No contacts yet.'}
-      errorMessage={errorMessage}
-    />
-  )
-}
-
-function OrganizationPicker({ value, onChange }: { value: string | null; onChange: (id: string | null) => void }) {
-  const { api } = Route.useRouteContext()
-  const [text, setText] = useState('')
-  const search = useDebounced(text.trim())
-  const { data } = useQuery(organizationOptionsQuery(api, search))
-  const options = (data?.items ?? []).map((o) => ({ id: o.id, label: o.name, description: o.domain }))
-  return (
-    <SearchPicker
-      label="Organization"
-      placeholder="Optional"
-      options={options}
-      value={value}
-      onChange={onChange}
-      inputValue={text}
-      onInputChange={(t) => {
-        setText(t)
-        // Clearing the text clears the choice; otherwise a stale id would be
-        // submitted behind an empty field.
-        if (!t) onChange(null)
-      }}
-      emptyText={search ? `No organization matches “${search}”.` : 'No organizations yet.'}
-    />
   )
 }
