@@ -188,6 +188,47 @@ Why a separate image rather than a second directory in the Flutter image:
 either app can roll, fail or be removed without the other, and the cutover is
 a routing change rather than a rebuild.
 
+### Installable app and Android share target: manifest, no service worker
+
+**Decision.** The app is an installable PWA with a manifest
+(`public/manifest.json`) and no service worker. The manifest declares a
+`share_target`, so once installed on Android, "Share → tinyCRM next" from
+LinkedIn, Chrome or any other app opens `/next/capture?title=…&text=…&url=…`,
+which saves the share to the inbox and says so.
+
+**Why no service worker.** The share target uses `GET`: the phone simply opens
+a URL with the shared text in its query string, and the page does the rest.
+Only a `POST` share target (sharing *files*) needs a service worker to catch
+the request. Current Chrome installs a PWA on a manifest, icons and HTTPS
+alone. A service worker would buy offline use, which a CRM that must reach
+its API anyway gets little from, and it brings back the stale-client problem
+the Flutter image's Caddyfile documents. **Revisit if** shares must survive
+being offline (queue them and send later) or files should be shareable — both
+are service-worker jobs.
+
+**How it behaves.**
+
+- The share page is behind the login like everything else; a share while
+  signed out goes through `/login` and comes back with its parameters intact.
+- It saves once on arrival, then replaces its URL with `?saved=<id>`, so a
+  reload or the back button shows the result instead of filing it twice.
+- Scope, start URL and id are `/next/`, and the name is "tinyCRM next", so it
+  installs *beside* the Flutter app and the share sheet tells the two apart.
+  The icons use this app's palette for the same reason.
+- `<link rel="manifest" crossorigin="use-credentials">`: staging is behind
+  basic auth, and a manifest is otherwise fetched without the browser's saved
+  credentials — the install prompt would silently never appear.
+
+**Open question — where shares land.** `/next` runs on staging only, so until
+the cutover a share from the phone files into *staging's* disposable database,
+not production's. Daily use of the React inbox before the cutover (criterion 7)
+means either accepting that, or enabling `frontendNext` in the production
+HelmRelease as well. Not decided yet.
+
+**Not yet verified on a device.** The manifest, share URL and icons are checked
+in CI (`ci/smoke.sh`); installing on a real Android phone behind staging's basic
+auth is the part only a phone can prove.
+
 ## Conventions
 
 - **Routes** in `src/routes/`; everything behind the login sits under the
@@ -212,8 +253,8 @@ The React app replaces Flutter at `/` when all of these hold:
    edit and delete where Flutter has them. The disabled nav entries are the
    checklist: none left.
 2. **Capture from the phone.** The PWA installs, and the Android share target
-   (`/capture`, in the Flutter manifest's `share_target`) works from the React
-   app — this is how the inbox gets filled.
+   works from the React app — this is how the inbox gets filled. Built
+   (`/next/capture`, see above); still to be confirmed on a real phone.
 3. **Generated API client.** No hand-written response types remain — true
    since the client moved to `openapi-fetch`; CI keeps it true.
 4. **Token decision revisited** (see Token storage) — lifetime shortened or
@@ -227,4 +268,8 @@ The React app replaces Flutter at `/` when all of these hold:
 
 The cutover itself is one commit: `frontend/` deleted, `frontend-next/` served
 at `/` (Vite `base`, the Ingress path, the Caddy root), and the Flutter image
-dropped from CI and promote.
+dropped from CI and promote. The manifest moves too: `id`, `scope`,
+`start_url` and the share `action` become `/`, the name "tinyCRM". With
+`id` equal to the Flutter app's (its start URL, `/`), an installed Flutter app
+is updated in place into the React one rather than needing a reinstall; the
+"tinyCRM next" install from the preview is then an orphan to uninstall.

@@ -140,7 +140,10 @@ a {
 }
 
 .nav-link {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
   color: var(--color-text-muted);
@@ -209,6 +212,128 @@ a {
 
 .page-header p {
   color: var(--color-text-muted);
+}
+
+/* Phone only (see Narrow screens): the top bar, its menu, and the floating
+   quick-note button. */
+.topbar,
+.quick-note-fab {
+  display: none;
+}
+
+.button.menu-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 0;
+  color: var(--color-text);
+}
+
+/* Three bars, drawn rather than shipped as an icon font or an SVG file. */
+.menu-icon,
+.menu-icon::before,
+.menu-icon::after {
+  display: block;
+  width: 20px;
+  height: 2px;
+  border-radius: 1px;
+  background: currentColor;
+}
+
+.menu-icon {
+  position: relative;
+}
+
+.menu-icon::before,
+.menu-icon::after {
+  content: '';
+  position: absolute;
+  left: 0;
+}
+
+.menu-icon::before {
+  top: -6px;
+}
+
+.menu-icon::after {
+  top: 6px;
+}
+
+/* The slide-in menu: the sidebar's own tone and content, from the left. */
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgb(58 51 42 / 0.3);
+}
+
+.drawer {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: min(82vw, 300px);
+  overflow-y: auto;
+  background: var(--color-sidebar);
+  box-shadow: 4px 0 24px rgb(58 51 42 / 0.18);
+}
+
+.drawer-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-height: 100%;
+  padding: var(--space-3) var(--space-3) var(--space-5);
+  outline: none;
+}
+
+.drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.button.drawer-close {
+  padding: var(--space-1) var(--space-3);
+  border: 0;
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.drawer-overlay[data-entering] {
+  animation: fade-in 180ms ease-out;
+}
+
+.drawer-overlay[data-exiting] {
+  animation: fade-in 150ms ease-in reverse;
+}
+
+.drawer[data-entering] {
+  animation: slide-in 180ms ease-out;
+}
+
+.drawer[data-exiting] {
+  animation: slide-in 150ms ease-in reverse;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes slide-in {
+  from {
+    transform: translateX(-100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawer,
+  .drawer-overlay {
+    animation: none !important;
+  }
 }
 
 /* ---------- Panels ---------- */
@@ -530,7 +655,8 @@ a {
   color: var(--color-text);
 }
 
-.tab[aria-selected='true'] {
+.tab[aria-selected='true'],
+.tab[aria-current='page'] {
   border-bottom-color: var(--color-accent);
   color: var(--color-accent);
   font-weight: 600;
@@ -587,6 +713,305 @@ a {
   justify-content: flex-end;
   gap: var(--space-2) var(--space-3);
   padding-bottom: var(--space-3);
+}
+
+/* ---------- Inbox ---------- */
+
+/* Waiting captures on the Inbox nav entry. */
+.nav-count {
+  min-width: 1.4rem;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The quick-note button: a sidebar button on a desktop, a floating one on a
+   phone (see Narrow screens) — never more than one tap away. `display` is on
+   the variants, so each breakpoint shows exactly one of the two. */
+.quick-note-sidebar {
+  display: inline-flex;
+}
+
+.quick-note {
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  margin: 0 var(--space-3);
+}
+
+.quick-note > span[aria-hidden] {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+/* Tabs outside a panel: no inner padding to line up with. */
+.tabs-plain {
+  padding: 0;
+}
+
+/* A one-line result of the last action ("Jane Doe is a lead"). */
+.notice {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+.capture-list {
+  padding: var(--space-2) var(--space-3);
+}
+
+.capture-list[data-stale] {
+  opacity: 0.6;
+}
+
+.capture-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.capture-item + .capture-item {
+  box-shadow: 0 -1px 0 var(--color-border);
+}
+
+.capture-item[data-hovered] {
+  background: rgb(58 51 42 / 0.05);
+}
+
+.capture-item[data-focus-visible] {
+  outline: none;
+  background: var(--color-accent-soft);
+}
+
+.captured dl {
+  gap: var(--space-3);
+}
+
+.share-result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-5);
+  text-align: center;
+}
+
+.share-mark {
+  width: 3rem;
+  height: 3rem;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-size: 1.5rem;
+}
+
+.share-actions {
+  justify-content: center;
+  margin-top: var(--space-4);
+}
+
+/* ---------- Dialogs and pickers ---------- */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: start center;
+  padding: 12vh var(--space-4) var(--space-4);
+  background: rgb(58 51 42 / 0.3);
+}
+
+.modal {
+  width: 100%;
+  max-width: 460px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 32px rgb(58 51 42 / 0.18);
+}
+
+.dialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  outline: none;
+}
+
+.dialog-title {
+  font-size: 1.15rem;
+}
+
+.quick-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.quick-saved {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+/* A quiet button that reads as a text link: "+ Add a note", "Undo". */
+.button.link-button {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.button.link-button:hover {
+  background: none;
+  text-decoration: underline;
+}
+
+.picker {
+  position: relative;
+  display: flex;
+}
+
+.picker .input {
+  flex: 1;
+  min-width: 0;
+  padding-right: 2.25rem;
+}
+
+.picker-button {
+  position: absolute;
+  top: 50%;
+  right: var(--space-2);
+  transform: translateY(-50%);
+  border: 0;
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.popover {
+  width: var(--trigger-width);
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px rgb(58 51 42 / 0.14);
+}
+
+.listbox {
+  padding: var(--space-1);
+  outline: none;
+}
+
+.listbox-item {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  outline: none;
+}
+
+.listbox-item[data-focused] {
+  background: var(--color-accent-soft);
+}
+
+.listbox-item[data-selected] {
+  font-weight: 600;
+  color: var(--color-accent);
+}
+
+.listbox-empty {
+  padding: var(--space-2) var(--space-3);
+  color: var(--color-text-muted);
+}
+
+.checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  cursor: pointer;
+}
+
+.checkbox-box {
+  flex: none;
+  width: 1.2rem;
+  height: 1.2rem;
+  margin-top: 2px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 4px;
+  background: var(--color-surface);
+  color: transparent;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.checkbox[data-selected] .checkbox-box {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.checkbox[data-focus-visible] .checkbox-box {
+  box-shadow: var(--focus-ring);
+}
+
+.checkbox-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.segmented {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 3px;
+  border-radius: var(--radius-sm);
+  background: var(--color-sidebar);
+}
+
+.segment {
+  padding: var(--space-1) var(--space-3);
+  border-radius: 4px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.segment[data-selected] {
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgb(58 51 42 / 0.1);
+}
+
+.segment[data-focus-visible] {
+  box-shadow: var(--focus-ring);
 }
 
 /* ---------- Status badges ---------- */
@@ -780,42 +1205,38 @@ textarea.input {
 
 /* ---------- Narrow screens ---------- */
 
-/* The sidebar becomes a top bar with a horizontally scrolling nav; the phone
-   is where the inbox gets triaged, so it has to work there from the start. */
+/* The sidebar gives way to a slim top bar whose menu button opens the nav as
+   a slide-in panel; the phone is where the inbox gets triaged, so it has to
+   work there from the start. */
 @media (max-width: 767px) {
-  /* minmax(0, …) lets the column shrink below the nav's full width, so the nav
-     scrolls instead of widening the page; auto rows keep the bar its own
-     height instead of sharing the spare viewport height with the content. */
+  /* Two rows: the bar at its own height, the page taking the rest. Without
+     the explicit rows the spare screen height is shared out, and the bar
+     grows. */
   .shell {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto 1fr;
   }
 
-  .nav {
-    min-width: 0;
-  }
-
   .sidebar {
-    position: static;
-    height: auto;
-    flex-direction: row;
+    display: none;
+  }
+
+  /* Sticky, so the menu is one tap away however far the page has scrolled. */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    display: flex;
     align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-3) var(--space-4);
+    justify-content: space-between;
+    padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+    background: var(--color-sidebar);
   }
 
-  .brand {
+  .topbar .brand {
     padding: 0;
-  }
-
-  .nav {
-    flex-direction: row;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .nav-link {
-    white-space: nowrap;
+    color: inherit;
+    text-decoration: none;
   }
 
   .dashboard {
@@ -836,6 +1257,34 @@ textarea.input {
     display: none;
   }
 
+  .quick-note-sidebar {
+    display: none;
+  }
+
+  /* Floating, bottom right, where a thumb is. The page keeps room for it. */
+  .quick-note-fab {
+    display: inline-flex;
+    position: fixed;
+    right: var(--space-4);
+    bottom: var(--space-4);
+    z-index: 50;
+    width: 3.5rem;
+    height: 3.5rem;
+    margin: 0;
+    padding: 0;
+    border-radius: 999px;
+    box-shadow: 0 6px 16px rgb(58 51 42 / 0.25);
+  }
+
+  .quick-note-fab > span[aria-hidden] {
+    font-size: 1.6rem;
+  }
+
+  .quick-note-label {
+    display: none;
+  }
+
+
   .tabs {
     gap: 0;
     padding: var(--space-2) var(--space-2) 0;
@@ -855,19 +1304,9 @@ textarea.input {
     padding: var(--space-4);
   }
 
-  /* Only the sign-out button survives on the top bar. */
-  .sidebar-footer {
-    flex-shrink: 0;
-    margin: 0 0 0 auto;
-    padding: 0;
-  }
-
-  .sidebar-meta {
-    display: none;
-  }
-
+  /* Room at the bottom for the floating quick-note button. */
   .main {
-    padding: var(--space-4);
+    padding: var(--space-4) var(--space-4) 6rem;
   }
 
   .panel-header {
