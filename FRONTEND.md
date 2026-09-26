@@ -97,6 +97,28 @@ login redirect. Component state is for what is genuinely transient.
 A route with a redirect parameter accepts same-app paths only (starts with `/`,
 not `//`), so it cannot become an open redirect.
 
+### Paging: real pages, the page in the URL
+
+**Decision.** Lists that keep growing — contacts, tasks, the activity log,
+documents, deals, sweep history — page through the API's `skip`/`limit`, 25
+rows at a time, with Previous/Next under the list (`components/ui/Pagination`)
+and the page as `?page=` in the URL. A new search or filter starts again at
+page one. Organizations keep the single capped request, since that list stays
+short enough to scan.
+
+**Why.** The first screens showed up to 100 rows and said how many were left
+out. That holds for a list you narrow by searching, not for a log you read
+back through: the rows you want are exactly the ones past the cap.
+
+### Dates: React Aria's DatePicker
+
+Date-only fields (a birthday, a due date) use `components/ui/DatePicker`, built
+on React Aria's `DatePicker` and `@internationalized/date`. It takes and gives
+the API's own `YYYY-MM-DD` string and `''` for no date, so a form holds a
+plain string. A date-only string is formatted with `formatDay`, which reads it
+as local midnight — `new Date("2026-09-26")` is UTC midnight, the day before
+anywhere west of Greenwich.
+
 ### Server state: TanStack Query
 
 All API data goes through the query cache. Query definitions are

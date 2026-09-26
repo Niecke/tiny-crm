@@ -1,11 +1,12 @@
-import { type UseQueryResult, useQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { Tab, TabList, TabPanel, Tabs } from 'react-aria-components'
 import { z } from 'zod'
 import { ApiError } from '../../../../api/client'
 import type { OrganizationRead } from '../../../../api/types'
-import { Button } from '../../../../components/ui/Button'
+import { AddNotReady, Fact, Facts, Rows } from '../../../../components/RecordPage'
+import { useSelectedTabInView } from '../../../../useSelectedTabInView'
 import { formatBytes, formatDate, formatDateTime } from '../../../../format'
 import { orgContactsQuery, orgDocumentsQuery, organizationQuery, orgInteractionsQuery } from '../../../../organizations'
 
@@ -39,14 +40,7 @@ function OrganizationDetail() {
   // flip on an unrelated re-render.
   const [now] = useState(() => Date.now())
 
-  // On a phone the tab strip can be wider than the screen; a tab opened from a
-  // link or a reload must not sit off to the side.
-  const tabsRef = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    tabsRef.current
-      ?.querySelector('[aria-selected="true"]')
-      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-  }, [tab, org.isSuccess])
+  const tabsRef = useSelectedTabInView(tab, org.isSuccess)
 
   if (org.isPending || org.error) {
     return (
@@ -96,7 +90,7 @@ function OrganizationDetail() {
       </header>
 
       <div className="profile">
-        <Facts org={o} />
+        <OrgFacts org={o} />
 
         {/* React Aria's Tabs: arrow keys move between tabs, and the tablist /
             tabpanel roles and their links are set up for screen readers. The
@@ -119,12 +113,22 @@ function OrganizationDetail() {
           </TabList>
 
           <TabPanel id="contacts" className="panel-body">
-            <AddNotReady label="Add contact" />
+            <div className="tab-toolbar">
+              <Link
+                to="/contacts/new"
+                search={{ organizationId, organizationName: o.name }}
+                className="button button-quiet"
+              >
+                Add contact
+              </Link>
+            </div>
             <Rows query={contacts} empty="No contacts at this organization.">
               {(c) => (
                 <li key={c.id}>
                   <span className="row-main">
-                    <span>{c.name}</span>
+                    <Link to="/contacts/$contactId" params={{ contactId: c.id }} className="row-link">
+                      {c.name}
+                    </Link>
                     {c.job_title && <span className="row-meta">{c.job_title}</span>}
                   </span>
                   {c.email && (
@@ -176,92 +180,33 @@ function OrganizationDetail() {
   )
 }
 
-// The action each tab will get. Shown disabled until the forms exist, so the
-// screen already has the shape it will keep and nobody goes looking elsewhere.
-// Only the selected TabPanel is rendered, so the id is unique on the page.
-function AddNotReady({ label }: { label: string }) {
-  return (
-    <div className="tab-toolbar">
-      <span className="muted small" id="add-not-ready">
-        Not available in the React preview yet — use the current app for now.
-      </span>
-      <Button variant="quiet" isDisabled aria-describedby="add-not-ready">
-        {label}
-      </Button>
-    </div>
-  )
-}
-
-// Label above value: the column is narrow, so the eye reads straight down
-// instead of jumping across a wide row from label to value.
-function Facts({ org }: { org: OrganizationRead }) {
+// Only http(s) is passed through, so the field cannot become a javascript: link.
+function OrgFacts({ org }: { org: OrganizationRead }) {
   const { domain, email, phone, address, notes } = org
-  // Stored as a bare domain, but an older record may hold a full URL. Only
-  // http(s) is passed through, so the field cannot become a javascript: link.
+  // Stored as a bare domain, but an older record may hold a full URL.
   const website = domain && (/^https?:\/\//i.test(domain) ? domain : `https://${domain}`)
 
   return (
-    <aside className="panel facts" aria-label="Details">
-      {!website && !email && !phone && !address && !notes ? (
-        <p className="muted small">No details yet.</p>
-      ) : (
-        <dl>
-          {website && (
-            <Fact label="Website">
-              <a href={website} target="_blank" rel="noreferrer">
-                {domain}
-              </a>
-            </Fact>
-          )}
-          {email && (
-            <Fact label="Email">
-              <a href={`mailto:${email}`}>{email}</a>
-            </Fact>
-          )}
-          {phone && (
-            <Fact label="Phone">
-              <a href={`tel:${phone}`}>{phone}</a>
-            </Fact>
-          )}
-          {address && <Fact label="Address">{address}</Fact>}
-          {notes && <Fact label="Notes">{notes}</Fact>}
-        </dl>
+    <Facts>
+      {website && (
+        <Fact label="Website">
+          <a href={website} target="_blank" rel="noreferrer">
+            {domain}
+          </a>
+        </Fact>
       )}
-    </aside>
-  )
-}
-
-function Fact({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="fact">
-      <dt>{label}</dt>
-      <dd>{children}</dd>
-    </div>
-  )
-}
-
-// The first page of one linked record type, and a line saying how many are
-// not shown.
-function Rows<T>({
-  query,
-  empty,
-  children,
-}: {
-  // The generated Page_*_ schemas all share this shape.
-  query: UseQueryResult<{ items: T[]; total: number }>
-  empty: string
-  children: (item: T) => ReactNode
-}) {
-  const { data, error, isPending } = query
-  if (isPending) return <p className="muted">Loading…</p>
-  if (error) return <p className="form-error">{error.message}</p>
-  if (data.items.length === 0) return <p className="muted">{empty}</p>
-  return (
-    <>
-      <ul className="rows">{data.items.map(children)}</ul>
-      {data.total > data.items.length && (
-        <p className="muted small">{data.total - data.items.length} more not shown.</p>
+      {email && (
+        <Fact label="Email">
+          <a href={`mailto:${email}`}>{email}</a>
+        </Fact>
       )}
-    </>
+      {phone && (
+        <Fact label="Phone">
+          <a href={`tel:${phone}`}>{phone}</a>
+        </Fact>
+      )}
+      {address && <Fact label="Address">{address}</Fact>}
+      {notes && <Fact label="Notes">{notes}</Fact>}
+    </Facts>
   )
 }

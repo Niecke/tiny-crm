@@ -56,3 +56,13 @@ export const orgDocumentsQuery = (api: Api, id: string) =>
     queryKey: ['documents', 'by-organization', id],
     queryFn: () => unwrap(api.GET('/documents/', linked(id))),
   })
+
+// Suggestions for an organization picker, by name or domain. Ten is plenty for
+// a dropdown.
+export const organizationOptionsQuery = (api: Api, search: string) =>
+  queryOptions({
+    queryKey: ['organizations', 'options', search],
+    queryFn: () =>
+      unwrap(api.GET('/organizations/', { params: { query: { search: search || undefined, limit: 10 } } })),
+    placeholderData: keepPreviousData,
+  })

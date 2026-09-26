@@ -53,7 +53,7 @@ export function SearchPicker({
       <div className="picker">
         <Input className="input" placeholder={placeholder} />
         <Button className="picker-button" aria-label={`Show ${label.toLowerCase()} suggestions`}>
-          ▾
+          <span aria-hidden="true">▾</span>
         </Button>
       </div>
       <FieldError className="field-error">{errorMessage}</FieldError>
