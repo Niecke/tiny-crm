@@ -6,6 +6,26 @@ export const formatDate = (iso: string) => dateFormat.format(new Date(iso))
 
 export const formatDateTime = (iso: string) => dateTimeFormat.format(new Date(iso))
 
+const relativeFormat = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
+const relativeUnits: [Intl.RelativeTimeFormatUnit, number][] = [
+  ['year', 365 * 86_400],
+  ['month', 30 * 86_400],
+  ['week', 7 * 86_400],
+  ['day', 86_400],
+  ['hour', 3_600],
+  ['minute', 60],
+]
+
+// "3 hours ago", "yesterday": the largest unit `iso` is at least one whole
+// step away in, truncated so 23 hours is not rounded up to "24 hours ago".
+export function formatTimeAgo(iso: string, now: Date = new Date()): string {
+  const seconds = (new Date(iso).getTime() - now.getTime()) / 1000
+  for (const [unit, size] of relativeUnits) {
+    if (Math.abs(seconds) >= size) return relativeFormat.format(Math.trunc(seconds / size), unit)
+  }
+  return relativeFormat.format(0, 'second')
+}
+
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
