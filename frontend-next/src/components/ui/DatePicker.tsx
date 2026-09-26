@@ -1,4 +1,4 @@
-import { type CalendarDate, parseDate } from '@internationalized/date'
+import { type CalendarDate, type CalendarDateTime, parseDate, parseDateTime } from '@internationalized/date'
 import {
   Button,
   Calendar,
@@ -16,9 +16,10 @@ import {
   Text,
 } from 'react-aria-components'
 
-// A date without a time: typed segment by segment in the browser's locale
-// order, or picked from a calendar. The value is the API's own spelling,
-// "YYYY-MM-DD", and "" for no date, so a form field holds a plain string.
+// A date, or with `withTime` a date and time: typed segment by segment in the
+// browser's locale order, or the day picked from a calendar. The value is a
+// plain string — "YYYY-MM-DD", or "YYYY-MM-DDTHH:mm" in local time — and ""
+// for none, so a form field holds a string.
 export function DatePicker({
   label,
   value,
@@ -27,6 +28,7 @@ export function DatePicker({
   errorMessage,
   minValue,
   maxValue,
+  withTime,
 }: {
   label: string
   value: string
@@ -35,18 +37,21 @@ export function DatePicker({
   errorMessage?: string
   minValue?: string
   maxValue?: string
+  withTime?: boolean
 }) {
-  const parsed = toDate(value)
+  const toValue = withTime ? toDateTime : toDate
+  const parsed = toValue(value)
   return (
     <AriaDatePicker
       className="field"
       value={parsed}
-      onChange={(d) => onChange(d ? d.toString() : '')}
-      minValue={toDate(minValue)}
-      maxValue={toDate(maxValue)}
+      onChange={(d) => onChange(d ? d.toString().slice(0, withTime ? 16 : 10) : '')}
+      minValue={toValue(minValue)}
+      maxValue={toValue(maxValue)}
       isInvalid={Boolean(errorMessage)}
       validationBehavior="aria"
-      granularity="day"
+      granularity={withTime ? 'minute' : 'day'}
+      hourCycle={24}
     >
       <Label className="field-label">{label}</Label>
       <Group className="input date-group">
@@ -97,6 +102,16 @@ function toDate(value: string | undefined): CalendarDate | null | undefined {
   if (!value) return null
   try {
     return parseDate(value.slice(0, 10))
+  } catch {
+    return null
+  }
+}
+
+function toDateTime(value: string | undefined): CalendarDateTime | null | undefined {
+  if (value === undefined) return undefined
+  if (!value) return null
+  try {
+    return parseDateTime(value.slice(0, 16))
   } catch {
     return null
   }

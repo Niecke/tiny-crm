@@ -7,8 +7,10 @@ import { ApiError } from '../../../../api/client'
 import type { OrganizationRead } from '../../../../api/types'
 import { AddNotReady, Fact, Facts, Rows } from '../../../../components/RecordPage'
 import { useSelectedTabInView } from '../../../../useSelectedTabInView'
-import { formatBytes, formatDate, formatDateTime } from '../../../../format'
-import { orgContactsQuery, orgDocumentsQuery, organizationQuery, orgInteractionsQuery } from '../../../../organizations'
+import { formatBytes, formatDate } from '../../../../format'
+import { orgContactsQuery, orgDocumentsQuery, organizationQuery } from '../../../../organizations'
+import { InteractionList } from '../../../../components/InteractionList'
+import { linkedInteractionsQuery, useToggleHappened } from '../../../../interactions'
 
 const tabs = ['contacts', 'interactions', 'documents'] as const
 type TabId = (typeof tabs)[number]
@@ -33,7 +35,8 @@ function OrganizationDetail() {
   // All three load up front: each tab label shows its count, and switching
   // tabs should not wait on a request.
   const contacts = useQuery(orgContactsQuery(api, organizationId))
-  const interactions = useQuery(orgInteractionsQuery(api, organizationId))
+  const interactions = useQuery(linkedInteractionsQuery(api, { organization_id: organizationId }))
+  const { toggle: toggleInteraction, pendingId: pendingInteraction, error: toggleInteractionError } = useToggleHappened(api)
   const documents = useQuery(orgDocumentsQuery(api, organizationId))
 
   // Fixed when the page opens: whether an entry is still planned should not
@@ -142,20 +145,38 @@ function OrganizationDetail() {
           </TabPanel>
 
           <TabPanel id="interactions" className="panel-body">
-            <AddNotReady label="Log interaction" />
-            <Rows query={interactions} empty="Nothing logged yet.">
-              {(i) => (
-                <li key={i.id}>
-                  <span className="row-main">
-                    <span>{i.subject}</span>
-                    <span className="row-meta">
-                      {i.kind} · {formatDateTime(i.occurred_at)}
-                    </span>
-                  </span>
-                  {Date.parse(i.occurred_at) > now && <span className="badge">planned</span>}
-                </li>
-              )}
-            </Rows>
+            <div className="tab-toolbar">
+              <Link to="/interactions/new" search={{ organizationId }} className="button button-quiet">
+                Log interaction
+              </Link>
+            </div>
+            {toggleInteractionError && (
+              <p className="form-error" role="alert">
+                Could not update the interaction: {toggleInteractionError.message}
+              </p>
+            )}
+            {interactions.isPending ? (
+              <p className="muted">Loading…</p>
+            ) : interactions.error ? (
+              <p className="form-error">{interactions.error.message}</p>
+            ) : interactions.data.items.length === 0 ? (
+              <p className="muted">Nothing logged yet.</p>
+            ) : (
+              <>
+                <InteractionList
+                  items={interactions.data.items}
+                  onToggle={toggleInteraction}
+                  pendingId={pendingInteraction}
+                  now={now}
+                  compact
+                />
+                {interactions.data.total > interactions.data.items.length && (
+                  <p className="muted small">
+                    {interactions.data.total - interactions.data.items.length} older not shown.
+                  </p>
+                )}
+              </>
+            )}
           </TabPanel>
 
           <TabPanel id="documents" className="panel-body">
