@@ -5,6 +5,7 @@ import {
   FieldError,
   Input,
   Label,
+  Text,
   TextArea,
 } from 'react-aria-components'
 
@@ -16,12 +17,14 @@ export type TextFieldProps = Omit<AriaTextFieldProps, 'className' | 'children'> 
   label: string
   errorMessage?: string
   placeholder?: string
+  // Help shown under the input, and read with it by screen readers.
+  description?: string
   // A <textarea> instead of an <input>.
   rows?: number
   inputRef?: Ref<HTMLInputElement & HTMLTextAreaElement>
 }
 
-export function TextField({ label, errorMessage, placeholder, rows, inputRef, ...props }: TextFieldProps) {
+export function TextField({ label, errorMessage, placeholder, description, rows, inputRef, ...props }: TextFieldProps) {
   return (
     <AriaTextField {...props} className="field" validationBehavior="aria">
       <Label className="field-label">{label}</Label>
@@ -29,6 +32,11 @@ export function TextField({ label, errorMessage, placeholder, rows, inputRef, ..
         <TextArea className="input" rows={rows} placeholder={placeholder} ref={inputRef} />
       ) : (
         <Input className="input" placeholder={placeholder} ref={inputRef} />
+      )}
+      {description && !props.isInvalid && (
+        <Text slot="description" className="field-description">
+          {description}
+        </Text>
       )}
       <FieldError className="field-error">{errorMessage}</FieldError>
     </AriaTextField>

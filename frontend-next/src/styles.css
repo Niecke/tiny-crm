@@ -1212,6 +1212,11 @@ a {
   border-color: var(--color-danger);
 }
 
+.field-description {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
 .field-error {
   font-size: 0.85rem;
   color: var(--color-danger);
@@ -1298,6 +1303,11 @@ textarea.input {
 .form-actions .button-quiet {
   padding: var(--space-2) var(--space-4);
   font-size: inherit;
+}
+
+/* Actions under a panel that is not a form: the account page's buttons. */
+.account-actions {
+  justify-content: flex-start;
 }
 
 .page-header-row {
