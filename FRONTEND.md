@@ -119,6 +119,23 @@ plain string. A date-only string is formatted with `formatDay`, which reads it
 as local midnight — `new Date("2026-09-26")` is UTC midnight, the day before
 anywhere west of Greenwich.
 
+### Markdown: react-markdown, no raw HTML
+
+Task descriptions, project descriptions and interaction notes are Markdown, as
+in the Flutter app. They are rendered with `react-markdown`
+(`components/Markdown`), which builds React elements, never `innerHTML`, and
+with `skipHtml`, so HTML typed into a note is dropped rather than rendered.
+Links open in a new tab. Editing goes through `ui/MarkdownField`, a textarea
+with a Write/Preview switch.
+
+### Task priority: amber and a word, never red (#137)
+
+Red already means overdue. High priority is an amber badge, Medium the accent
+colour, and Low (the default) gets none; the badge always carries the word, so
+it survives grey print and colour blindness. One component
+(`components/PriorityBadge`), used by the task list, every record page's Tasks
+tab and the dashboard, so the surfaces cannot drift.
+
 ### Server state: TanStack Query
 
 All API data goes through the query cache. Query definitions are

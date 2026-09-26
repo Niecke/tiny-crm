@@ -1584,6 +1584,113 @@ textarea.input {
   filter: brightness(0.92);
 }
 
+/* ---------- Tasks ---------- */
+
+.task-row {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.task-row > .row-main {
+  flex: 1;
+}
+
+.task-row > .task-check {
+  flex: none;
+  margin-top: 1px;
+}
+
+.task-row[data-done] .task-title {
+  text-decoration: line-through;
+  color: var(--color-text-muted);
+}
+
+/* Priority (#137): amber for High, the accent for Medium, and a word on the
+   badge either way. Never red — red is overdue ("late"). */
+.badge.priority[data-priority='high'] {
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+
+.badge.priority[data-priority='medium'] {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+/* Something the form is linked to that is not a picker: the interaction a
+   task follows up on. */
+.follow-up {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-sidebar);
+}
+
+/* A destructive action at the far left of a form's buttons. */
+.form-actions-start {
+  margin-right: auto;
+}
+
+.panel[data-stale] {
+  opacity: 0.6;
+}
+
+/* ---------- Markdown ---------- */
+
+.markdown-field {
+  position: relative;
+}
+
+.markdown-field-toggle {
+  position: absolute;
+  top: -4px;
+  right: 0;
+  z-index: 1;
+}
+
+.markdown-field-toggle .segment {
+  padding: 0 var(--space-2);
+  font-size: 0.8rem;
+}
+
+.markdown-preview {
+  padding: var(--space-2) var(--space-3);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+
+.markdown > :first-child {
+  margin-top: 0;
+}
+
+.markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown p,
+.markdown ul,
+.markdown ol {
+  margin: 0 0 var(--space-2);
+}
+
+.markdown ul,
+.markdown ol {
+  padding-left: 1.25rem;
+}
+
+.markdown code {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.9em;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--color-sidebar);
+}
+
 /* ---------- Narrow screens ---------- */
 
 /* The sidebar gives way to a slim top bar whose menu button opens the nav as
