@@ -1,8 +1,9 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link, useCanGoBack, useNavigate, useRouter } from '@tanstack/react-router'
 import { z } from 'zod'
 import { TaskForm, type TaskFields, type TaskLinks } from '../../../components/TaskForm'
 import { Button } from '../../../components/ui/Button'
+import { contactQuery } from '../../../contacts'
 import { createTask, invalidateTasks, taskQuery } from '../../../tasks'
 
 // A new task opened from a record starts linked to it. The names travel with
@@ -32,8 +33,11 @@ function NewTask() {
   const canGoBack = useCanGoBack()
   const queryClient = useQueryClient()
 
+  // A follow-up from an interaction knows the contact's id but not the name;
+  // the picker needs the name to show it, so it is looked up first.
+  const contact = useQuery({ ...contactQuery(api, contactId ?? ''), enabled: Boolean(contactId && !contactName) })
   const links: TaskLinks = {
-    contact: contactId ? { id: contactId, name: contactName ?? '' } : undefined,
+    contact: contactId ? { id: contactId, name: contactName ?? contact.data?.name ?? '' } : undefined,
     deal: dealId ? { id: dealId, title: dealTitle ?? '' } : undefined,
     interaction: interactionId ? { id: interactionId, subject: interactionSubject ?? '' } : undefined,
   }
@@ -57,6 +61,9 @@ function NewTask() {
       <header className="page-header">
         <h1>New task</h1>
       </header>
+      {contactId && !contactName && contact.isPending ? (
+        <p className="muted">Loading…</p>
+      ) : (
       <TaskForm
         links={links}
         onSubmit={(body) => mutation.mutate(body)}
@@ -69,6 +76,7 @@ function NewTask() {
           </Button>
         }
       />
+      )}
     </div>
   )
 }
