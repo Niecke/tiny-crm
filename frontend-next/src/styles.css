@@ -2121,6 +2121,46 @@ textarea.input {
   margin-left: auto;
 }
 
+/* ---------- Watches ---------- */
+
+/* What is due and the two ways to sweep, above the facts and history. */
+.sweep-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+}
+
+.sweep-bar[data-due] {
+  border-color: var(--color-warning);
+  background: var(--color-warning-soft);
+}
+
+.sweep-row {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+}
+
+.sweep-row > .row-main {
+  flex: 1;
+}
+
+.sweep-mark {
+  flex: none;
+  width: 1.2rem;
+  color: var(--color-text-muted);
+}
+
+.sweep-row[data-found] .sweep-mark {
+  color: var(--color-warning);
+}
+
+.table-row[data-paused] .cell-title {
+  color: var(--color-text-muted);
+}
+
 /* ---------- Narrow screens ---------- */
 
 /* The sidebar gives way to a slim top bar whose menu button opens the nav as
