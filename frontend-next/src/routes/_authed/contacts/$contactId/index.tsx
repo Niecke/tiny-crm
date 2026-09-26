@@ -5,12 +5,11 @@ import { Tab, TabList, TabPanel, Tabs } from 'react-aria-components'
 import { z } from 'zod'
 import { ApiError } from '../../../../api/client'
 import type { ContactRead } from '../../../../api/types'
-import { AddNotReady, Fact, Facts, Rows } from '../../../../components/RecordPage'
+import { Fact, Facts } from '../../../../components/RecordPage'
 import { useSelectedTabInView } from '../../../../useSelectedTabInView'
 import { Button } from '../../../../components/ui/Button'
 import { ConfirmDialog } from '../../../../components/ui/ConfirmDialog'
 import {
-  contactDocumentsQuery,
   contactQuery,
   deleteContact,
   freelancerAnswer,
@@ -20,10 +19,12 @@ import {
   relationOptions,
   sourceOptions,
 } from '../../../../contacts'
-import { formatBytes, formatDate, formatDay, localDay } from '../../../../format'
+import { formatDay, localDay } from '../../../../format'
 import { linkedTasksQuery, useToggleDone } from '../../../../tasks'
 import { TaskList } from '../../../../components/TaskList'
 import { Checkbox } from '../../../../components/ui/Checkbox'
+import { DocumentRows } from '../../../../components/DocumentRows'
+import { linkedDocumentsQuery } from '../../../../documents'
 import { InteractionList } from '../../../../components/InteractionList'
 import { linkedInteractionsQuery, useToggleHappened } from '../../../../interactions'
 
@@ -53,7 +54,7 @@ function ContactDetail() {
   const { toggle, pendingId, error: toggleError, repeated } = useToggleDone(api)
   const interactions = useQuery(linkedInteractionsQuery(api, { contact_id: contactId }))
   const { toggle: toggleInteraction, pendingId: pendingInteraction, error: toggleInteractionError } = useToggleHappened(api)
-  const documents = useQuery(contactDocumentsQuery(api, contactId))
+  const documents = useQuery(linkedDocumentsQuery(api, { contact_id: contactId }))
   const [now] = useState(() => Date.now())
   const tabsRef = useSelectedTabInView(tab, contact.isSuccess)
 
@@ -226,20 +227,25 @@ function ContactDetail() {
           </TabPanel>
 
           <TabPanel id="documents" className="panel-body">
-            <AddNotReady label="Upload document" />
-            <Rows query={documents} empty="Nothing filed here yet.">
-              {(d) => (
-                <li key={d.id}>
-                  <span className="row-main">
-                    <span>{d.title}</span>
-                    <span className="row-meta">
-                      {d.format.toUpperCase()} · {formatBytes(d.size)}
-                    </span>
-                  </span>
-                  <span className="row-side muted">{formatDate(d.created_at)}</span>
-                </li>
-              )}
-            </Rows>
+            <div className="tab-toolbar">
+              <Link to="/documents/new" search={{ contactId }} className="button button-quiet">
+                Upload document
+              </Link>
+            </div>
+            {documents.isPending ? (
+              <p className="muted">Loading…</p>
+            ) : documents.error ? (
+              <p className="form-error">{documents.error.message}</p>
+            ) : documents.data.items.length === 0 ? (
+              <p className="muted">Nothing filed here yet.</p>
+            ) : (
+              <>
+                <DocumentRows items={documents.data.items} />
+                {documents.data.total > documents.data.items.length && (
+                  <p className="muted small">{documents.data.total - documents.data.items.length} more not shown.</p>
+                )}
+              </>
+            )}
           </TabPanel>
         </Tabs>
       </div>

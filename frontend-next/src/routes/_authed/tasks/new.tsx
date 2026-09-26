@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createFileRoute, Link, useCanGoBack, useNavigate, useRouter } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
+import { useLeave } from '../../../useLeave'
 import { z } from 'zod'
 import { TaskForm, type TaskFields, type TaskLinks } from '../../../components/TaskForm'
 import { Button } from '../../../components/ui/Button'
@@ -26,11 +27,6 @@ function NewTask() {
   const { api } = Route.useRouteContext()
   const { contactId, contactName, dealId, dealTitle, interactionId, interactionSubject, ...filters } =
     Route.useSearch()
-  const navigate = useNavigate()
-  const router = useRouter()
-  // Opened from a record page, saving and cancelling go back there; opened
-  // directly, to the list.
-  const canGoBack = useCanGoBack()
   const queryClient = useQueryClient()
 
   // A follow-up from an interaction knows the contact's id but not the name;
@@ -42,7 +38,7 @@ function NewTask() {
     interaction: interactionId ? { id: interactionId, subject: interactionSubject ?? '' } : undefined,
   }
 
-  const leave = () => (canGoBack ? router.history.back() : navigate({ to: '/tasks', search: filters }))
+  const leave = useLeave({ to: '/tasks', search: filters })
 
   const mutation = useMutation({
     mutationFn: (body: TaskFields) => createTask(api, body),
