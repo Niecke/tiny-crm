@@ -136,6 +136,22 @@ it survives grey print and colour blindness. One component
 (`components/PriorityBadge`), used by the task list, every record page's Tasks
 tab and the dashboard, so the surfaces cannot drift.
 
+### Documents: files as blobs, PDFs through pdf.js
+
+The file and its preview image are behind the login, so they are fetched with
+the token as blobs (`contentQuery`, `previewQuery`) rather than linked to, and
+shown through object URLs that are revoked when the image goes away. Both are
+keyed by the document's `updated_at`, so a replaced file is never served from
+the cache and a list refresh never refetches them.
+
+PDFs are drawn with `pdfjs-dist` (`components/PdfView`), which is loaded only
+when a PDF is opened — its own chunk and worker, not part of the app bundle.
+It uses pdf.js's **legacy** build: the modern one calls
+`Map#getOrInsertComputed`, which current Chrome and Safari do not have, and
+fails there outright. Markdown documents render through `components/Markdown`,
+text files as preformatted text. **Revisit** the legacy build once browsers
+ship that method.
+
 ### Server state: TanStack Query
 
 All API data goes through the query cache. Query definitions are

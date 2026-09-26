@@ -44,12 +44,6 @@ export const orgContactsQuery = (api: Api, id: string) =>
     queryFn: () => unwrap(api.GET('/contacts/', linked(id))),
   })
 
-export const orgDocumentsQuery = (api: Api, id: string) =>
-  queryOptions({
-    queryKey: ['documents', 'by-organization', id],
-    queryFn: () => unwrap(api.GET('/documents/', linked(id))),
-  })
-
 // Suggestions for an organization picker, by name or domain. Ten is plenty for
 // a dropdown.
 export const organizationOptionsQuery = (api: Api, search: string) =>
