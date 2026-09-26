@@ -2094,6 +2094,33 @@ textarea.input {
   font-variant-numeric: tabular-nums;
 }
 
+/* ---------- Projects ---------- */
+
+.project-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.project-groups[data-stale] {
+  opacity: 0.6;
+}
+
+/* A tab's search-to-link field, with the tab's other actions beside it. */
+.link-toolbar {
+  justify-content: flex-start;
+  align-items: flex-end;
+}
+
+.add-link {
+  flex: 1 1 16rem;
+  max-width: 24rem;
+}
+
+.link-toolbar > :last-child {
+  margin-left: auto;
+}
+
 /* ---------- Narrow screens ---------- */
 
 /* The sidebar gives way to a slim top bar whose menu button opens the nav as

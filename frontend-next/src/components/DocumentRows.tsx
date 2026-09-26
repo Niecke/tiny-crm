@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { useState } from 'react'
+import { type ReactNode, useState } from 'react'
 import type { DocumentRead } from '../api/types'
 import { formatBytes, formatDate } from '../format'
 import { DocumentViewer } from './DocumentViewer'
@@ -8,7 +8,14 @@ import { Button } from './ui/Button'
 // A record page's Documents tab: each file with a View button, its page one
 // click away, and where else it is filed — a contract under the deal is often
 // also under the organization.
-export function DocumentRows({ items }: { items: DocumentRead[] }) {
+export function DocumentRows({
+  items,
+  actions,
+}: {
+  items: DocumentRead[]
+  // Extra buttons per row: Unlink, on a project.
+  actions?: (doc: DocumentRead) => ReactNode
+}) {
   const [viewing, setViewing] = useState<DocumentRead | null>(null)
   return (
     <>
@@ -29,9 +36,12 @@ export function DocumentRows({ items }: { items: DocumentRead[] }) {
                   {elsewhere > 1 && ` · also filed under ${elsewhere} others`}
                 </span>
               </span>
-              <Button variant="quiet" onPress={() => setViewing(d)}>
-                View
-              </Button>
+              <span className="row-actions">
+                <Button variant="quiet" onPress={() => setViewing(d)}>
+                  View
+                </Button>
+                {actions?.(d)}
+              </span>
             </li>
           )
         })}

@@ -1,4 +1,5 @@
 import { Link } from '@tanstack/react-router'
+import type { ReactNode } from 'react'
 import { Checkbox } from 'react-aria-components'
 import type { TaskRead } from '../api/types'
 import { formatDay, localDay } from '../format'
@@ -14,6 +15,7 @@ export function TaskList({
   pendingId,
   hideAbout,
   now,
+  actions,
 }: {
   tasks: TaskRead[]
   onToggle: (task: TaskRead) => void
@@ -23,6 +25,8 @@ export function TaskList({
   // Fixed by the caller when its page opens, so a row does not turn late on
   // an unrelated re-render.
   now: number
+  // Extra buttons per row: Unlink, on a project.
+  actions?: (task: TaskRead) => ReactNode
 }) {
   return (
     <ul className="rows task-list">
@@ -65,6 +69,7 @@ export function TaskList({
               )}
             </span>
             <PriorityBadge priority={t.priority} />
+            {actions && <span className="row-actions">{actions(t)}</span>}
           </li>
         )
       })}
