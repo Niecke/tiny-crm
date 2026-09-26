@@ -45,6 +45,11 @@ declare module '@tanstack/react-router' {
   interface Register {
     router: typeof router
   }
+  // A one-line message for the page navigated to — what an action just did
+  // ("Jane Doe is a lead"). History state, so it is gone on reload.
+  interface HistoryState {
+    flash?: string
+  }
 }
 
 createRoot(document.getElementById('root')!).render(

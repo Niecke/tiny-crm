@@ -86,6 +86,12 @@ asset=$(curl -fsS "$WEB_NEXT/next/" | grep -o '/next/assets/[^"]*\.js' | head -n
 curl -fsS -o /dev/null "$WEB_NEXT$asset" || fail "bundle $asset is not served"
 [ "$(curl -s -o /dev/null -w '%{http_code}' "$WEB_NEXT/next/assets/missing.js")" = "404" ] \
   || fail "a missing asset should be 404"
+# The installable app's manifest: without its share_target, "Share → tinyCRM"
+# disappears from the Android share sheet and nothing else would notice.
+share_action=$(curl -fsS "$WEB_NEXT/next/manifest.json" | json "['share_target']['action']")
+[ "$share_action" = "/next/capture" ] || fail "manifest share_target is '$share_action', expected /next/capture"
+curl -fsS "$WEB_NEXT/next/capture?text=smoke" | grep -q '<div id="root">' \
+  || fail "the share target does not fall back to the app"
 
 step "migrations ran and the admin CLI works"
 $COMPOSE exec -T -e PYTHONPATH=/app backend python scripts/create_admin.py "$EMAIL" "$PASSWORD" \

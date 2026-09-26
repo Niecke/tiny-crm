@@ -12,8 +12,12 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
+import { Route as AuthedCaptureRouteImport } from './routes/_authed/capture'
+import { Route as AuthedInboxRouteRouteImport } from './routes/_authed/inbox/route'
 import { Route as AuthedOrganizationsRouteRouteImport } from './routes/_authed/organizations/route'
 import { Route as AuthedSystemRouteImport } from './routes/_authed/system'
+import { Route as AuthedInboxIndexRouteImport } from './routes/_authed/inbox/index'
+import { Route as AuthedInboxCaptureIdRouteImport } from './routes/_authed/inbox/$captureId'
 import { Route as AuthedOrganizationsIndexRouteImport } from './routes/_authed/organizations/index'
 import { Route as AuthedOrganizationsNewRouteImport } from './routes/_authed/organizations/new'
 import { Route as AuthedOrganizationsOrganizationIdIndexRouteImport } from './routes/_authed/organizations/$organizationId/index'
@@ -33,6 +37,16 @@ const AuthedIndexRoute = AuthedIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedCaptureRoute = AuthedCaptureRouteImport.update({
+  id: '/capture',
+  path: '/capture',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedInboxRouteRoute = AuthedInboxRouteRouteImport.update({
+  id: '/inbox',
+  path: '/inbox',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedOrganizationsRouteRoute =
   AuthedOrganizationsRouteRouteImport.update({
     id: '/organizations',
@@ -43,6 +57,16 @@ const AuthedSystemRoute = AuthedSystemRouteImport.update({
   id: '/system',
   path: '/system',
   getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedInboxIndexRoute = AuthedInboxIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthedInboxRouteRoute,
+} as any)
+const AuthedInboxCaptureIdRoute = AuthedInboxCaptureIdRouteImport.update({
+  id: '/$captureId',
+  path: '/$captureId',
+  getParentRoute: () => AuthedInboxRouteRoute,
 } as any)
 const AuthedOrganizationsIndexRoute =
   AuthedOrganizationsIndexRouteImport.update({
@@ -71,18 +95,25 @@ const AuthedOrganizationsOrganizationIdEditRoute =
 export interface FileRoutesByFullPath {
   '/': typeof AuthedIndexRoute
   '/login': typeof LoginRoute
+  '/inbox': typeof AuthedInboxRouteRouteWithChildren
   '/organizations': typeof AuthedOrganizationsRouteRouteWithChildren
+  '/capture': typeof AuthedCaptureRoute
   '/system': typeof AuthedSystemRoute
+  '/inbox/$captureId': typeof AuthedInboxCaptureIdRoute
   '/organizations/new': typeof AuthedOrganizationsNewRoute
+  '/inbox/': typeof AuthedInboxIndexRoute
   '/organizations/': typeof AuthedOrganizationsIndexRoute
   '/organizations/$organizationId/edit': typeof AuthedOrganizationsOrganizationIdEditRoute
   '/organizations/$organizationId/': typeof AuthedOrganizationsOrganizationIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
+  '/capture': typeof AuthedCaptureRoute
   '/system': typeof AuthedSystemRoute
   '/': typeof AuthedIndexRoute
+  '/inbox/$captureId': typeof AuthedInboxCaptureIdRoute
   '/organizations/new': typeof AuthedOrganizationsNewRoute
+  '/inbox': typeof AuthedInboxIndexRoute
   '/organizations': typeof AuthedOrganizationsIndexRoute
   '/organizations/$organizationId/edit': typeof AuthedOrganizationsOrganizationIdEditRoute
   '/organizations/$organizationId': typeof AuthedOrganizationsOrganizationIdIndexRoute
@@ -91,10 +122,14 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authed': typeof AuthedRouteWithChildren
   '/login': typeof LoginRoute
+  '/_authed/inbox': typeof AuthedInboxRouteRouteWithChildren
   '/_authed/organizations': typeof AuthedOrganizationsRouteRouteWithChildren
+  '/_authed/capture': typeof AuthedCaptureRoute
   '/_authed/system': typeof AuthedSystemRoute
   '/_authed/': typeof AuthedIndexRoute
+  '/_authed/inbox/$captureId': typeof AuthedInboxCaptureIdRoute
   '/_authed/organizations/new': typeof AuthedOrganizationsNewRoute
+  '/_authed/inbox/': typeof AuthedInboxIndexRoute
   '/_authed/organizations/': typeof AuthedOrganizationsIndexRoute
   '/_authed/organizations/$organizationId/edit': typeof AuthedOrganizationsOrganizationIdEditRoute
   '/_authed/organizations/$organizationId/': typeof AuthedOrganizationsOrganizationIdIndexRoute
@@ -104,18 +139,25 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/inbox'
     | '/organizations'
+    | '/capture'
     | '/system'
+    | '/inbox/$captureId'
     | '/organizations/new'
+    | '/inbox/'
     | '/organizations/'
     | '/organizations/$organizationId/edit'
     | '/organizations/$organizationId/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
+    | '/capture'
     | '/system'
     | '/'
+    | '/inbox/$captureId'
     | '/organizations/new'
+    | '/inbox'
     | '/organizations'
     | '/organizations/$organizationId/edit'
     | '/organizations/$organizationId'
@@ -123,10 +165,14 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_authed'
     | '/login'
+    | '/_authed/inbox'
     | '/_authed/organizations'
+    | '/_authed/capture'
     | '/_authed/system'
     | '/_authed/'
+    | '/_authed/inbox/$captureId'
     | '/_authed/organizations/new'
+    | '/_authed/inbox/'
     | '/_authed/organizations/'
     | '/_authed/organizations/$organizationId/edit'
     | '/_authed/organizations/$organizationId/'
@@ -160,6 +206,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/capture': {
+      id: '/_authed/capture'
+      path: '/capture'
+      fullPath: '/capture'
+      preLoaderRoute: typeof AuthedCaptureRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/inbox': {
+      id: '/_authed/inbox'
+      path: '/inbox'
+      fullPath: '/inbox'
+      preLoaderRoute: typeof AuthedInboxRouteRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/organizations': {
       id: '/_authed/organizations'
       path: '/organizations'
@@ -173,6 +233,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/system'
       preLoaderRoute: typeof AuthedSystemRouteImport
       parentRoute: typeof AuthedRoute
+    }
+    '/_authed/inbox/': {
+      id: '/_authed/inbox/'
+      path: '/'
+      fullPath: '/inbox/'
+      preLoaderRoute: typeof AuthedInboxIndexRouteImport
+      parentRoute: typeof AuthedInboxRouteRoute
+    }
+    '/_authed/inbox/$captureId': {
+      id: '/_authed/inbox/$captureId'
+      path: '/$captureId'
+      fullPath: '/inbox/$captureId'
+      preLoaderRoute: typeof AuthedInboxCaptureIdRouteImport
+      parentRoute: typeof AuthedInboxRouteRoute
     }
     '/_authed/organizations/': {
       id: '/_authed/organizations/'
@@ -205,6 +279,19 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AuthedInboxRouteRouteChildren {
+  AuthedInboxCaptureIdRoute: typeof AuthedInboxCaptureIdRoute
+  AuthedInboxIndexRoute: typeof AuthedInboxIndexRoute
+}
+
+const AuthedInboxRouteRouteChildren: AuthedInboxRouteRouteChildren = {
+  AuthedInboxCaptureIdRoute: AuthedInboxCaptureIdRoute,
+  AuthedInboxIndexRoute: AuthedInboxIndexRoute,
+}
+
+const AuthedInboxRouteRouteWithChildren =
+  AuthedInboxRouteRoute._addFileChildren(AuthedInboxRouteRouteChildren)
+
 interface AuthedOrganizationsRouteRouteChildren {
   AuthedOrganizationsNewRoute: typeof AuthedOrganizationsNewRoute
   AuthedOrganizationsIndexRoute: typeof AuthedOrganizationsIndexRoute
@@ -228,13 +315,17 @@ const AuthedOrganizationsRouteRouteWithChildren =
   )
 
 interface AuthedRouteChildren {
+  AuthedInboxRouteRoute: typeof AuthedInboxRouteRouteWithChildren
   AuthedOrganizationsRouteRoute: typeof AuthedOrganizationsRouteRouteWithChildren
+  AuthedCaptureRoute: typeof AuthedCaptureRoute
   AuthedSystemRoute: typeof AuthedSystemRoute
   AuthedIndexRoute: typeof AuthedIndexRoute
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
+  AuthedInboxRouteRoute: AuthedInboxRouteRouteWithChildren,
   AuthedOrganizationsRouteRoute: AuthedOrganizationsRouteRouteWithChildren,
+  AuthedCaptureRoute: AuthedCaptureRoute,
   AuthedSystemRoute: AuthedSystemRoute,
   AuthedIndexRoute: AuthedIndexRoute,
 }
