@@ -16,6 +16,8 @@ import { Route as AuthedCaptureRouteImport } from './routes/_authed/capture'
 import { Route as AuthedInboxRouteRouteImport } from './routes/_authed/inbox/route'
 import { Route as AuthedOrganizationsRouteRouteImport } from './routes/_authed/organizations/route'
 import { Route as AuthedSystemRouteImport } from './routes/_authed/system'
+import { Route as AuthedAccountIndexRouteImport } from './routes/_authed/account/index'
+import { Route as AuthedAccountPasswordRouteImport } from './routes/_authed/account/password'
 import { Route as AuthedInboxIndexRouteImport } from './routes/_authed/inbox/index'
 import { Route as AuthedInboxCaptureIdRouteImport } from './routes/_authed/inbox/$captureId'
 import { Route as AuthedOrganizationsIndexRouteImport } from './routes/_authed/organizations/index'
@@ -56,6 +58,16 @@ const AuthedOrganizationsRouteRoute =
 const AuthedSystemRoute = AuthedSystemRouteImport.update({
   id: '/system',
   path: '/system',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedAccountIndexRoute = AuthedAccountIndexRouteImport.update({
+  id: '/account/',
+  path: '/account/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedAccountPasswordRoute = AuthedAccountPasswordRouteImport.update({
+  id: '/account/password',
+  path: '/account/password',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedInboxIndexRoute = AuthedInboxIndexRouteImport.update({
@@ -99,8 +111,10 @@ export interface FileRoutesByFullPath {
   '/organizations': typeof AuthedOrganizationsRouteRouteWithChildren
   '/capture': typeof AuthedCaptureRoute
   '/system': typeof AuthedSystemRoute
+  '/account/password': typeof AuthedAccountPasswordRoute
   '/inbox/$captureId': typeof AuthedInboxCaptureIdRoute
   '/organizations/new': typeof AuthedOrganizationsNewRoute
+  '/account/': typeof AuthedAccountIndexRoute
   '/inbox/': typeof AuthedInboxIndexRoute
   '/organizations/': typeof AuthedOrganizationsIndexRoute
   '/organizations/$organizationId/edit': typeof AuthedOrganizationsOrganizationIdEditRoute
@@ -111,8 +125,10 @@ export interface FileRoutesByTo {
   '/capture': typeof AuthedCaptureRoute
   '/system': typeof AuthedSystemRoute
   '/': typeof AuthedIndexRoute
+  '/account/password': typeof AuthedAccountPasswordRoute
   '/inbox/$captureId': typeof AuthedInboxCaptureIdRoute
   '/organizations/new': typeof AuthedOrganizationsNewRoute
+  '/account': typeof AuthedAccountIndexRoute
   '/inbox': typeof AuthedInboxIndexRoute
   '/organizations': typeof AuthedOrganizationsIndexRoute
   '/organizations/$organizationId/edit': typeof AuthedOrganizationsOrganizationIdEditRoute
@@ -127,8 +143,10 @@ export interface FileRoutesById {
   '/_authed/capture': typeof AuthedCaptureRoute
   '/_authed/system': typeof AuthedSystemRoute
   '/_authed/': typeof AuthedIndexRoute
+  '/_authed/account/password': typeof AuthedAccountPasswordRoute
   '/_authed/inbox/$captureId': typeof AuthedInboxCaptureIdRoute
   '/_authed/organizations/new': typeof AuthedOrganizationsNewRoute
+  '/_authed/account/': typeof AuthedAccountIndexRoute
   '/_authed/inbox/': typeof AuthedInboxIndexRoute
   '/_authed/organizations/': typeof AuthedOrganizationsIndexRoute
   '/_authed/organizations/$organizationId/edit': typeof AuthedOrganizationsOrganizationIdEditRoute
@@ -143,8 +161,10 @@ export interface FileRouteTypes {
     | '/organizations'
     | '/capture'
     | '/system'
+    | '/account/password'
     | '/inbox/$captureId'
     | '/organizations/new'
+    | '/account/'
     | '/inbox/'
     | '/organizations/'
     | '/organizations/$organizationId/edit'
@@ -155,8 +175,10 @@ export interface FileRouteTypes {
     | '/capture'
     | '/system'
     | '/'
+    | '/account/password'
     | '/inbox/$captureId'
     | '/organizations/new'
+    | '/account'
     | '/inbox'
     | '/organizations'
     | '/organizations/$organizationId/edit'
@@ -170,8 +192,10 @@ export interface FileRouteTypes {
     | '/_authed/capture'
     | '/_authed/system'
     | '/_authed/'
+    | '/_authed/account/password'
     | '/_authed/inbox/$captureId'
     | '/_authed/organizations/new'
+    | '/_authed/account/'
     | '/_authed/inbox/'
     | '/_authed/organizations/'
     | '/_authed/organizations/$organizationId/edit'
@@ -232,6 +256,20 @@ declare module '@tanstack/react-router' {
       path: '/system'
       fullPath: '/system'
       preLoaderRoute: typeof AuthedSystemRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/account/': {
+      id: '/_authed/account/'
+      path: '/account'
+      fullPath: '/account/'
+      preLoaderRoute: typeof AuthedAccountIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/account/password': {
+      id: '/_authed/account/password'
+      path: '/account/password'
+      fullPath: '/account/password'
+      preLoaderRoute: typeof AuthedAccountPasswordRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/inbox/': {
@@ -320,6 +358,8 @@ interface AuthedRouteChildren {
   AuthedCaptureRoute: typeof AuthedCaptureRoute
   AuthedSystemRoute: typeof AuthedSystemRoute
   AuthedIndexRoute: typeof AuthedIndexRoute
+  AuthedAccountPasswordRoute: typeof AuthedAccountPasswordRoute
+  AuthedAccountIndexRoute: typeof AuthedAccountIndexRoute
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
@@ -328,6 +368,8 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedCaptureRoute: AuthedCaptureRoute,
   AuthedSystemRoute: AuthedSystemRoute,
   AuthedIndexRoute: AuthedIndexRoute,
+  AuthedAccountPasswordRoute: AuthedAccountPasswordRoute,
+  AuthedAccountIndexRoute: AuthedAccountIndexRoute,
 }
 
 const AuthedRouteWithChildren =
