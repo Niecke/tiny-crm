@@ -111,12 +111,6 @@ export const invalidateContacts = (queryClient: QueryClient) =>
 // The record page's tabs: each linked type filtered by contact_id.
 const linked = (id: string) => ({ params: { query: { contact_id: id, limit: DETAIL_LIMIT } } })
 
-export const contactInteractionsQuery = (api: Api, id: string) =>
-  queryOptions({
-    queryKey: ['interactions', 'by-contact', id],
-    queryFn: () => unwrap(api.GET('/interactions/', linked(id))),
-  })
-
 export const contactDocumentsQuery = (api: Api, id: string) =>
   queryOptions({
     queryKey: ['documents', 'by-contact', id],

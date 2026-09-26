@@ -1691,6 +1691,83 @@ textarea.input {
   background: var(--color-sidebar);
 }
 
+/* ---------- Interactions ---------- */
+
+/* Planned beside the log on a desktop; the log gets the room. */
+.activity-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.interaction-row {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+}
+
+.interaction-row > .row-main {
+  flex: 1;
+  gap: 2px;
+}
+
+.interaction-notes {
+  margin-top: var(--space-1);
+  font-size: 0.9rem;
+}
+
+/* The actions on a row, kept small and on the right. */
+.row-actions {
+  display: flex;
+  flex: none;
+  gap: var(--space-2);
+}
+
+.kind-badge {
+  vertical-align: 1px;
+}
+
+/* Linked records in a form: a search to add, chips to remove. */
+.links-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.chips.chips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 1px 2px 1px var(--space-2);
+  border-radius: 999px;
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.button.chip-remove {
+  padding: 0 6px;
+  border: 0;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  color: inherit;
+}
+
+/* A checkbox in a form row, level with the inputs beside it. */
+.field-checkbox {
+  justify-content: flex-end;
+  padding-bottom: var(--space-2);
+}
+
 /* ---------- Narrow screens ---------- */
 
 /* The sidebar gives way to a slim top bar whose menu button opens the nav as
@@ -1741,8 +1818,14 @@ textarea.input {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .system-grid {
+  .system-grid,
+  .activity-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* The row's actions go under its text rather than squeezing it. */
+  .interaction-row {
+    flex-wrap: wrap;
   }
 
   .system-status {

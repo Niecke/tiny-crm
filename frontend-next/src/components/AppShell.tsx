@@ -19,7 +19,7 @@ const nav: { label: string; to?: LinkProps['to'] }[] = [
   { label: 'Tasks', to: '/tasks' },
   { label: 'Deals' },
   { label: 'Projects' },
-  { label: 'Interactions' },
+  { label: 'Interactions', to: '/interactions' },
   { label: 'Documents' },
   { label: 'Watches' },
   { label: 'Account', to: '/account' },
