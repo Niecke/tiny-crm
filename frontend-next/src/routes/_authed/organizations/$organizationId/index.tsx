@@ -5,10 +5,11 @@ import { Tab, TabList, TabPanel, Tabs } from 'react-aria-components'
 import { z } from 'zod'
 import { ApiError } from '../../../../api/client'
 import type { OrganizationRead } from '../../../../api/types'
-import { AddNotReady, Fact, Facts, Rows } from '../../../../components/RecordPage'
+import { Fact, Facts, Rows } from '../../../../components/RecordPage'
 import { useSelectedTabInView } from '../../../../useSelectedTabInView'
-import { formatBytes, formatDate } from '../../../../format'
-import { orgContactsQuery, orgDocumentsQuery, organizationQuery } from '../../../../organizations'
+import { orgContactsQuery, organizationQuery } from '../../../../organizations'
+import { DocumentRows } from '../../../../components/DocumentRows'
+import { linkedDocumentsQuery } from '../../../../documents'
 import { InteractionList } from '../../../../components/InteractionList'
 import { linkedInteractionsQuery, useToggleHappened } from '../../../../interactions'
 
@@ -37,7 +38,7 @@ function OrganizationDetail() {
   const contacts = useQuery(orgContactsQuery(api, organizationId))
   const interactions = useQuery(linkedInteractionsQuery(api, { organization_id: organizationId }))
   const { toggle: toggleInteraction, pendingId: pendingInteraction, error: toggleInteractionError } = useToggleHappened(api)
-  const documents = useQuery(orgDocumentsQuery(api, organizationId))
+  const documents = useQuery(linkedDocumentsQuery(api, { organization_id: organizationId }))
 
   // Fixed when the page opens: whether an entry is still planned should not
   // flip on an unrelated re-render.
@@ -180,20 +181,25 @@ function OrganizationDetail() {
           </TabPanel>
 
           <TabPanel id="documents" className="panel-body">
-            <AddNotReady label="Upload document" />
-            <Rows query={documents} empty="No documents filed here.">
-              {(d) => (
-                <li key={d.id}>
-                  <span className="row-main">
-                    <span>{d.title}</span>
-                    <span className="row-meta">
-                      {d.format.toUpperCase()} · {formatBytes(d.size)}
-                    </span>
-                  </span>
-                  <span className="row-side muted">{formatDate(d.created_at)}</span>
-                </li>
-              )}
-            </Rows>
+            <div className="tab-toolbar">
+              <Link to="/documents/new" search={{ organizationId }} className="button button-quiet">
+                Upload document
+              </Link>
+            </div>
+            {documents.isPending ? (
+              <p className="muted">Loading…</p>
+            ) : documents.error ? (
+              <p className="form-error">{documents.error.message}</p>
+            ) : documents.data.items.length === 0 ? (
+              <p className="muted">Nothing filed here yet.</p>
+            ) : (
+              <>
+                <DocumentRows items={documents.data.items} />
+                {documents.data.total > documents.data.items.length && (
+                  <p className="muted small">{documents.data.total - documents.data.items.length} more not shown.</p>
+                )}
+              </>
+            )}
           </TabPanel>
         </Tabs>
       </div>

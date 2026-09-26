@@ -1,6 +1,5 @@
 import type { UseQueryResult } from '@tanstack/react-query'
 import { Children, type ReactNode } from 'react'
-import { Button } from './ui/Button'
 
 // The pieces every record page is built from (FRONTEND.md, "Record pages"):
 // a facts column on the left, linked records in tabs on the right.
@@ -50,21 +49,5 @@ export function Rows<T>({
         <p className="muted small">{data.total - data.items.length} more not shown.</p>
       )}
     </>
-  )
-}
-
-// The action a tab will get once its screen is ported. Shown disabled, so the
-// page already has the shape it will keep and nobody goes looking elsewhere.
-// Only the selected TabPanel is rendered, so the id is unique on the page.
-export function AddNotReady({ label }: { label: string }) {
-  return (
-    <div className="tab-toolbar">
-      <span className="muted small" id="add-not-ready">
-        Not available in the React preview yet — use the current app for now.
-      </span>
-      <Button variant="quiet" isDisabled aria-describedby="add-not-ready">
-        {label}
-      </Button>
-    </div>
   )
 }

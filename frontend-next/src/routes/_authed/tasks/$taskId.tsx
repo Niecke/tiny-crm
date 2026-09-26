@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createFileRoute, Link, useCanGoBack, useNavigate, useRouter } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
+import { useLeave } from '../../../useLeave'
 import { useState } from 'react'
 import { ApiError, unwrap } from '../../../api/client'
 import { TaskForm, type TaskFields } from '../../../components/TaskForm'
@@ -18,15 +19,12 @@ function EditTask() {
   const { api } = Route.useRouteContext()
   const { taskId } = Route.useParams()
   const filters = Route.useSearch()
-  const navigate = useNavigate()
-  const router = useRouter()
-  const canGoBack = useCanGoBack()
   const queryClient = useQueryClient()
   const task = useQuery(taskQuery(api, taskId))
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [repeated, setRepeated] = useState<string | null>(null)
 
-  const leave = () => (canGoBack ? router.history.back() : navigate({ to: '/tasks', search: filters }))
+  const leave = useLeave({ to: '/tasks', search: filters })
 
   const save = useMutation({
     mutationFn: (body: TaskFields) => updateTask(api, taskId, body),

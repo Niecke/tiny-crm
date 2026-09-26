@@ -1768,6 +1768,167 @@ textarea.input {
   padding-bottom: var(--space-2);
 }
 
+/* ---------- Documents ---------- */
+
+.doc-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--space-4);
+}
+
+.doc-grid[data-stale] {
+  opacity: 0.6;
+}
+
+/* Thumbnail on the left, details on the right. */
+.doc-card,
+.doc-file {
+  display: flex;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  min-width: 0;
+}
+
+.doc-open {
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.doc-open:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+
+/* A4-shaped. */
+.doc-thumb {
+  display: grid;
+  place-items: center;
+  width: 84px;
+  aspect-ratio: 210 / 297;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+}
+
+.doc-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+
+.doc-format {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+.doc-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  flex: 1;
+}
+
+.doc-title {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.doc-description {
+  margin: 0;
+  font-size: 0.9rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.doc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: auto;
+  padding-top: var(--space-2);
+}
+
+.doc-file {
+  margin-bottom: var(--space-4);
+}
+
+.file-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-sm);
+}
+
+.file-picker[data-invalid] {
+  border-color: var(--color-danger);
+}
+
+/* The viewer: wide on a desktop, the whole screen on a phone. */
+.modal.viewer {
+  max-width: min(960px, 100%);
+}
+
+.modal-overlay:has(.viewer) {
+  padding-top: 4vh;
+}
+
+.viewer-dialog {
+  max-height: 90vh;
+}
+
+.viewer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.viewer-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.viewer-body {
+  overflow: auto;
+  min-height: 200px;
+}
+
+.viewer-text {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.pdf-pages {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.pdf-page {
+  display: block;
+  max-width: 100%;
+  border: 1px solid var(--color-border);
+  box-shadow: 0 2px 6px rgb(58 51 42 / 0.08);
+}
+
 /* ---------- Narrow screens ---------- */
 
 /* The sidebar gives way to a slim top bar whose menu button opens the nav as
@@ -1884,6 +2045,25 @@ textarea.input {
 
   .form-row {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .doc-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .modal-overlay:has(.viewer) {
+    padding: 0;
+  }
+
+  .modal.viewer {
+    height: 100dvh;
+    border-radius: 0;
+  }
+
+  .viewer-dialog {
+    height: 100%;
+    max-height: none;
+    padding: var(--space-4);
   }
 
   .form {
