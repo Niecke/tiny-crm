@@ -28,7 +28,7 @@ from app.routers import (
 )
 from app.schemas.user import UserRead, UserUpdate
 from app.storage import check_storage
-from app.version import BUILD_TIMESTAMP, GIT_COMMIT
+from app.version import APP_VERSION, BUILD_TIMESTAMP, GIT_COMMIT
 
 # Configure JSON logging before anything emits records (and after uvicorn applies
 # its own defaults, since uvicorn imports this module on startup).
@@ -127,6 +127,7 @@ app.include_router(
                 "application/json": {
                     "example": {
                         "version": "94170aa",
+                        "app_version": "v0.1.0-94170aa",
                         "build_timestamp": "2026-07-04T19:33:00Z",
                     }
                 }
@@ -135,9 +136,10 @@ app.include_router(
     },
 )
 async def version() -> dict[str, str]:
-    """Returns the running build's git commit and image build timestamp."""
+    """Returns the running build's git commit, product version and image build timestamp."""
     return {
         "version": GIT_COMMIT,
+        "app_version": APP_VERSION,
         "build_timestamp": BUILD_TIMESTAMP,
     }
 

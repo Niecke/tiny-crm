@@ -9,7 +9,7 @@ drives the built containers.
 from httpx2 import ASGITransport, AsyncClient
 
 from app.main import app
-from app.version import BUILD_TIMESTAMP, GIT_COMMIT
+from app.version import APP_VERSION, BUILD_TIMESTAMP, GIT_COMMIT
 
 
 async def test_version_reports_the_running_build() -> None:
@@ -20,5 +20,6 @@ async def test_version_reports_the_running_build() -> None:
     assert response.status_code == 200
     assert response.json() == {
         "version": GIT_COMMIT,
+        "app_version": APP_VERSION,
         "build_timestamp": BUILD_TIMESTAMP,
     }

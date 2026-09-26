@@ -670,7 +670,7 @@ export interface paths {
         };
         /**
          * Version
-         * @description Returns the running build's git commit and image build timestamp.
+         * @description Returns the running build's git commit, product version and image build timestamp.
          */
         get: operations["version_version_get"];
         put?: never;
@@ -4524,6 +4524,7 @@ export interface operations {
                     /**
                      * @example {
                      *       "version": "94170aa",
+                     *       "app_version": "v0.1.0-94170aa",
                      *       "build_timestamp": "2026-07-04T19:33:00Z"
                      *     }
                      */

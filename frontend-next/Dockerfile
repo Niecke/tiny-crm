@@ -6,9 +6,12 @@ COPY . .
 # Git commit of this build, passed in from CI. Baked into the bundle (shown on
 # the System page) and written to version.json, which the smoke test compares
 # against the backend's — the same contract the Flutter image keeps. The build
-# time is baked in beside it, in the backend's format.
+# time is baked in beside it, in the backend's format, and so is the product
+# version CI works out ("v0.1.0" for a release, "v0.1.0-abc1234" otherwise).
 ARG GIT_COMMIT=dev
 ENV VITE_GIT_COMMIT=$GIT_COMMIT
+ARG APP_VERSION=dev
+ENV VITE_APP_VERSION=$APP_VERSION
 RUN echo "{\"version\":\"$GIT_COMMIT\"}" > public/version.json && \
     VITE_BUILD_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ") npm run build
 
