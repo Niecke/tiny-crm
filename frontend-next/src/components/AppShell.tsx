@@ -16,6 +16,7 @@ const nav: { label: string; to?: LinkProps['to'] }[] = [
   { label: 'Inbox', to: '/inbox' },
   { label: 'Organizations', to: '/organizations' },
   { label: 'Contacts', to: '/contacts' },
+  { label: 'Tasks', to: '/tasks' },
   { label: 'Deals' },
   { label: 'Projects' },
   { label: 'Interactions' },

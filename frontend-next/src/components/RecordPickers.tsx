@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useRouteContext } from '@tanstack/react-router'
 import { useState } from 'react'
 import { contactOptionsQuery } from '../contacts'
+import { dealOptionsQuery } from '../deals'
 import { organizationOptionsQuery } from '../organizations'
 import { useDebounced } from '../useDebounced'
 import { SearchPicker } from './ui/SearchPicker'
@@ -86,6 +87,42 @@ export function OrganizationPicker({
         if (!t) onChange(null)
       }}
       emptyText={search ? `No organization matches “${search}”.` : 'No organizations yet.'}
+      errorMessage={errorMessage}
+    />
+  )
+}
+
+export function DealPicker({
+  value,
+  onChange,
+  initialLabel,
+  label = 'Deal',
+  placeholder = 'Optional',
+  errorMessage,
+}: PickerProps) {
+  const { api } = useRouteContext({ from: '/_authed' })
+  const [text, setText] = useState(initialLabel ?? '')
+  const search = useDebounced(text.trim())
+  const { data } = useQuery(dealOptionsQuery(api, value && text === initialLabel ? '' : search))
+  const options = (data?.items ?? []).map((d) => ({
+    id: d.id,
+    label: d.title,
+    description: [d.organization_name ?? d.contact_name, d.stage].filter(Boolean).join(' · ') || null,
+  }))
+  if (value && initialLabel && !options.some((o) => o.id === value)) options.unshift({ id: value, label: initialLabel, description: null })
+  return (
+    <SearchPicker
+      label={label}
+      placeholder={placeholder}
+      options={options}
+      value={value}
+      onChange={onChange}
+      inputValue={text}
+      onInputChange={(t) => {
+        setText(t)
+        if (!t) onChange(null)
+      }}
+      emptyText={search ? `No deal matches “${search}”.` : 'No deals yet.'}
       errorMessage={errorMessage}
     />
   )

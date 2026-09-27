@@ -17,6 +17,7 @@ import { Route as AuthedContactsRouteRouteImport } from './routes/_authed/contac
 import { Route as AuthedInboxRouteRouteImport } from './routes/_authed/inbox/route'
 import { Route as AuthedOrganizationsRouteRouteImport } from './routes/_authed/organizations/route'
 import { Route as AuthedSystemRouteImport } from './routes/_authed/system'
+import { Route as AuthedTasksRouteRouteImport } from './routes/_authed/tasks/route'
 import { Route as AuthedAccountIndexRouteImport } from './routes/_authed/account/index'
 import { Route as AuthedAccountPasswordRouteImport } from './routes/_authed/account/password'
 import { Route as AuthedContactsIndexRouteImport } from './routes/_authed/contacts/index'
@@ -25,6 +26,9 @@ import { Route as AuthedInboxIndexRouteImport } from './routes/_authed/inbox/ind
 import { Route as AuthedInboxCaptureIdRouteImport } from './routes/_authed/inbox/$captureId'
 import { Route as AuthedOrganizationsIndexRouteImport } from './routes/_authed/organizations/index'
 import { Route as AuthedOrganizationsNewRouteImport } from './routes/_authed/organizations/new'
+import { Route as AuthedTasksIndexRouteImport } from './routes/_authed/tasks/index'
+import { Route as AuthedTasksTaskIdRouteImport } from './routes/_authed/tasks/$taskId'
+import { Route as AuthedTasksNewRouteImport } from './routes/_authed/tasks/new'
 import { Route as AuthedContactsContactIdIndexRouteImport } from './routes/_authed/contacts/$contactId/index'
 import { Route as AuthedContactsContactIdEditRouteImport } from './routes/_authed/contacts/$contactId/edit'
 import { Route as AuthedOrganizationsOrganizationIdIndexRouteImport } from './routes/_authed/organizations/$organizationId/index'
@@ -70,6 +74,11 @@ const AuthedSystemRoute = AuthedSystemRouteImport.update({
   path: '/system',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedTasksRouteRoute = AuthedTasksRouteRouteImport.update({
+  id: '/tasks',
+  path: '/tasks',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedAccountIndexRoute = AuthedAccountIndexRouteImport.update({
   id: '/account/',
   path: '/account/',
@@ -111,6 +120,21 @@ const AuthedOrganizationsNewRoute = AuthedOrganizationsNewRouteImport.update({
   path: '/new',
   getParentRoute: () => AuthedOrganizationsRouteRoute,
 } as any)
+const AuthedTasksIndexRoute = AuthedTasksIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthedTasksRouteRoute,
+} as any)
+const AuthedTasksTaskIdRoute = AuthedTasksTaskIdRouteImport.update({
+  id: '/$taskId',
+  path: '/$taskId',
+  getParentRoute: () => AuthedTasksRouteRoute,
+} as any)
+const AuthedTasksNewRoute = AuthedTasksNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => AuthedTasksRouteRoute,
+} as any)
 const AuthedContactsContactIdIndexRoute =
   AuthedContactsContactIdIndexRouteImport.update({
     id: '/$contactId/',
@@ -142,16 +166,20 @@ export interface FileRoutesByFullPath {
   '/contacts': typeof AuthedContactsRouteRouteWithChildren
   '/inbox': typeof AuthedInboxRouteRouteWithChildren
   '/organizations': typeof AuthedOrganizationsRouteRouteWithChildren
+  '/tasks': typeof AuthedTasksRouteRouteWithChildren
   '/capture': typeof AuthedCaptureRoute
   '/system': typeof AuthedSystemRoute
   '/account/password': typeof AuthedAccountPasswordRoute
   '/contacts/new': typeof AuthedContactsNewRoute
   '/inbox/$captureId': typeof AuthedInboxCaptureIdRoute
   '/organizations/new': typeof AuthedOrganizationsNewRoute
+  '/tasks/$taskId': typeof AuthedTasksTaskIdRoute
+  '/tasks/new': typeof AuthedTasksNewRoute
   '/account/': typeof AuthedAccountIndexRoute
   '/contacts/': typeof AuthedContactsIndexRoute
   '/inbox/': typeof AuthedInboxIndexRoute
   '/organizations/': typeof AuthedOrganizationsIndexRoute
+  '/tasks/': typeof AuthedTasksIndexRoute
   '/contacts/$contactId/edit': typeof AuthedContactsContactIdEditRoute
   '/organizations/$organizationId/edit': typeof AuthedOrganizationsOrganizationIdEditRoute
   '/contacts/$contactId/': typeof AuthedContactsContactIdIndexRoute
@@ -166,10 +194,13 @@ export interface FileRoutesByTo {
   '/contacts/new': typeof AuthedContactsNewRoute
   '/inbox/$captureId': typeof AuthedInboxCaptureIdRoute
   '/organizations/new': typeof AuthedOrganizationsNewRoute
+  '/tasks/$taskId': typeof AuthedTasksTaskIdRoute
+  '/tasks/new': typeof AuthedTasksNewRoute
   '/account': typeof AuthedAccountIndexRoute
   '/contacts': typeof AuthedContactsIndexRoute
   '/inbox': typeof AuthedInboxIndexRoute
   '/organizations': typeof AuthedOrganizationsIndexRoute
+  '/tasks': typeof AuthedTasksIndexRoute
   '/contacts/$contactId/edit': typeof AuthedContactsContactIdEditRoute
   '/organizations/$organizationId/edit': typeof AuthedOrganizationsOrganizationIdEditRoute
   '/contacts/$contactId': typeof AuthedContactsContactIdIndexRoute
@@ -182,6 +213,7 @@ export interface FileRoutesById {
   '/_authed/contacts': typeof AuthedContactsRouteRouteWithChildren
   '/_authed/inbox': typeof AuthedInboxRouteRouteWithChildren
   '/_authed/organizations': typeof AuthedOrganizationsRouteRouteWithChildren
+  '/_authed/tasks': typeof AuthedTasksRouteRouteWithChildren
   '/_authed/capture': typeof AuthedCaptureRoute
   '/_authed/system': typeof AuthedSystemRoute
   '/_authed/': typeof AuthedIndexRoute
@@ -189,10 +221,13 @@ export interface FileRoutesById {
   '/_authed/contacts/new': typeof AuthedContactsNewRoute
   '/_authed/inbox/$captureId': typeof AuthedInboxCaptureIdRoute
   '/_authed/organizations/new': typeof AuthedOrganizationsNewRoute
+  '/_authed/tasks/$taskId': typeof AuthedTasksTaskIdRoute
+  '/_authed/tasks/new': typeof AuthedTasksNewRoute
   '/_authed/account/': typeof AuthedAccountIndexRoute
   '/_authed/contacts/': typeof AuthedContactsIndexRoute
   '/_authed/inbox/': typeof AuthedInboxIndexRoute
   '/_authed/organizations/': typeof AuthedOrganizationsIndexRoute
+  '/_authed/tasks/': typeof AuthedTasksIndexRoute
   '/_authed/contacts/$contactId/edit': typeof AuthedContactsContactIdEditRoute
   '/_authed/organizations/$organizationId/edit': typeof AuthedOrganizationsOrganizationIdEditRoute
   '/_authed/contacts/$contactId/': typeof AuthedContactsContactIdIndexRoute
@@ -206,16 +241,20 @@ export interface FileRouteTypes {
     | '/contacts'
     | '/inbox'
     | '/organizations'
+    | '/tasks'
     | '/capture'
     | '/system'
     | '/account/password'
     | '/contacts/new'
     | '/inbox/$captureId'
     | '/organizations/new'
+    | '/tasks/$taskId'
+    | '/tasks/new'
     | '/account/'
     | '/contacts/'
     | '/inbox/'
     | '/organizations/'
+    | '/tasks/'
     | '/contacts/$contactId/edit'
     | '/organizations/$organizationId/edit'
     | '/contacts/$contactId/'
@@ -230,10 +269,13 @@ export interface FileRouteTypes {
     | '/contacts/new'
     | '/inbox/$captureId'
     | '/organizations/new'
+    | '/tasks/$taskId'
+    | '/tasks/new'
     | '/account'
     | '/contacts'
     | '/inbox'
     | '/organizations'
+    | '/tasks'
     | '/contacts/$contactId/edit'
     | '/organizations/$organizationId/edit'
     | '/contacts/$contactId'
@@ -245,6 +287,7 @@ export interface FileRouteTypes {
     | '/_authed/contacts'
     | '/_authed/inbox'
     | '/_authed/organizations'
+    | '/_authed/tasks'
     | '/_authed/capture'
     | '/_authed/system'
     | '/_authed/'
@@ -252,10 +295,13 @@ export interface FileRouteTypes {
     | '/_authed/contacts/new'
     | '/_authed/inbox/$captureId'
     | '/_authed/organizations/new'
+    | '/_authed/tasks/$taskId'
+    | '/_authed/tasks/new'
     | '/_authed/account/'
     | '/_authed/contacts/'
     | '/_authed/inbox/'
     | '/_authed/organizations/'
+    | '/_authed/tasks/'
     | '/_authed/contacts/$contactId/edit'
     | '/_authed/organizations/$organizationId/edit'
     | '/_authed/contacts/$contactId/'
@@ -325,6 +371,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedSystemRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/tasks': {
+      id: '/_authed/tasks'
+      path: '/tasks'
+      fullPath: '/tasks'
+      preLoaderRoute: typeof AuthedTasksRouteRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/account/': {
       id: '/_authed/account/'
       path: '/account'
@@ -380,6 +433,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/organizations/new'
       preLoaderRoute: typeof AuthedOrganizationsNewRouteImport
       parentRoute: typeof AuthedOrganizationsRouteRoute
+    }
+    '/_authed/tasks/': {
+      id: '/_authed/tasks/'
+      path: '/'
+      fullPath: '/tasks/'
+      preLoaderRoute: typeof AuthedTasksIndexRouteImport
+      parentRoute: typeof AuthedTasksRouteRoute
+    }
+    '/_authed/tasks/$taskId': {
+      id: '/_authed/tasks/$taskId'
+      path: '/$taskId'
+      fullPath: '/tasks/$taskId'
+      preLoaderRoute: typeof AuthedTasksTaskIdRouteImport
+      parentRoute: typeof AuthedTasksRouteRoute
+    }
+    '/_authed/tasks/new': {
+      id: '/_authed/tasks/new'
+      path: '/new'
+      fullPath: '/tasks/new'
+      preLoaderRoute: typeof AuthedTasksNewRouteImport
+      parentRoute: typeof AuthedTasksRouteRoute
     }
     '/_authed/contacts/$contactId/': {
       id: '/_authed/contacts/$contactId/'
@@ -464,10 +538,26 @@ const AuthedOrganizationsRouteRouteWithChildren =
     AuthedOrganizationsRouteRouteChildren,
   )
 
+interface AuthedTasksRouteRouteChildren {
+  AuthedTasksTaskIdRoute: typeof AuthedTasksTaskIdRoute
+  AuthedTasksNewRoute: typeof AuthedTasksNewRoute
+  AuthedTasksIndexRoute: typeof AuthedTasksIndexRoute
+}
+
+const AuthedTasksRouteRouteChildren: AuthedTasksRouteRouteChildren = {
+  AuthedTasksTaskIdRoute: AuthedTasksTaskIdRoute,
+  AuthedTasksNewRoute: AuthedTasksNewRoute,
+  AuthedTasksIndexRoute: AuthedTasksIndexRoute,
+}
+
+const AuthedTasksRouteRouteWithChildren =
+  AuthedTasksRouteRoute._addFileChildren(AuthedTasksRouteRouteChildren)
+
 interface AuthedRouteChildren {
   AuthedContactsRouteRoute: typeof AuthedContactsRouteRouteWithChildren
   AuthedInboxRouteRoute: typeof AuthedInboxRouteRouteWithChildren
   AuthedOrganizationsRouteRoute: typeof AuthedOrganizationsRouteRouteWithChildren
+  AuthedTasksRouteRoute: typeof AuthedTasksRouteRouteWithChildren
   AuthedCaptureRoute: typeof AuthedCaptureRoute
   AuthedSystemRoute: typeof AuthedSystemRoute
   AuthedIndexRoute: typeof AuthedIndexRoute
@@ -479,6 +569,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedContactsRouteRoute: AuthedContactsRouteRouteWithChildren,
   AuthedInboxRouteRoute: AuthedInboxRouteRouteWithChildren,
   AuthedOrganizationsRouteRoute: AuthedOrganizationsRouteRouteWithChildren,
+  AuthedTasksRouteRoute: AuthedTasksRouteRouteWithChildren,
   AuthedCaptureRoute: AuthedCaptureRoute,
   AuthedSystemRoute: AuthedSystemRoute,
   AuthedIndexRoute: AuthedIndexRoute,

@@ -18,6 +18,7 @@ function AccountPage() {
     <div className="page page-narrow">
       <header className="page-header">
         <h1>Account</h1>
+        <p>The user this browser is signed in as.</p>
       </header>
 
       {isPending ? (
@@ -46,11 +47,14 @@ function AccountPage() {
       )}
 
       <div className="form-actions account-actions">
+        <Link to="/system" className="button button-quiet">
+          System status
+        </Link>
         <Link to="/account/password" className="button">
           Change password
         </Link>
-      </div>
-    </div>
+      </div >
+    </div >
   )
 }
 
