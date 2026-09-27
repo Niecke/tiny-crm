@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createFileRoute, Link, useCanGoBack, useNavigate, useRouter } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
+import { useLeave } from '../../../useLeave'
 import { useState } from 'react'
 import { ApiError } from '../../../api/client'
 import type { InteractionCreate } from '../../../api/types'
@@ -23,13 +24,10 @@ function EditInteraction() {
   const { api } = Route.useRouteContext()
   const { interactionId } = Route.useParams()
   const filters = Route.useSearch()
-  const navigate = useNavigate()
-  const router = useRouter()
-  const canGoBack = useCanGoBack()
   const queryClient = useQueryClient()
   const interaction = useQuery(interactionQuery(api, interactionId))
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const leave = () => (canGoBack ? router.history.back() : navigate({ to: '/interactions', search: filters }))
+  const leave = useLeave({ to: '/interactions', search: filters })
 
   const save = useMutation({
     mutationFn: (body: InteractionCreate) => updateInteraction(api, interactionId, body),

@@ -4,8 +4,6 @@ import type { ContactCreate } from './api/types'
 
 // Rows per page on every paged list (FRONTEND.md, "Paging").
 export const PAGE_SIZE = 25
-// Per tab on a record page, as on the organization page.
-const DETAIL_LIMIT = 20
 
 // The fixed vocabularies, in the order the Flutter app offers them. The values
 // are the API's; the schema types them, so a value the backend does not have
@@ -107,12 +105,3 @@ export const invalidateContacts = (queryClient: QueryClient) =>
     queryClient.invalidateQueries({ queryKey: ['contacts'] }),
     queryClient.invalidateQueries({ queryKey: ['organizations'] }),
   ])
-
-// The record page's tabs: each linked type filtered by contact_id.
-const linked = (id: string) => ({ params: { query: { contact_id: id, limit: DETAIL_LIMIT } } })
-
-export const contactDocumentsQuery = (api: Api, id: string) =>
-  queryOptions({
-    queryKey: ['documents', 'by-contact', id],
-    queryFn: () => unwrap(api.GET('/documents/', linked(id))),
-  })
