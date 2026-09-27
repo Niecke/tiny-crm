@@ -11,7 +11,6 @@ import { Button } from '../../../../components/ui/Button'
 import { ConfirmDialog } from '../../../../components/ui/ConfirmDialog'
 import {
   contactDocumentsQuery,
-  contactInteractionsQuery,
   contactQuery,
   deleteContact,
   freelancerAnswer,
@@ -21,10 +20,12 @@ import {
   relationOptions,
   sourceOptions,
 } from '../../../../contacts'
-import { formatBytes, formatDate, formatDateTime, formatDay, localDay } from '../../../../format'
+import { formatBytes, formatDate, formatDay, localDay } from '../../../../format'
 import { linkedTasksQuery, useToggleDone } from '../../../../tasks'
 import { TaskList } from '../../../../components/TaskList'
 import { Checkbox } from '../../../../components/ui/Checkbox'
+import { InteractionList } from '../../../../components/InteractionList'
+import { linkedInteractionsQuery, useToggleHappened } from '../../../../interactions'
 
 const tabs = ['tasks', 'interactions', 'documents'] as const
 type TabId = (typeof tabs)[number]
@@ -50,7 +51,8 @@ function ContactDetail() {
   const [showDone, setShowDone] = useState(false)
   const tasks = useQuery(linkedTasksQuery(api, { contact_id: contactId }, showDone))
   const { toggle, pendingId, error: toggleError, repeated } = useToggleDone(api)
-  const interactions = useQuery(contactInteractionsQuery(api, contactId))
+  const interactions = useQuery(linkedInteractionsQuery(api, { contact_id: contactId }))
+  const { toggle: toggleInteraction, pendingId: pendingInteraction, error: toggleInteractionError } = useToggleHappened(api)
   const documents = useQuery(contactDocumentsQuery(api, contactId))
   const [now] = useState(() => Date.now())
   const tabsRef = useSelectedTabInView(tab, contact.isSuccess)
@@ -188,20 +190,39 @@ function ContactDetail() {
           </TabPanel>
 
           <TabPanel id="interactions" className="panel-body">
-            <AddNotReady label="Log interaction" />
-            <Rows query={interactions} empty="Nothing logged yet.">
-              {(i) => (
-                <li key={i.id}>
-                  <span className="row-main">
-                    <span>{i.subject}</span>
-                    <span className="row-meta">
-                      {i.kind} · {formatDateTime(i.occurred_at)}
-                    </span>
-                  </span>
-                  {Date.parse(i.occurred_at) > now && <span className="badge">planned</span>}
-                </li>
-              )}
-            </Rows>
+            <div className="tab-toolbar">
+              <Link to="/interactions/new" search={{ contactId }} className="button button-quiet">
+                Log interaction
+              </Link>
+            </div>
+            {toggleInteractionError && (
+              <p className="form-error" role="alert">
+                Could not update the interaction: {toggleInteractionError.message}
+              </p>
+            )}
+            {interactions.isPending ? (
+              <p className="muted">Loading…</p>
+            ) : interactions.error ? (
+              <p className="form-error">{interactions.error.message}</p>
+            ) : interactions.data.items.length === 0 ? (
+              <p className="muted">Nothing logged yet.</p>
+            ) : (
+              <>
+                <InteractionList
+                  items={interactions.data.items}
+                  onToggle={toggleInteraction}
+                  pendingId={pendingInteraction}
+                  now={now}
+                  compact
+                  hideContacts
+                />
+                {interactions.data.total > interactions.data.items.length && (
+                  <p className="muted small">
+                    {interactions.data.total - interactions.data.items.length} older not shown.
+                  </p>
+                )}
+              </>
+            )}
           </TabPanel>
 
           <TabPanel id="documents" className="panel-body">

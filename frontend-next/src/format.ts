@@ -69,3 +69,17 @@ export function endOfLocalDay(isoDate: string): string {
   const [y, m, d] = isoDate.split('-').map(Number)
   return new Date(y, m - 1, d, 23, 59).toISOString()
 }
+
+// A moment as the local "YYYY-MM-DDTHH:mm" a date-time field edits, and back.
+export function toLocalDateTime(iso: string): string {
+  const d = new Date(iso)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${localDay(iso)}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+export function fromLocalDateTime(local: string): string {
+  const [day, time] = local.split('T')
+  const [y, m, d] = day.split('-').map(Number)
+  const [h, min] = time.split(':').map(Number)
+  return new Date(y, m - 1, d, h, min).toISOString()
+}

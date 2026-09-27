@@ -33,7 +33,7 @@ export const createOrganization = (api: Api, body: OrganizationCreate) =>
 export const updateOrganization = (api: Api, id: string, body: OrganizationCreate) =>
   unwrap(api.PATCH('/organizations/{organization_id}', { params: { path: { organization_id: id } }, body }))
 
-// Contacts, interactions and documents each filter by organization_id. Three
+// Contacts and documents each filter by organization_id. Three
 // calls rather than one generic helper: each path is checked against the
 // schema, and each result keeps its own row type.
 const linked = (id: string) => ({ params: { query: { organization_id: id, limit: DETAIL_LIMIT } } })
@@ -42,13 +42,6 @@ export const orgContactsQuery = (api: Api, id: string) =>
   queryOptions({
     queryKey: ['contacts', 'by-organization', id],
     queryFn: () => unwrap(api.GET('/contacts/', linked(id))),
-  })
-
-// Newest first, planned entries included — the API's default order.
-export const orgInteractionsQuery = (api: Api, id: string) =>
-  queryOptions({
-    queryKey: ['interactions', 'by-organization', id],
-    queryFn: () => unwrap(api.GET('/interactions/', linked(id))),
   })
 
 export const orgDocumentsQuery = (api: Api, id: string) =>
