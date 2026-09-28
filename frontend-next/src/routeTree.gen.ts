@@ -22,6 +22,7 @@ import { Route as AuthedOrganizationsRouteRouteImport } from './routes/_authed/o
 import { Route as AuthedProjectsRouteRouteImport } from './routes/_authed/projects/route'
 import { Route as AuthedSystemRouteImport } from './routes/_authed/system'
 import { Route as AuthedTasksRouteRouteImport } from './routes/_authed/tasks/route'
+import { Route as AuthedWatchesRouteRouteImport } from './routes/_authed/watches/route'
 import { Route as AuthedAccountIndexRouteImport } from './routes/_authed/account/index'
 import { Route as AuthedAccountPasswordRouteImport } from './routes/_authed/account/password'
 import { Route as AuthedContactsIndexRouteImport } from './routes/_authed/contacts/index'
@@ -43,6 +44,8 @@ import { Route as AuthedProjectsNewRouteImport } from './routes/_authed/projects
 import { Route as AuthedTasksIndexRouteImport } from './routes/_authed/tasks/index'
 import { Route as AuthedTasksTaskIdRouteImport } from './routes/_authed/tasks/$taskId'
 import { Route as AuthedTasksNewRouteImport } from './routes/_authed/tasks/new'
+import { Route as AuthedWatchesIndexRouteImport } from './routes/_authed/watches/index'
+import { Route as AuthedWatchesNewRouteImport } from './routes/_authed/watches/new'
 import { Route as AuthedContactsContactIdIndexRouteImport } from './routes/_authed/contacts/$contactId/index'
 import { Route as AuthedContactsContactIdEditRouteImport } from './routes/_authed/contacts/$contactId/edit'
 import { Route as AuthedDealsDealIdIndexRouteImport } from './routes/_authed/deals/$dealId/index'
@@ -51,6 +54,8 @@ import { Route as AuthedOrganizationsOrganizationIdIndexRouteImport } from './ro
 import { Route as AuthedOrganizationsOrganizationIdEditRouteImport } from './routes/_authed/organizations/$organizationId/edit'
 import { Route as AuthedProjectsProjectIdIndexRouteImport } from './routes/_authed/projects/$projectId/index'
 import { Route as AuthedProjectsProjectIdEditRouteImport } from './routes/_authed/projects/$projectId/edit'
+import { Route as AuthedWatchesWatchIdIndexRouteImport } from './routes/_authed/watches/$watchId/index'
+import { Route as AuthedWatchesWatchIdEditRouteImport } from './routes/_authed/watches/$watchId/edit'
 
 const AuthedRoute = AuthedRouteImport.update({
   id: '/_authed',
@@ -115,6 +120,11 @@ const AuthedSystemRoute = AuthedSystemRouteImport.update({
 const AuthedTasksRouteRoute = AuthedTasksRouteRouteImport.update({
   id: '/tasks',
   path: '/tasks',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedWatchesRouteRoute = AuthedWatchesRouteRouteImport.update({
+  id: '/watches',
+  path: '/watches',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedAccountIndexRoute = AuthedAccountIndexRouteImport.update({
@@ -225,6 +235,16 @@ const AuthedTasksNewRoute = AuthedTasksNewRouteImport.update({
   path: '/new',
   getParentRoute: () => AuthedTasksRouteRoute,
 } as any)
+const AuthedWatchesIndexRoute = AuthedWatchesIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthedWatchesRouteRoute,
+} as any)
+const AuthedWatchesNewRoute = AuthedWatchesNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => AuthedWatchesRouteRoute,
+} as any)
 const AuthedContactsContactIdIndexRoute =
   AuthedContactsContactIdIndexRouteImport.update({
     id: '/$contactId/',
@@ -271,6 +291,18 @@ const AuthedProjectsProjectIdEditRoute =
     path: '/$projectId/edit',
     getParentRoute: () => AuthedProjectsRouteRoute,
   } as any)
+const AuthedWatchesWatchIdIndexRoute =
+  AuthedWatchesWatchIdIndexRouteImport.update({
+    id: '/$watchId/',
+    path: '/$watchId/',
+    getParentRoute: () => AuthedWatchesRouteRoute,
+  } as any)
+const AuthedWatchesWatchIdEditRoute =
+  AuthedWatchesWatchIdEditRouteImport.update({
+    id: '/$watchId/edit',
+    path: '/$watchId/edit',
+    getParentRoute: () => AuthedWatchesRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthedIndexRoute
@@ -283,6 +315,7 @@ export interface FileRoutesByFullPath {
   '/organizations': typeof AuthedOrganizationsRouteRouteWithChildren
   '/projects': typeof AuthedProjectsRouteRouteWithChildren
   '/tasks': typeof AuthedTasksRouteRouteWithChildren
+  '/watches': typeof AuthedWatchesRouteRouteWithChildren
   '/capture': typeof AuthedCaptureRoute
   '/system': typeof AuthedSystemRoute
   '/account/password': typeof AuthedAccountPasswordRoute
@@ -297,6 +330,7 @@ export interface FileRoutesByFullPath {
   '/projects/new': typeof AuthedProjectsNewRoute
   '/tasks/$taskId': typeof AuthedTasksTaskIdRoute
   '/tasks/new': typeof AuthedTasksNewRoute
+  '/watches/new': typeof AuthedWatchesNewRoute
   '/account/': typeof AuthedAccountIndexRoute
   '/contacts/': typeof AuthedContactsIndexRoute
   '/deals/': typeof AuthedDealsIndexRoute
@@ -306,14 +340,17 @@ export interface FileRoutesByFullPath {
   '/organizations/': typeof AuthedOrganizationsIndexRoute
   '/projects/': typeof AuthedProjectsIndexRoute
   '/tasks/': typeof AuthedTasksIndexRoute
+  '/watches/': typeof AuthedWatchesIndexRoute
   '/contacts/$contactId/edit': typeof AuthedContactsContactIdEditRoute
   '/deals/$dealId/edit': typeof AuthedDealsDealIdEditRoute
   '/organizations/$organizationId/edit': typeof AuthedOrganizationsOrganizationIdEditRoute
   '/projects/$projectId/edit': typeof AuthedProjectsProjectIdEditRoute
+  '/watches/$watchId/edit': typeof AuthedWatchesWatchIdEditRoute
   '/contacts/$contactId/': typeof AuthedContactsContactIdIndexRoute
   '/deals/$dealId/': typeof AuthedDealsDealIdIndexRoute
   '/organizations/$organizationId/': typeof AuthedOrganizationsOrganizationIdIndexRoute
   '/projects/$projectId/': typeof AuthedProjectsProjectIdIndexRoute
+  '/watches/$watchId/': typeof AuthedWatchesWatchIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
@@ -332,6 +369,7 @@ export interface FileRoutesByTo {
   '/projects/new': typeof AuthedProjectsNewRoute
   '/tasks/$taskId': typeof AuthedTasksTaskIdRoute
   '/tasks/new': typeof AuthedTasksNewRoute
+  '/watches/new': typeof AuthedWatchesNewRoute
   '/account': typeof AuthedAccountIndexRoute
   '/contacts': typeof AuthedContactsIndexRoute
   '/deals': typeof AuthedDealsIndexRoute
@@ -341,14 +379,17 @@ export interface FileRoutesByTo {
   '/organizations': typeof AuthedOrganizationsIndexRoute
   '/projects': typeof AuthedProjectsIndexRoute
   '/tasks': typeof AuthedTasksIndexRoute
+  '/watches': typeof AuthedWatchesIndexRoute
   '/contacts/$contactId/edit': typeof AuthedContactsContactIdEditRoute
   '/deals/$dealId/edit': typeof AuthedDealsDealIdEditRoute
   '/organizations/$organizationId/edit': typeof AuthedOrganizationsOrganizationIdEditRoute
   '/projects/$projectId/edit': typeof AuthedProjectsProjectIdEditRoute
+  '/watches/$watchId/edit': typeof AuthedWatchesWatchIdEditRoute
   '/contacts/$contactId': typeof AuthedContactsContactIdIndexRoute
   '/deals/$dealId': typeof AuthedDealsDealIdIndexRoute
   '/organizations/$organizationId': typeof AuthedOrganizationsOrganizationIdIndexRoute
   '/projects/$projectId': typeof AuthedProjectsProjectIdIndexRoute
+  '/watches/$watchId': typeof AuthedWatchesWatchIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -362,6 +403,7 @@ export interface FileRoutesById {
   '/_authed/organizations': typeof AuthedOrganizationsRouteRouteWithChildren
   '/_authed/projects': typeof AuthedProjectsRouteRouteWithChildren
   '/_authed/tasks': typeof AuthedTasksRouteRouteWithChildren
+  '/_authed/watches': typeof AuthedWatchesRouteRouteWithChildren
   '/_authed/capture': typeof AuthedCaptureRoute
   '/_authed/system': typeof AuthedSystemRoute
   '/_authed/': typeof AuthedIndexRoute
@@ -377,6 +419,7 @@ export interface FileRoutesById {
   '/_authed/projects/new': typeof AuthedProjectsNewRoute
   '/_authed/tasks/$taskId': typeof AuthedTasksTaskIdRoute
   '/_authed/tasks/new': typeof AuthedTasksNewRoute
+  '/_authed/watches/new': typeof AuthedWatchesNewRoute
   '/_authed/account/': typeof AuthedAccountIndexRoute
   '/_authed/contacts/': typeof AuthedContactsIndexRoute
   '/_authed/deals/': typeof AuthedDealsIndexRoute
@@ -386,14 +429,17 @@ export interface FileRoutesById {
   '/_authed/organizations/': typeof AuthedOrganizationsIndexRoute
   '/_authed/projects/': typeof AuthedProjectsIndexRoute
   '/_authed/tasks/': typeof AuthedTasksIndexRoute
+  '/_authed/watches/': typeof AuthedWatchesIndexRoute
   '/_authed/contacts/$contactId/edit': typeof AuthedContactsContactIdEditRoute
   '/_authed/deals/$dealId/edit': typeof AuthedDealsDealIdEditRoute
   '/_authed/organizations/$organizationId/edit': typeof AuthedOrganizationsOrganizationIdEditRoute
   '/_authed/projects/$projectId/edit': typeof AuthedProjectsProjectIdEditRoute
+  '/_authed/watches/$watchId/edit': typeof AuthedWatchesWatchIdEditRoute
   '/_authed/contacts/$contactId/': typeof AuthedContactsContactIdIndexRoute
   '/_authed/deals/$dealId/': typeof AuthedDealsDealIdIndexRoute
   '/_authed/organizations/$organizationId/': typeof AuthedOrganizationsOrganizationIdIndexRoute
   '/_authed/projects/$projectId/': typeof AuthedProjectsProjectIdIndexRoute
+  '/_authed/watches/$watchId/': typeof AuthedWatchesWatchIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -408,6 +454,7 @@ export interface FileRouteTypes {
     | '/organizations'
     | '/projects'
     | '/tasks'
+    | '/watches'
     | '/capture'
     | '/system'
     | '/account/password'
@@ -422,6 +469,7 @@ export interface FileRouteTypes {
     | '/projects/new'
     | '/tasks/$taskId'
     | '/tasks/new'
+    | '/watches/new'
     | '/account/'
     | '/contacts/'
     | '/deals/'
@@ -431,14 +479,17 @@ export interface FileRouteTypes {
     | '/organizations/'
     | '/projects/'
     | '/tasks/'
+    | '/watches/'
     | '/contacts/$contactId/edit'
     | '/deals/$dealId/edit'
     | '/organizations/$organizationId/edit'
     | '/projects/$projectId/edit'
+    | '/watches/$watchId/edit'
     | '/contacts/$contactId/'
     | '/deals/$dealId/'
     | '/organizations/$organizationId/'
     | '/projects/$projectId/'
+    | '/watches/$watchId/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
@@ -457,6 +508,7 @@ export interface FileRouteTypes {
     | '/projects/new'
     | '/tasks/$taskId'
     | '/tasks/new'
+    | '/watches/new'
     | '/account'
     | '/contacts'
     | '/deals'
@@ -466,14 +518,17 @@ export interface FileRouteTypes {
     | '/organizations'
     | '/projects'
     | '/tasks'
+    | '/watches'
     | '/contacts/$contactId/edit'
     | '/deals/$dealId/edit'
     | '/organizations/$organizationId/edit'
     | '/projects/$projectId/edit'
+    | '/watches/$watchId/edit'
     | '/contacts/$contactId'
     | '/deals/$dealId'
     | '/organizations/$organizationId'
     | '/projects/$projectId'
+    | '/watches/$watchId'
   id:
     | '__root__'
     | '/_authed'
@@ -486,6 +541,7 @@ export interface FileRouteTypes {
     | '/_authed/organizations'
     | '/_authed/projects'
     | '/_authed/tasks'
+    | '/_authed/watches'
     | '/_authed/capture'
     | '/_authed/system'
     | '/_authed/'
@@ -501,6 +557,7 @@ export interface FileRouteTypes {
     | '/_authed/projects/new'
     | '/_authed/tasks/$taskId'
     | '/_authed/tasks/new'
+    | '/_authed/watches/new'
     | '/_authed/account/'
     | '/_authed/contacts/'
     | '/_authed/deals/'
@@ -510,14 +567,17 @@ export interface FileRouteTypes {
     | '/_authed/organizations/'
     | '/_authed/projects/'
     | '/_authed/tasks/'
+    | '/_authed/watches/'
     | '/_authed/contacts/$contactId/edit'
     | '/_authed/deals/$dealId/edit'
     | '/_authed/organizations/$organizationId/edit'
     | '/_authed/projects/$projectId/edit'
+    | '/_authed/watches/$watchId/edit'
     | '/_authed/contacts/$contactId/'
     | '/_authed/deals/$dealId/'
     | '/_authed/organizations/$organizationId/'
     | '/_authed/projects/$projectId/'
+    | '/_authed/watches/$watchId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -616,6 +676,13 @@ declare module '@tanstack/react-router' {
       path: '/tasks'
       fullPath: '/tasks'
       preLoaderRoute: typeof AuthedTasksRouteRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/watches': {
+      id: '/_authed/watches'
+      path: '/watches'
+      fullPath: '/watches'
+      preLoaderRoute: typeof AuthedWatchesRouteRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/account/': {
@@ -765,6 +832,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedTasksNewRouteImport
       parentRoute: typeof AuthedTasksRouteRoute
     }
+    '/_authed/watches/': {
+      id: '/_authed/watches/'
+      path: '/'
+      fullPath: '/watches/'
+      preLoaderRoute: typeof AuthedWatchesIndexRouteImport
+      parentRoute: typeof AuthedWatchesRouteRoute
+    }
+    '/_authed/watches/new': {
+      id: '/_authed/watches/new'
+      path: '/new'
+      fullPath: '/watches/new'
+      preLoaderRoute: typeof AuthedWatchesNewRouteImport
+      parentRoute: typeof AuthedWatchesRouteRoute
+    }
     '/_authed/contacts/$contactId/': {
       id: '/_authed/contacts/$contactId/'
       path: '/$contactId'
@@ -820,6 +901,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/projects/$projectId/edit'
       preLoaderRoute: typeof AuthedProjectsProjectIdEditRouteImport
       parentRoute: typeof AuthedProjectsRouteRoute
+    }
+    '/_authed/watches/$watchId/': {
+      id: '/_authed/watches/$watchId/'
+      path: '/$watchId'
+      fullPath: '/watches/$watchId/'
+      preLoaderRoute: typeof AuthedWatchesWatchIdIndexRouteImport
+      parentRoute: typeof AuthedWatchesRouteRoute
+    }
+    '/_authed/watches/$watchId/edit': {
+      id: '/_authed/watches/$watchId/edit'
+      path: '/$watchId/edit'
+      fullPath: '/watches/$watchId/edit'
+      preLoaderRoute: typeof AuthedWatchesWatchIdEditRouteImport
+      parentRoute: typeof AuthedWatchesRouteRoute
     }
   }
 }
@@ -958,6 +1053,23 @@ const AuthedTasksRouteRouteChildren: AuthedTasksRouteRouteChildren = {
 const AuthedTasksRouteRouteWithChildren =
   AuthedTasksRouteRoute._addFileChildren(AuthedTasksRouteRouteChildren)
 
+interface AuthedWatchesRouteRouteChildren {
+  AuthedWatchesNewRoute: typeof AuthedWatchesNewRoute
+  AuthedWatchesIndexRoute: typeof AuthedWatchesIndexRoute
+  AuthedWatchesWatchIdEditRoute: typeof AuthedWatchesWatchIdEditRoute
+  AuthedWatchesWatchIdIndexRoute: typeof AuthedWatchesWatchIdIndexRoute
+}
+
+const AuthedWatchesRouteRouteChildren: AuthedWatchesRouteRouteChildren = {
+  AuthedWatchesNewRoute: AuthedWatchesNewRoute,
+  AuthedWatchesIndexRoute: AuthedWatchesIndexRoute,
+  AuthedWatchesWatchIdEditRoute: AuthedWatchesWatchIdEditRoute,
+  AuthedWatchesWatchIdIndexRoute: AuthedWatchesWatchIdIndexRoute,
+}
+
+const AuthedWatchesRouteRouteWithChildren =
+  AuthedWatchesRouteRoute._addFileChildren(AuthedWatchesRouteRouteChildren)
+
 interface AuthedRouteChildren {
   AuthedContactsRouteRoute: typeof AuthedContactsRouteRouteWithChildren
   AuthedDealsRouteRoute: typeof AuthedDealsRouteRouteWithChildren
@@ -967,6 +1079,7 @@ interface AuthedRouteChildren {
   AuthedOrganizationsRouteRoute: typeof AuthedOrganizationsRouteRouteWithChildren
   AuthedProjectsRouteRoute: typeof AuthedProjectsRouteRouteWithChildren
   AuthedTasksRouteRoute: typeof AuthedTasksRouteRouteWithChildren
+  AuthedWatchesRouteRoute: typeof AuthedWatchesRouteRouteWithChildren
   AuthedCaptureRoute: typeof AuthedCaptureRoute
   AuthedSystemRoute: typeof AuthedSystemRoute
   AuthedIndexRoute: typeof AuthedIndexRoute
@@ -983,6 +1096,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedOrganizationsRouteRoute: AuthedOrganizationsRouteRouteWithChildren,
   AuthedProjectsRouteRoute: AuthedProjectsRouteRouteWithChildren,
   AuthedTasksRouteRoute: AuthedTasksRouteRouteWithChildren,
+  AuthedWatchesRouteRoute: AuthedWatchesRouteRouteWithChildren,
   AuthedCaptureRoute: AuthedCaptureRoute,
   AuthedSystemRoute: AuthedSystemRoute,
   AuthedIndexRoute: AuthedIndexRoute,
