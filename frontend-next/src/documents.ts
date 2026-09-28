@@ -137,3 +137,11 @@ export function saveBlob(blob: Blob, filename: string) {
 // A filename that is safe on every OS, from the document's title.
 export const filenameFor = (doc: Pick<DocumentRead, 'title' | 'format'>) =>
   `${doc.title.replace(/[\\/:*?"<>|]+/g, '-').trim() || 'document'}.${extensionFor(doc.format)}`
+
+// Suggestions for a document picker, by title.
+export const documentOptionsQuery = (api: Api, search: string) =>
+  queryOptions({
+    queryKey: ['documents', 'options', search],
+    queryFn: () => unwrap(api.GET('/documents/', { params: { query: { search: search || undefined, limit: 10 } } })),
+    placeholderData: keepPreviousData,
+  })
