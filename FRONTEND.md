@@ -152,6 +152,18 @@ fails there outright. Markdown documents render through `components/Markdown`,
 text files as preformatted text. **Revisit** the legacy build once browsers
 ship that method.
 
+### Deals board: React Aria drag and drop (#13)
+
+The pipeline is a board by default, one column per stage in the chosen scope,
+with a list view beside it (`?view=list`). Each column is a React Aria
+`GridList` with `useDragAndDrop`, so a card moves by mouse, touch or keyboard
+(Enter to pick up, Tab to a column, Enter to drop) with no extra library; every
+card also has a "Move to…" menu, the plain way on a phone. Order inside a
+column is the API's (expected close date), not by hand, so a drop anywhere in a
+column means "move to this stage". Moves go through `POST /deals/{id}/stage`,
+update the board's cache at once, and ask for an optional reason on the way to
+Lost (`useMoveDeal`).
+
 ### Server state: TanStack Query
 
 All API data goes through the query cache. Query definitions are
