@@ -2,6 +2,7 @@ import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import datetime
+from typing import TypedDict
 
 from fastapi import Depends, FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -72,8 +73,33 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     yield
 
 
-# FastAPI() creates the ASGI app. title/version show up in auto-generated docs at /docs.
-app = FastAPI(title="tinyCRM", version="0.1.0", lifespan=lifespan)
+class ApiDocsUrls(TypedDict):
+    docs_url: str | None
+    redoc_url: str | None
+    openapi_url: str | None
+
+
+def api_docs_urls(environment: Environment) -> ApiDocsUrls:
+    """Where FastAPI serves the interactive docs and the OpenAPI schema.
+
+    Production serves none of them: every endpoint is authenticated anyway, but
+    nobody besides the operator needs the full API surface, so there is no reason
+    to hand it out unauthenticated. Development keeps them. app.openapi() still
+    builds the schema either way, so scripts/export_openapi.py is unaffected.
+    """
+    if environment is Environment.production:
+        return {"docs_url": None, "redoc_url": None, "openapi_url": None}
+    return {"docs_url": "/docs", "redoc_url": "/redoc", "openapi_url": "/openapi.json"}
+
+
+# FastAPI() creates the ASGI app. title/version show up in auto-generated docs at /docs
+# (served outside production only, see api_docs_urls()).
+app = FastAPI(
+    title="tinyCRM",
+    version="0.1.0",
+    lifespan=lifespan,
+    **api_docs_urls(settings.environment),
+)
 
 # CORS lets the browser-hosted Flutter app call this API.
 # allow_origins=["*"] during local dev; set CORS_ORIGINS env var in prod.
