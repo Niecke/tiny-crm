@@ -1,6 +1,10 @@
 import { queryOptions } from '@tanstack/react-query'
 import { type Api, unwrap } from './api/client'
 
+// The backend's rule (MIN_PASSWORD_LENGTH in app/schemas/user.py), checked here
+// first so the common mistake never needs a round trip.
+export const MIN_PASSWORD_LENGTH = 8
+
 // Also the guard's token check: a token that no longer works fails here with a
 // 401 before any protected page renders.
 export const meQuery = (api: Api) =>

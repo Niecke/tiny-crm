@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation } from '@tanstack/react-query'
-import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
+import { createFileRoute, Link, redirect, useRouter } from '@tanstack/react-router'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { ApiError } from '../api/client'
@@ -96,6 +96,9 @@ function LoginPage() {
         <Button type="submit" isDisabled={mutation.isPending}>
           {mutation.isPending ? 'Signing in…' : 'Sign in'}
         </Button>
+        <Link to="/forgot-password" className="button link-button">
+          Forgot password?
+        </Link>
       </form>
     </div>
   )

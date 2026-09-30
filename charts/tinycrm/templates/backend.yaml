@@ -18,6 +18,11 @@ stringData:
   JWT_SECRET: {{ $jwt | quote }}
   S3_ACCESS_KEY: {{ $s3AccessKey | quote }}
   S3_SECRET_KEY: {{ $s3SecretKey | quote }}
+  {{- with .Values.backend.mail.brevoApiKey }}
+  # Sends mail as the verified sender. Kept out of every log and error message
+  # by app/mail.py.
+  BREVO_API_KEY: {{ . | quote }}
+  {{- end }}
 ---
 apiVersion: v1
 kind: Service
@@ -57,7 +62,7 @@ spec:
       annotations:
         # Helm does not roll pods when only a referenced Secret changes, so a
         # rotated password would leave the running pods on the old one.
-        checksum/credentials: {{ printf "%s|%s|%s" .Values.postgres.password $jwt $s3SecretKey | sha256sum }}
+        checksum/credentials: {{ printf "%s|%s|%s|%s" .Values.postgres.password $jwt $s3SecretKey .Values.backend.mail.brevoApiKey | sha256sum }}
     spec:
       {{- with .Values.priorityClassName }}
       priorityClassName: {{ . | quote }}
@@ -96,6 +101,17 @@ spec:
             # when the briefing CronJob itself is switched off.
             - name: BRIEFING_TIMEZONE
               value: {{ .Values.briefing.timeZone | quote }}
+            # Where invite and reset links point. Mail is off without it.
+            {{- if .Values.ingress.host }}
+            - name: APP_URL
+              value: {{ printf "https://%s" .Values.ingress.host | quote }}
+            {{- end }}
+            {{- with .Values.backend.mail.fromAddress }}
+            - name: MAIL_FROM_ADDRESS
+              value: {{ . | quote }}
+            {{- end }}
+            - name: MAIL_FROM_NAME
+              value: {{ .Values.backend.mail.fromName | quote }}
           # readiness only. /health runs SELECT 1 and returns 503 when the
           # database is unreachable — correct for pulling a pod out of the
           # Service, wrong for liveness, where it would restart every backend

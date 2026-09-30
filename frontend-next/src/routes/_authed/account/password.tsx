@@ -4,17 +4,13 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { ApiError, unwrap } from '../../../api/client'
-import { meQuery } from '../../../auth'
+import { MIN_PASSWORD_LENGTH as MIN_LENGTH, meQuery } from '../../../auth'
 import { Button } from '../../../components/ui/Button'
 import { FormTextField } from '../../../components/ui/FormTextField'
 
 export const Route = createFileRoute('/_authed/account/password')({
   component: ChangePassword,
 })
-
-// The backend's own rule (PasswordChange.new_password, min_length=8), checked
-// here first so the common mistake never needs a round trip.
-const MIN_LENGTH = 8
 
 const formSchema = z
   .object({

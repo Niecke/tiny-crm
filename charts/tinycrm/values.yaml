@@ -81,6 +81,18 @@ backend:
   # without this every user shares one address in the login throttle.
   forwardedAllowIps: 10.42.0.0/16
 
+  # Transactional mail through Brevo: account invites (`python -m app.cli
+  # create-user`) and password-reset links, which point at
+  # https://<ingress.host>/next/reset-password — so mail needs frontendNext too.
+  # Optional — without brevoApiKey and fromAddress nothing is sent: a reset
+  # request is logged and dropped, and the CLI refuses to invite.
+  mail:
+    # A bearer credential: it belongs in the cluster Secret, never in git.
+    brevoApiKey: ""
+    # A sender Brevo has verified, on a domain carrying Brevo's SPF/DKIM records.
+    fromAddress: ""
+    fromName: tinyCRM
+
   resources:
     requests:
       cpu: 100m

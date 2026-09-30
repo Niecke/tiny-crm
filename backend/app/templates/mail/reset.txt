@@ -1,0 +1,9 @@
+{% set subject = "Reset your tinyCRM password" %}
+Hello{% if name %} {{ name }}{% endif %},
+
+Someone asked to reset the password for this account. To choose a new one:
+
+{{ link }}
+
+The link works once and expires in {{ lifetime }}. If you did not ask for
+this, ignore this mail — your password stays as it is.

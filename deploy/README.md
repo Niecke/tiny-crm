@@ -155,8 +155,8 @@ right after the first merge — the HelmRelease reports not-ready until they exi
 
 The staging stack has no backup and no briefing CronJob, runs at a negative
 priority so the kubelet evicts it before production, and is sized to about
-250 Mi of real memory. Its first admin comes from `create_admin.py` exactly as in
-production, with `-n tinycrm-staging`.
+250 Mi of real memory. Its first admin comes from `python -m app.cli create-user`
+exactly as in production, with `-n tinycrm-staging`.
 
 ### The React client at `/next`
 
@@ -259,14 +259,58 @@ The schedule (`0 7 * * 1-5`, Europe/Berlin) and the timezone are in
 which decides whether a task due at 23:59 counts as today — change both
 together or not at all.
 
-### Creating an admin user
+### Turning on mail
 
-No signup flow; the first account comes from the CLI.
+Invites and password-reset links go out through Brevo's API (`app/mail.py`).
+Until it is configured, `POST /auth/forgot-password` logs the request and sends
+nothing, and `create-user` refuses to invite.
+
+In Brevo, once:
+
+1. Senders, Domains & Dedicated IPs → Domains: add the sending domain and put
+   the SPF, DKIM and DMARC records it shows into DNS. Wait for "Authenticated".
+2. Add the from-address as a sender on that domain.
+3. SMTP & API → API keys: create a key for this instance.
+4. Turn off click tracking for transactional mail. It rewrites every link
+   through Brevo's redirect domain — for a reset link, that routes a live
+   password token through a third party's logs.
+
+The API key is a bearer credential, so it goes into the `tinycrm-values`
+Secret exactly like the Slack webhook above:
+
+```yaml
+backend:
+  mail:
+    brevoApiKey: xkeysib-...
+```
+
+The from-address is not secret; set `backend.mail.fromAddress` under `values:`
+in `deploy/flux/prod/helmrelease.yaml`.
+
+Links point at `https://<ingress.host>/next/reset-password`: the page exists
+only in the React client, so mail needs `frontendNext.enabled: true` too
+(staging has it; production does not yet). Without it, an invite lands on the
+Flutter app, which has no such page.
+
+### Creating a user
+
+No signup flow; accounts come from the CLI, which mails an invite with a
+single-use link to choose a password (valid 12 hours):
+
+```bash
+kubectl -n tinycrm exec deploy/tinycrm-backend -- \
+  python -m app.cli create-user you@niecke-it.de --name "You" --superuser
+kubectl -n tinycrm exec deploy/tinycrm-backend -- \
+  python -m app.cli invite you@niecke-it.de      # expired or lost invite
+```
+
+Before mail is set up, set the password directly. It is read from stdin, never
+passed as an argument:
 
 ```bash
 read -rsp 'password: ' PW && echo
-kubectl -n tinycrm exec -i deploy/tinycrm-backend -- \
-  env PYTHONPATH=/app python scripts/create_admin.py you@niecke-it.de "$PW"
+printf '%s\n' "$PW" | kubectl -n tinycrm exec -i deploy/tinycrm-backend -- \
+  python -m app.cli create-user you@niecke-it.de --superuser --set-password
 unset PW
 ```
 

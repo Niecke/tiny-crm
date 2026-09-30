@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block content %}
+<p style="margin:0 0 16px;">Someone asked to reset the password for this account. To choose a new one:</p>
+{% with label = "Reset password" %}{% include "_button.html" %}{% endwith %}
+<p style="margin:0;">The link works once and expires in {{ lifetime }}. If you did not ask for
+    this, ignore this mail &mdash; your password stays as it is.</p>
+{% endblock %}
