@@ -11,6 +11,7 @@ import '../widgets/attachment_pickers.dart';
 const kindLabels = {
   'call': 'Call',
   'meeting': 'Meeting',
+  'event': 'Event',
   'email': 'Mail',
   'note': 'Note',
   'other': 'Other',
@@ -19,6 +20,7 @@ const kindLabels = {
 const kindIcons = {
   'call': Icons.phone_outlined,
   'meeting': Icons.groups_outlined,
+  'event': Icons.event_outlined,
   'email': Icons.mail_outline,
   'note': Icons.sticky_note_2_outlined,
   'other': Icons.more_horiz,

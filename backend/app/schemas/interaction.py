@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-InteractionKind = Literal["call", "meeting", "email", "note", "other"]
+InteractionKind = Literal["call", "meeting", "event", "email", "note", "other"]
 
 
 class InteractionLinks(BaseModel):
