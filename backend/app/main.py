@@ -27,7 +27,7 @@ from app.routers import (
     users,
     watches,
 )
-from app.schemas.user import UserRead, UserUpdate
+from app.schemas.user import UserRead
 from app.storage import check_storage
 from app.version import APP_VERSION, BUILD_TIMESTAMP, GIT_COMMIT
 
@@ -147,15 +147,10 @@ app.include_router(
     prefix="/auth",
     tags=["auth"],
 )
-# Custom password-change endpoint (must register before fastapi-users users router
-# so the more specific /users/me/password route resolves first).
+# GET /users/me and POST /users/me/password. Not fastapi-users' users router: its
+# PATCH /users/me set a new password without the old one and changed the email
+# address — which, with password reset, redirected every reset link (#150).
 app.include_router(users.router)
-# /users/me for profile; no register router — admin created via CLI
-app.include_router(
-    fastapi_users.get_users_router(UserRead, UserUpdate),
-    prefix="/users",
-    tags=["users"],
-)
 
 
 @app.get(

@@ -16,6 +16,33 @@ async def test_the_profile_reports_the_signed_in_account(
     assert "hashed_password" not in response.json()
 
 
+async def test_the_profile_cannot_be_patched(client: AsyncClient, alice: Account) -> None:
+    """#150: fastapi-users' PATCH /users/me set a password without the old one
+    and changed the address password-reset links go to."""
+    response = await client.patch(
+        "/users/me",
+        json={"password": "attacker-chosen", "email": "evil@example.com"},
+        headers=alice.headers,
+    )
+    assert response.status_code == 405
+
+    stolen = await client.post(
+        "/auth/jwt/login", data={"username": "evil@example.com", "password": "attacker-chosen"}
+    )
+    assert stolen.status_code == 400
+    profile = await client.get("/users/me", headers=alice.headers)
+    assert profile.json()["email"] == alice.email
+
+
+async def test_other_accounts_are_not_reachable(
+    client: AsyncClient, alice: Account, bob: Account
+) -> None:
+    """fastapi-users' router also served /users/{id} to superusers."""
+    response = await client.get(f"/users/{bob.id}", headers=alice.headers)
+
+    assert response.status_code == 404
+
+
 async def test_changing_the_password_invalidates_the_old_one(
     client: AsyncClient, alice: Account
 ) -> None:

@@ -5,8 +5,7 @@ from fastapi_users import schemas as fu_schemas
 from pydantic import BaseModel, Field
 
 # One rule for every way a password gets set: the change endpoint enforces it in
-# its schema, UserManager.validate_password for the fastapi-users routes (password
-# reset and PATCH /users/me).
+# its schema, UserManager.validate_password for password reset and the CLI.
 MIN_PASSWORD_LENGTH = 8
 
 
@@ -18,10 +17,6 @@ class UserRead(fu_schemas.BaseUser[UUID]):
 class UserCreate(fu_schemas.BaseUserCreate):
     """Only the CLI creates accounts (app/cli.py); there is no register route."""
 
-    name: str | None = None
-
-
-class UserUpdate(fu_schemas.BaseUserUpdate):
     name: str | None = None
 
 
