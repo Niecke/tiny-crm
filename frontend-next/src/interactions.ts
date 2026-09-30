@@ -9,6 +9,7 @@ type Kind = NonNullable<InteractionCreate['kind']>
 export const kindOptions: { value: Kind; label: string }[] = [
   { value: 'call', label: 'Call' },
   { value: 'meeting', label: 'Meeting' },
+  { value: 'event', label: 'Event' },
   { value: 'email', label: 'Mail' },
   { value: 'note', label: 'Note' },
   { value: 'other', label: 'Other' },

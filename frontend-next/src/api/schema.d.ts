@@ -886,7 +886,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "call" | "meeting" | "email" | "note" | "other";
+            kind: "call" | "meeting" | "event" | "email" | "note" | "other";
             /** Subject */
             subject: string;
             /**
@@ -1104,7 +1104,7 @@ export interface components {
              * @default email
              * @enum {string}
              */
-            kind: "call" | "meeting" | "email" | "note" | "other";
+            kind: "call" | "meeting" | "event" | "email" | "note" | "other";
             /** Subject */
             subject: string;
             /** Notes */
@@ -1607,7 +1607,7 @@ export interface components {
              * @default note
              * @enum {string}
              */
-            kind: "call" | "meeting" | "email" | "note" | "other";
+            kind: "call" | "meeting" | "event" | "email" | "note" | "other";
             /** Subject */
             subject: string;
             /** Notes */
@@ -1661,7 +1661,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "call" | "meeting" | "email" | "note" | "other";
+            kind: "call" | "meeting" | "event" | "email" | "note" | "other";
             /** Subject */
             subject: string;
             /** Notes */
@@ -1691,7 +1691,7 @@ export interface components {
         /** InteractionUpdate */
         InteractionUpdate: {
             /** Kind */
-            kind?: ("call" | "meeting" | "email" | "note" | "other") | null;
+            kind?: ("call" | "meeting" | "event" | "email" | "note" | "other") | null;
             /** Subject */
             subject?: string | null;
             /** Notes */
@@ -3807,7 +3807,7 @@ export interface operations {
                 organization_id?: string | null;
                 deal_id?: string | null;
                 project_id?: string | null;
-                kind?: ("call" | "meeting" | "email" | "note" | "other") | null;
+                kind?: ("call" | "meeting" | "event" | "email" | "note" | "other") | null;
                 upcoming?: boolean | null;
             };
             header?: never;

@@ -1,5 +1,5 @@
 // Backend accepts exactly these values for `kind` (see schemas/interaction.py).
-const interactionKinds = ['call', 'meeting', 'email', 'note', 'other'];
+const interactionKinds = ['call', 'meeting', 'event', 'email', 'note', 'other'];
 
 class Interaction {
   const Interaction({
