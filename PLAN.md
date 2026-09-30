@@ -28,7 +28,7 @@ is only what is still open.
 |---|---|---|
 | API | FastAPI + uvicorn, SQLAlchemy 2.0 async, Pydantic v2, Alembic | JSON logging via `log_config.json` |
 | Database | PostgreSQL 18 + asyncpg | Tags use Postgres-native `ARRAY(String)` |
-| Auth | fastapi-users, JWT bearer, admin created via `scripts/create_admin.py` | No register / verify / reset routers mounted |
+| Auth | fastapi-users, JWT bearer, accounts created via `python -m app.cli create-user` | Password reset and invites mailed through Brevo; no register router |
 | Blob store | S3-compatible via aioboto3, Versity Gateway locally, Hetzner Object Storage in production | Bucket versioning checked at boot |
 | Client | Flutter web, Riverpod 3, go_router 17, dio, flutter_secure_storage | Hand-written models |
 | Scheduling | Kubernetes CronJobs on the backup and backend images | Off-site backup; weekday morning briefing to Slack. No scheduler inside the API |

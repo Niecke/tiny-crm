@@ -424,9 +424,18 @@ what is late. `app/routers/briefing.py`; the clock is a dependency
 
 ## Auth and hardening
 
-- **JWT bearer** via fastapi-users. No register / verify / reset routers are
-  mounted; the admin is created with `scripts/create_admin.py`.
+- **JWT bearer** via fastapi-users. No register router; accounts come from
+  `python -m app.cli create-user` (`app/cli.py`), which mails an invite.
   `/auth/jwt/login`, `/auth/jwt/logout`, `/users/me`, `/users/me/password`.
+- **Password reset** (#128): `/auth/forgot-password` mails a link through
+  Brevo (`app/mail.py`); `/auth/reset-password` redeems it. The pages are
+  frontend-next only: `/next/forgot-password` (linked from sign-in) and
+  `/next/reset-password#token=…` — the token in the fragment, so it never
+  reaches a server log. Invites use the same
+  token. Links are single-use and expire after 12 hours
+  (`PASSWORD_TOKEN_LIFETIME_SECONDS`). Redeeming one marks the address verified;
+  `/auth/request-verify-token` + `/auth/verify` are mounted too, but no mail
+  carries a verify token.
 - **Token lifetime is 270 days** with no refresh and no denylist — tracked in #133 —
   [CONTRIBUTING.md](CONTRIBUTING.md).
 - **Login throttle** (`app/ratelimit.py`): sliding window of *failed* logins per

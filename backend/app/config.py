@@ -65,6 +65,27 @@ class Settings(BaseSettings):
     # message. Optional: without it the briefing simply has no link.
     app_url: str | None = None
 
+    # Transactional mail through Brevo's API (app/mail.py): the invite a new
+    # account gets and the password-reset link. Both links point at APP_URL, so
+    # sending needs all three. Unset means no mail: a reset request is logged
+    # and dropped, and the CLI refuses to invite.
+    brevo_api_key: str | None = None
+    # Must be a sender Brevo has verified, on a domain with its SPF/DKIM records.
+    mail_from_address: str | None = None
+    mail_from_name: str = "tinyCRM"
+    # How long an invite or reset link stays usable. Either one is single-use
+    # regardless: the token is bound to the password hash it was issued for.
+    password_token_lifetime_seconds: int = 60 * 60 * 12
+
+    def missing_mail_settings(self) -> list[str]:
+        """Env vars that must be set before any mail can go out."""
+        required = {
+            "BREVO_API_KEY": self.brevo_api_key,
+            "MAIL_FROM_ADDRESS": self.mail_from_address,
+            "APP_URL": self.app_url,
+        }
+        return [name for name, value in required.items() if not value]
+
     def insecure_defaults(self) -> list[str]:
         """Env vars still sitting on a built-in default that is unsafe to deploy.
 

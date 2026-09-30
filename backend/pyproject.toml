@@ -13,6 +13,14 @@ dependencies = [
     "aioboto3>=13.0",
     "pymupdf>=1.24.0",
     "python-multipart>=0.0.20",
+    # Talks to Brevo (app/mail.py); the tests also drive the ASGI app with it.
+    # httpx2 is Pydantic's maintained continuation of httpx, which has gone
+    # quiet; same API, so the only change was the import name.
+    "httpx2>=2.12.0",
+    # The operator CLI, `python -m app.cli`.
+    "typer>=0.27.2",
+    # Mail bodies, app/templates/mail/.
+    "jinja2>=3.1.6",
 ]
 
 [dependency-groups]
@@ -21,10 +29,6 @@ dev = [
     "mypy>=1.15",
     "pytest>=8",
     "pytest-asyncio>=0.25",
-    # Async client the tests drive the ASGI app with. httpx2 is Pydantic's
-    # maintained continuation of httpx, which has gone quiet; same API, so the
-    # only change was the import name.
-    "httpx2>=2.12.0",
     "types-aioboto3[s3]>=13.0",
     "pytest-cov>=7.1.0",
 ]

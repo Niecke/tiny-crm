@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block content %}
+<p style="margin:0 0 16px;">An account has been created for you. Choose a password to sign in:</p>
+{% with label = "Choose a password" %}{% include "_button.html" %}{% endwith %}
+<p style="margin:0;">The link works once and expires in {{ lifetime }}. If it has expired, use
+    &ldquo;Forgot password&rdquo; on the sign-in page to get a new one.</p>
+{% endblock %}

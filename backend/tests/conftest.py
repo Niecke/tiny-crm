@@ -25,14 +25,23 @@ from httpx2 import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app import ratelimit
-from app.auth.users import User, get_jwt_strategy
+from app.auth.users import User, UserManager, get_jwt_strategy
 from app.config import settings
 from app.db import Base, get_session
+from app.mail import Mail, MailDeliveryError, get_mail_sender
 from app.main import app
 
 # The shipped placeholder is too short for HS256 and PyJWT warns on every token.
 # check_secure_defaults() only runs in the lifespan hook, which tests do not use.
 settings.jwt_secret = "test-secret-" + "0" * 52
+# UserManager copied the placeholder into its token secrets at import time.
+UserManager.reset_password_token_secret = settings.jwt_secret
+UserManager.verification_token_secret = settings.jwt_secret
+# A developer's backend/.env may hold a real Brevo key; no test sends real mail.
+# Tests that need a sender use the `outbox` fixture.
+settings.brevo_api_key = None
+settings.mail_from_address = "crm@example.com"
+settings.app_url = "https://crm.example.com"
 
 # Server to create the scratch database on. The database named here is only used
 # to issue CREATE DATABASE, so any existing one works.
@@ -111,6 +120,27 @@ async def client(
     async with AsyncClient(transport=transport, base_url="http://test") as http_client:
         yield http_client
     app.dependency_overrides.clear()
+
+
+class Outbox:
+    """A MailSender that keeps what it is given. `fail` makes it refuse."""
+
+    def __init__(self) -> None:
+        self.sent: list[Mail] = []
+        self.fail = False
+
+    async def send(self, mail: Mail) -> None:
+        if self.fail:
+            raise MailDeliveryError("Brevo refused the mail: HTTP 401 unauthorized")
+        self.sent.append(mail)
+
+
+@pytest.fixture
+def outbox(client: AsyncClient) -> Outbox:
+    """Mail the API sends lands here instead of at Brevo."""
+    box = Outbox()
+    app.dependency_overrides[get_mail_sender] = lambda: box
+    return box
 
 
 @dataclass

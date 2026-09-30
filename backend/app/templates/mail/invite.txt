@@ -1,0 +1,9 @@
+{% set subject = "Your tinyCRM account" %}
+Hello{% if name %} {{ name }}{% endif %},
+
+An account has been created for you. Choose a password to sign in:
+
+{{ link }}
+
+The link works once and expires in {{ lifetime }}. If it has expired, use
+"Forgot password" on the sign-in page to get a new one.

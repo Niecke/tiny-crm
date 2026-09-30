@@ -94,8 +94,9 @@ curl -fsS "$WEB_NEXT/next/capture?text=smoke" | grep -q '<div id="root">' \
   || fail "the share target does not fall back to the app"
 
 step "migrations ran and the admin CLI works"
-$COMPOSE exec -T -e PYTHONPATH=/app backend python scripts/create_admin.py "$EMAIL" "$PASSWORD" \
-  | grep -q "created" || fail "could not create the admin user"
+printf '%s\n' "$PASSWORD" \
+  | $COMPOSE exec -T backend python -m app.cli create-user "$EMAIL" --superuser --set-password \
+  | grep -q "Created user" || fail "could not create the admin user"
 
 step "login returns a token"
 token=$(curl -fsS -X POST "$API/auth/jwt/login" \

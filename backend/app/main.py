@@ -134,6 +134,19 @@ app.include_router(
     tags=["auth"],
     dependencies=[Depends(enforce_login_rate_limit)],
 )
+# /auth/forgot-password + /auth/reset-password. forgot-password answers 202 whether
+# or not the address exists, so it does not reveal which accounts do.
+app.include_router(
+    fastapi_users.get_reset_password_router(),
+    prefix="/auth",
+    tags=["auth"],
+)
+# /auth/request-verify-token + /auth/verify
+app.include_router(
+    fastapi_users.get_verify_router(UserRead),
+    prefix="/auth",
+    tags=["auth"],
+)
 # Custom password-change endpoint (must register before fastapi-users users router
 # so the more specific /users/me/password route resolves first).
 app.include_router(users.router)
