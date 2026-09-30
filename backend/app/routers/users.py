@@ -4,9 +4,16 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.auth import current_active_user
 from app.auth.users import User, UserManager, get_user_manager
-from app.schemas.user import PasswordChange
+from app.schemas.user import PasswordChange, UserRead
 
+# The account's own endpoints. Deliberately no PATCH /users/me: nothing about an
+# account is editable except the password, and that needs the old one.
 router = APIRouter(prefix="/users", tags=["users"])
+
+
+@router.get("/me", response_model=UserRead)
+async def read_me(user: User = Depends(current_active_user)) -> User:
+    return user
 
 
 @router.post("/me/password", status_code=status.HTTP_204_NO_CONTENT)
