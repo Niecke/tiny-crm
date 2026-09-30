@@ -2,7 +2,7 @@ import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
 import { ApiError } from '../api/client'
 import { meQuery } from '../auth'
 import { AppShell } from '../components/AppShell'
-import { clearToken, getToken } from '../token'
+import { clearTokens, getToken } from '../token'
 
 // Pathless layout: every route under src/routes/_authed/ is behind the login
 // and inside the app shell. /login is the only page outside it.
@@ -15,7 +15,7 @@ export const Route = createFileRoute('/_authed')({
       await context.queryClient.ensureQueryData(meQuery(context.api))
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
-        clearToken()
+        clearTokens()
         throw toLogin
       }
       // Anything else (API down, 500) is not a reason to log out; the error

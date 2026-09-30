@@ -426,7 +426,21 @@ what is late. `app/routers/briefing.py`; the clock is a dependency
 
 - **JWT bearer** via fastapi-users. No register router; accounts come from
   `python -m app.cli create-user` (`app/cli.py`), which mails an invite.
-  `/auth/jwt/login`, `/auth/jwt/logout`, `/users/me`, `/users/me/password`.
+  `/auth/jwt/login`, `/auth/jwt/refresh`, `/auth/jwt/logout`, `/users/me`,
+  `/users/me/password`.
+- **Sessions** (#133, `app/auth/sessions.py`): a login opens a row in
+  `auth_sessions` and returns a 15-minute access token plus a refresh token.
+  The access token names its session (`sid`), and every request checks that
+  the session still exists, so ending one takes effect at once. Refresh tokens
+  rotate on every use and are verified by HMAC, not stored; one replaced less
+  than 60 s ago is answered with the same new pair (two tabs, a retried
+  request), anything older is treated as stolen and ends the session. The
+  refresh lifetime is idle time — each refresh extends it.
+  **Ended by:** sign-out (`/auth/jwt/logout`, takes the refresh token, always
+  204); a password change (every *other* session; the one that changed it
+  stays); a password reset (all of them). Both clients renew the access token
+  shortly before it expires and retry once on a 401, so a stale tab recovers
+  by itself.
 - **Password reset** (#128): `/auth/forgot-password` mails a link through
   Brevo (`app/mail.py`); `/auth/reset-password` redeems it. The pages are
   frontend-next only: `/next/forgot-password` (linked from sign-in) and
@@ -436,8 +450,6 @@ what is late. `app/routers/briefing.py`; the clock is a dependency
   (`PASSWORD_TOKEN_LIFETIME_SECONDS`). Redeeming one marks the address verified;
   `/auth/request-verify-token` + `/auth/verify` are mounted too, but no mail
   carries a verify token.
-- **Token lifetime is 270 days** with no refresh and no denylist — tracked in #133 —
-  [CONTRIBUTING.md](CONTRIBUTING.md).
 - **Login throttle** (`app/ratelimit.py`): sliding window of *failed* logins per
   client address, `LOGIN_MAX_FAILURES` (10) per `LOGIN_FAILURE_WINDOW_SECONDS`
   (300). Over budget → 429 with `Retry-After`. Counted in middleware, because a
@@ -467,7 +479,8 @@ All via env or `backend/.env` (see `.env.example`).
 | `DB_ECHO` | `false` | leave off — echo logs personal data |
 | `CORS_ORIGINS` | `["*"]` | must be the real origin in production |
 | `JWT_SECRET` | placeholder | `openssl rand -hex 32` |
-| `JWT_LIFETIME_SECONDS` | 270 days | keeps the Android PWA logged in |
+| `ACCESS_TOKEN_LIFETIME_SECONDS` | 15 min | what a leaked token is good for |
+| `REFRESH_TOKEN_LIFETIME_SECONDS` | 90 days | idle time: every refresh extends it |
 | `LOGIN_MAX_FAILURES` / `LOGIN_FAILURE_WINDOW_SECONDS` | 10 / 300 | failed logins only |
 | `S3_ENDPOINT_URL` / `S3_ACCESS_KEY` / `S3_SECRET_KEY` / `S3_BUCKET` / `S3_REGION` | Versity Gateway locally, Hetzner Object Storage in production | bucket versioning is checked at boot |
 | `SLACK_WEBHOOK_URL` | unset | without it a real briefing send exits 2 |
@@ -483,9 +496,9 @@ the frontend polls it to prompt a reload after a deploy.
 
 ## Tests
 
-- **Backend: 340 tests** (`cd backend && uv run pytest`). A scratch Postgres
+- **Backend: 396 tests** (`cd backend && uv run pytest`). A scratch Postgres
   database per session; tables rebuilt from the models before each test; two
-  accounts (Alice and Bob) with tokens minted straight from the JWT strategy.
+  accounts (Alice and Bob) with sessions opened directly, skipping the password hash.
   S3 is faked in memory for document tests. `uv run mypy app tests` is clean and
   gated in CI; `ruff check` and `ruff format --check` too.
 - **Frontend: 11 test files** (`cd frontend && flutter test`) covering the

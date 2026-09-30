@@ -2,10 +2,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, type LinkProps, useLocation, useRouteContext, useRouter } from '@tanstack/react-router'
 import { type ReactNode, useState } from 'react'
 import { Dialog, Modal, ModalOverlay } from 'react-aria-components'
-import { meQuery } from '../auth'
+import { logout, meQuery } from '../auth'
 import { captureCountQuery } from '../captures'
 import { dueCountQuery } from '../watches'
-import { clearToken } from '../token'
 import { QuickCaptureButton } from './QuickCapture'
 import { Button } from './ui/Button'
 
@@ -137,11 +136,10 @@ function Account() {
   const queryClient = useQueryClient()
   const router = useRouter()
 
-  // The JWT is stateless, so there is nothing to revoke server-side: dropping
-  // the token is the logout. The cache goes last, after the protected page
-  // has unmounted, so nothing refetches in between.
-  async function logout() {
-    clearToken()
+  // Ends the session server-side, then leaves. The cache goes last, after the
+  // protected page has unmounted, so nothing refetches in between.
+  async function signOut() {
+    await logout(api)
     await router.navigate({ to: '/login' })
     queryClient.clear()
   }
@@ -154,7 +152,7 @@ function Account() {
         </div>
         <div>React preview · #122</div>
       </div>
-      <Button variant="quiet" onPress={logout}>
+      <Button variant="quiet" onPress={signOut}>
         Sign out
       </Button>
     </div>

@@ -582,8 +582,25 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Auth:Jwt.Login */
-        post: operations["auth_jwt_login_auth_jwt_login_post"];
+        /** Login */
+        post: operations["login_auth_jwt_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/jwt/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Refresh */
+        post: operations["refresh_auth_jwt_refresh_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -599,8 +616,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Auth:Jwt.Logout */
-        post: operations["auth_jwt_logout_auth_jwt_logout_post"];
+        /** Logout */
+        post: operations["logout_auth_jwt_logout_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -701,7 +718,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Change Password */
+        /**
+         * Change Password
+         * @description Change the password and sign out every other session.
+         *
+         *     This one stays signed in: the caller just proved they know the password.
+         *     Every other device has to sign in again with the new one — which is the
+         *     point when the reason for the change is a lost laptop.
+         */
         post: operations["change_password_users_me_password_post"];
         delete?: never;
         options?: never;
@@ -756,15 +780,8 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** BearerResponse */
-        BearerResponse: {
-            /** Access Token */
-            access_token: string;
-            /** Token Type */
-            token_type: string;
-        };
-        /** Body_auth_jwt_login_auth_jwt_login_post */
-        Body_auth_jwt_login_auth_jwt_login_post: {
+        /** Body_login_auth_jwt_login_post */
+        Body_login_auth_jwt_login_post: {
             /** Grant Type */
             grant_type?: string | null;
             /** Username */
@@ -1979,6 +1996,11 @@ export interface components {
             /** Document Ids */
             document_ids?: string[] | null;
         };
+        /** RefreshTokenBody */
+        RefreshTokenBody: {
+            /** Refresh Token */
+            refresh_token: string;
+        };
         /**
          * TaskCompletionRead
          * @description A patched task, plus the instance that completing it created.
@@ -2176,6 +2198,24 @@ export interface components {
             recurrence_interval?: number | null;
             /** Recurrence Until */
             recurrence_until?: string | null;
+        };
+        /**
+         * TokenPair
+         * @description What a login or a refresh hands out (app/auth/sessions.py).
+         */
+        TokenPair: {
+            /** Access Token */
+            access_token: string;
+            /**
+             * Token Type
+             * @default bearer
+             * @constant
+             */
+            token_type: "bearer";
+            /** Expires In */
+            expires_in: number;
+            /** Refresh Token */
+            refresh_token: string;
         };
         /** UserRead */
         UserRead: {
@@ -4218,7 +4258,7 @@ export interface operations {
             };
         };
     };
-    auth_jwt_login_auth_jwt_login_post: {
+    login_auth_jwt_login_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -4227,7 +4267,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/x-www-form-urlencoded": components["schemas"]["Body_auth_jwt_login_auth_jwt_login_post"];
+                "application/x-www-form-urlencoded": components["schemas"]["Body_login_auth_jwt_login_post"];
             };
         };
         responses: {
@@ -4237,13 +4277,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    /**
-                     * @example {
-                     *       "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoiOTIyMWZmYzktNjQwZi00MzcyLTg2ZDMtY2U2NDJjYmE1NjAzIiwiYXVkIjoiZmFzdGFwaS11c2VyczphdXRoIiwiZXhwIjoxNTcxNTA0MTkzfQ.M10bjOe45I5Ncu_uXvOmVV8QxnL-nZfcH96U90JaocI",
-                     *       "token_type": "bearer"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["BearerResponse"];
+                    "application/json": components["schemas"]["TokenPair"];
                 };
             };
             /** @description Bad Request */
@@ -4266,14 +4300,18 @@ export interface operations {
             };
         };
     };
-    auth_jwt_logout_auth_jwt_logout_post: {
+    refresh_auth_jwt_refresh_post: {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefreshTokenBody"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -4281,15 +4319,57 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["TokenPair"];
                 };
             };
-            /** @description Missing token or inactive user. */
+            /** @description Unauthorized */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
+                content: {
+                    "application/json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    logout_auth_jwt_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefreshTokenBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };

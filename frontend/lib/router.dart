@@ -271,7 +271,7 @@ class AppShell extends ConsumerWidget {
             tooltip: 'My account',
           ),
           IconButton(
-            onPressed: () => ref.read(authProvider.notifier).logout(),
+            onPressed: () => ref.read(authProvider.notifier).signOut(),
             icon: const Icon(Icons.logout),
             tooltip: 'Sign out',
           ),

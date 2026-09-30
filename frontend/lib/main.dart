@@ -26,6 +26,7 @@ void main() {
       validateStatus: (status) => status != null,
     ))
       ..interceptors.add(AuthInterceptor(
+        baseUrl: config.apiUrl,
         onUnauthorized: () => container.read(authProvider.notifier).logout(),
       ))
       ..interceptors.add(ErrorInterceptor());

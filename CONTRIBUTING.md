@@ -66,7 +66,7 @@ messages and code comments still resolve.
 |---|---|---|
 | API | FastAPI + uvicorn, SQLAlchemy 2.0 async, Pydantic v2, Alembic | JSON logging via `log_config.json` |
 | Database | PostgreSQL 18 + asyncpg | Tags use Postgres-native `ARRAY(String)` |
-| Auth | fastapi-users, JWT bearer, accounts created via `python -m app.cli create-user` | Password reset and invites mailed through Brevo; no register router |
+| Auth | fastapi-users, 15-minute JWT bearer plus rotating refresh token, sessions revocable server-side, accounts created via `python -m app.cli create-user` | Password reset and invites mailed through Brevo; no register router |
 | Blob store | S3-compatible via aioboto3, Versity Gateway locally, Hetzner Object Storage in production | Bucket versioning checked at boot |
 | Client | Flutter web, Riverpod 3, go_router 17, dio, flutter_secure_storage | Hand-written models; being replaced, see #122 and [FRONTEND.md](FRONTEND.md) |
 | Scheduling | Kubernetes CronJobs on the backup and backend images | Off-site backup; weekday morning briefing to Slack. No scheduler inside the API |
