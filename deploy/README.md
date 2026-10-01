@@ -15,6 +15,7 @@ merge to main
 
 merge the release-please pull request → tag vX.Y.Z
   └─ release.yml           retags sha-<short> as X.Y.Z, X.Y, X, stable,
+                           signs it and attests its SBOM (cosign keyless),
                            commits X.Y.Z into deploy/flux/prod/helmrelease.yaml
 ```
 
@@ -54,8 +55,14 @@ the production decision:
    release-please, which tags `vX.Y.Z` and publishes the GitHub Release.
 3. The tag runs `release.yml`. It waits for `sha-<short>` on all three images
    and fails if they never appear — it never builds. Then it tags that digest
-   `X.Y.Z`, `X.Y`, `X` and `stable`, commits `Deploy X.Y.Z to production`, and
-   appends the image digests to the GitHub Release.
+   `X.Y.Z`, `X.Y`, `X` and `stable`, signs each digest with cosign (keyless,
+   GitHub OIDC) and attaches a signed syft SPDX SBOM as an attestation, commits
+   `Deploy X.Y.Z to production`, and appends the image digests, the SBOM files
+   and the `cosign verify` commands to the GitHub Release.
+
+Every image also carries SLSA provenance (`mode=max`) from its build on the
+pull request; the retags copy it along with the digest. It records the build
+args, so a build arg must never carry a secret.
 
 `stable`, `X`, `X.Y` and production only move forward: a tag older than the
 newest release gets its `X.Y.Z` and nothing else.
