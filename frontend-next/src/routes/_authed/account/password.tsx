@@ -44,8 +44,8 @@ function ChangePassword() {
   const mutation = useMutation({
     mutationFn: ({ old_password, new_password }: FormValues) =>
       unwrap(api.POST('/users/me/password', { body: { old_password, new_password } })),
-    // "Password last changed" on the account page is stale now. The token is
-    // not: the JWT does not depend on the password, so this tab stays signed in.
+    // "Password last changed" on the account page is stale now. The session is
+    // not: the backend keeps the one that changed the password and ends the rest.
     onSuccess: () => queryClient.invalidateQueries({ queryKey: meQuery(api).queryKey }),
     onError: (error) => {
       if (error instanceof ApiError && error.detail === 'INVALID_OLD_PASSWORD') {
@@ -59,7 +59,7 @@ function ChangePassword() {
       <div className="page page-narrow">
         <header className="page-header">
           <h1>Password changed</h1>
-          <p>Use the new password the next time you sign in, here and in the current app.</p>
+          <p>You stay signed in here. Every other device has been signed out and needs the new password, here and in the current app.</p>
         </header>
         <div className="form-actions account-actions">
           <Link to="/account" className="button">

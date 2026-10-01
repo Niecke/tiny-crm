@@ -50,7 +50,9 @@ class _ChangePasswordPageState extends ConsumerState<ChangePasswordPage> {
         context.go('/');
       }
       messenger.showSnackBar(
-        const SnackBar(content: Text('Password updated successfully.')),
+        const SnackBar(
+          content: Text('Password updated. Other devices have been signed out.'),
+        ),
       );
       return;
     } on DioException catch (e) {

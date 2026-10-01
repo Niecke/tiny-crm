@@ -9,12 +9,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import auth_backend, fastapi_users
+from app.auth import fastapi_users
 from app.config import Environment, settings
 from app.db import get_session
 from app.logging_config import configure_logging
-from app.ratelimit import count_failed_logins, enforce_login_rate_limit
+from app.ratelimit import count_failed_logins
 from app.routers import (
+    auth,
     briefing,
     captures,
     contacts,
@@ -125,15 +126,10 @@ app.include_router(projects.router)
 app.include_router(interactions.router)
 app.include_router(watches.router)
 app.include_router(briefing.router)
-# The throttle covers logout as well as login. That is deliberate: both are the
-# credential surface, and the budget is generous enough that no real session
-# hits it.
-app.include_router(
-    fastapi_users.get_auth_router(auth_backend),
-    prefix="/auth/jwt",
-    tags=["auth"],
-    dependencies=[Depends(enforce_login_rate_limit)],
-)
+# /auth/jwt/login, /refresh and /logout. The throttle covers logout as well as
+# login. That is deliberate: both are the credential surface, and the budget is
+# generous enough that no real session hits it.
+app.include_router(auth.router)
 # /auth/forgot-password + /auth/reset-password. forgot-password answers 202 whether
 # or not the address exists, so it does not reveal which accounts do.
 app.include_router(

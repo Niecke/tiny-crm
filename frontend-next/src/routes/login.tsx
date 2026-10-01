@@ -7,7 +7,7 @@ import { ApiError } from '../api/client'
 import { Button } from '../components/ui/Button'
 import { FormTextField } from '../components/ui/FormTextField'
 import { login } from '../auth'
-import { getToken, setToken } from '../token'
+import { getToken, setTokens } from '../token'
 
 // Only same-app paths: an absolute or protocol-relative URL here would turn
 // the login page into an open redirect.
@@ -57,8 +57,8 @@ function LoginPage() {
 
   const mutation = useMutation({
     mutationFn: (values: FormValues) => login(api, values.email, values.password),
-    onSuccess: async (token) => {
-      setToken(token)
+    onSuccess: async (tokens) => {
+      setTokens(tokens)
       await router.navigate({ to: search.redirect ?? '/', replace: true })
     },
   })

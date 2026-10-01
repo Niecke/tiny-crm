@@ -30,9 +30,13 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["*"]
     # Must be overridden in prod with a long random secret
     jwt_secret: str = DEFAULT_JWT_SECRET
-    # How long a login stays valid. There is no refresh token, so this is also
-    # the hard re-login interval. ~9 months keeps the Android PWA logged in.
-    jwt_lifetime_seconds: int = 60 * 60 * 24 * 270
+    # A login is a session (app/auth/sessions.py): a short-lived access token
+    # the clients renew with a refresh token. The access token is what a leak
+    # exposes, so it lives minutes. The refresh token's lifetime is idle time —
+    # every refresh extends it — so the Android PWA stays signed in as long as
+    # it is opened at least once in that window.
+    access_token_lifetime_seconds: int = 60 * 15
+    refresh_token_lifetime_seconds: int = 60 * 60 * 24 * 90
 
     # Login throttling, counted per client address over a sliding window.
     # Only failed logins count, so a legitimate mistype costs almost nothing.

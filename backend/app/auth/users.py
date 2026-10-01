@@ -3,15 +3,17 @@ from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
 from uuid import UUID
 
-from fastapi import Depends, Request
+from fastapi import Depends, HTTPException, Request, status
 from fastapi_users import (
     BaseUserManager,
     FastAPIUsers,
     InvalidPasswordException,
     UUIDIDMixin,
+    exceptions,
     schemas,
 )
-from fastapi_users.authentication import AuthenticationBackend, BearerTransport, JWTStrategy
+from fastapi_users.authentication import AuthenticationBackend, BearerTransport
+from fastapi_users.authentication.strategy import StrategyDestroyNotSupportedError
 from fastapi_users.db import SQLAlchemyBaseUserTableUUID, SQLAlchemyUserDatabase
 from fastapi_users.exceptions import UserInactive
 from fastapi_users.jwt import generate_jwt
@@ -19,6 +21,7 @@ from sqlalchemy import DateTime, String
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.auth.sessions import close_sessions, read_access_token, session_is_open
 from app.config import settings
 from app.db import Base, get_session
 from app.mail import (
@@ -58,6 +61,8 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, UUID]):
         mail_sender: MailSender | None = None,
     ) -> None:
         super().__init__(user_db)
+        # The request's own session, for the sessions table (app/auth/sessions.py).
+        self.db = user_db.session
         self.mail_sender = mail_sender
 
     def password_token(self, user: User) -> str:
@@ -133,6 +138,9 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, UUID]):
         await self.user_db.update(
             user, {"password_changed_at": datetime.now(UTC), "is_verified": True}
         )
+        # Whoever reset the password may not be whoever is signed in: every
+        # session ends, including any the old password opened.
+        await close_sessions(self.db, user.id)
         logger.info("Password reset completed for user %s", user.id)
 
     async def on_after_request_verify(
@@ -154,16 +162,56 @@ async def get_user_manager(
 bearer_transport = BearerTransport(tokenUrl="/auth/jwt/login")
 
 
-def get_jwt_strategy() -> JWTStrategy[User, UUID]:
-    return JWTStrategy(secret=settings.jwt_secret, lifetime_seconds=settings.jwt_lifetime_seconds)
+class SessionStrategy:
+    """Reads access tokens for fastapi-users' current_user dependency.
+
+    Unlike fastapi-users' JWTStrategy, a valid signature is not enough: the
+    token's session must still exist, so a signed-out token is dead at once.
+    Tokens are issued by app/routers/auth.py, not through this class.
+    """
+
+    def __init__(self, db: AsyncSession) -> None:
+        self.db = db
+
+    async def read_token(
+        self, token: str | None, user_manager: BaseUserManager[User, UUID]
+    ) -> User | None:
+        claims = read_access_token(token) if token else None
+        if claims is None or not await session_is_open(self.db, claims):
+            return None
+        try:
+            return await user_manager.get(claims.user_id)
+        except exceptions.UserNotExists:
+            return None
+
+    async def write_token(self, user: User) -> str:
+        raise NotImplementedError("tokens are issued by app.auth.sessions.open_session")
+
+    async def destroy_token(self, token: str, user: User) -> None:
+        raise StrategyDestroyNotSupportedError("sign-out is POST /auth/jwt/logout")
+
+
+def get_session_strategy(db: AsyncSession = Depends(get_session)) -> SessionStrategy:
+    return SessionStrategy(db)
 
 
 auth_backend = AuthenticationBackend(
     name="jwt",
     transport=bearer_transport,
-    get_strategy=get_jwt_strategy,
+    get_strategy=get_session_strategy,
 )
 
 fastapi_users = FastAPIUsers[User, UUID](get_user_manager, [auth_backend])
 
 current_active_user = fastapi_users.current_user(active=True)
+
+
+async def current_session_id(
+    token: str = Depends(bearer_transport.scheme),
+    user: User = Depends(current_active_user),
+) -> UUID:
+    """The session the request's access token belongs to, for sign-out-others."""
+    claims = read_access_token(token)
+    if claims is None:  # pragma: no cover — current_active_user already checked it
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+    return claims.session_id

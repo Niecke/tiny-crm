@@ -10,9 +10,10 @@ import './styles.css'
 const config = await loadConfig()
 const api = createApi(config.apiUrl)
 
-// A token that dies mid-session (expiry, password change elsewhere) shows up as
-// a 401 on whatever request comes next. The API client has already dropped it;
-// this sends the user to /login and back here afterwards.
+// A session that ends (signed out, a password change on another device, idle
+// too long) shows up as a 401 on whatever request comes next — an expired
+// access token alone never does, the API client renews it. The client has
+// already dropped the tokens; this sends the user to /login and back here.
 function onAuthError(err: unknown) {
   if (!(err instanceof ApiError) || err.status !== 401) return
   const { location } = router.state
