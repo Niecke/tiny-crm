@@ -20,7 +20,8 @@ spec:
 # Content-Encoding and any body under minResponseBodyBytes, where the gzip
 # framing would cost more than it saves. Formats that are compressed already
 # (photos, document previews, woff2, archives) only burn CPU, so they are left
-# alone; main.dart.js and main.dart.wasm are what this is really for.
+# alone; the app's JavaScript chunks (pdf.js alone is close to half a megabyte)
+# and the API's JSON lists are what this is really for.
 apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:

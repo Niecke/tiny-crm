@@ -26,7 +26,8 @@ export default defineConfig({
       provider: 'v8',
       include: ['src/**/*.{ts,tsx}'],
       exclude: ['src/routeTree.gen.ts', 'src/api/schema.d.ts', 'src/routes/**', 'src/test/**', 'src/**/*.test.{ts,tsx}'],
-      reporter: ['text', 'json-summary'],
+      // cobertura: the XML ci/pr_report.py reads, as it does the backend's.
+      reporter: ['text', 'cobertura'],
     },
   },
 })

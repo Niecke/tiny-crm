@@ -284,7 +284,8 @@ The timezone and locale are pinned (`America/New_York`, `en-US`) so a run
 gives the same strings everywhere. The zone is west of Greenwich on purpose:
 that is where a date read as UTC midnight shows as the day before.
 
-Coverage is reported in CI's job summary, not enforced: a threshold invites
+Coverage is reported in the pull request's test report (`ci/pr_report.py`,
+beside the backend's), not enforced: a threshold invites
 tests written for the number.
 
 ### Serving: a static image at `/`
@@ -382,7 +383,6 @@ and the Flutter image is dropped from CI and promote: building it was the
 slowest job in the pipeline. The manifest moved too: `id`, `scope`,
 `start_url` and the share `action` are `/`, the name "tinyCRM".
 
-Still to do: delete `frontend/`, and with it the Flutter parts of
-`ci/pr_report.py`, the `frontend/pubspec.yaml` entry in
+Still to do: delete `frontend/`, and with it the `frontend/pubspec.yaml` entry in
 `release-please-config.json` and the `frontend/**` rule in `renovate.json`.
 Renaming `frontend-next/` to `frontend/` can follow in the same change.
