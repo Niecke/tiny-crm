@@ -429,6 +429,11 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+<<<<<<< Updated upstream
+=======
+<<<<<<< Updated upstream
+=======
+>>>>>>> Stashed changes
   # The images as pushed, so the scan sees exactly the digest promote will
   # retag. It reports HIGH/CRITICAL findings with a fixed version available and
   # never blocks the merge. A blocking gate fails every pull request the moment
@@ -453,6 +458,10 @@ jobs:
     permissions:
       contents: read
       packages: read
+<<<<<<< Updated upstream
+=======
+      pull-requests: write
+>>>>>>> Stashed changes
     env:
       # renovate: datasource=github-releases depName=aquasecurity/trivy
       TRIVY_VERSION: v0.74.0
@@ -461,10 +470,20 @@ jobs:
       TRIVY_SKIP_VERSION_CHECK: "true"
       IMAGE_TAG: ${{ needs.meta.outputs.tag }}
     steps:
+<<<<<<< Updated upstream
       # Only the accepted findings, each with a reason and an expiry date.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           sparse-checkout: .trivyignore.yaml
+=======
+      # The accepted findings (each with a reason and an expiry date) and the
+      # script that renders the report.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          sparse-checkout: |
+            .trivyignore.yaml
+            ci/scan_report.py
+>>>>>>> Stashed changes
           sparse-checkout-cone-mode: false
 
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
@@ -483,7 +502,12 @@ jobs:
           ignore-unfixed: true
           exit-code: "0"
           trivyignores: .trivyignore.yaml
+<<<<<<< Updated upstream
           output: trivy-backend.txt
+=======
+          format: json
+          output: trivy-backend.json
+>>>>>>> Stashed changes
 
       - name: Scan frontend
         if: ${{ !cancelled() }}
@@ -496,7 +520,12 @@ jobs:
           ignore-unfixed: true
           exit-code: "0"
           trivyignores: .trivyignore.yaml
+<<<<<<< Updated upstream
           output: trivy-frontend.txt
+=======
+          format: json
+          output: trivy-frontend.json
+>>>>>>> Stashed changes
 
       - name: Scan backup
         if: ${{ !cancelled() }}
@@ -509,6 +538,7 @@ jobs:
           ignore-unfixed: true
           exit-code: "0"
           trivyignores: .trivyignore.yaml
+<<<<<<< Updated upstream
           output: trivy-backup.txt
 
       # `output:` sends Trivy's table to a file instead of the scan step's log,
@@ -535,6 +565,40 @@ jobs:
             } | tee -a "$GITHUB_STEP_SUMMARY"
           done
 
+=======
+          format: json
+          output: trivy-backup.json
+
+      - name: Render the report
+        if: ${{ !cancelled() }}
+        run: |
+          images=(--image backend=trivy-backend.json --image frontend=trivy-frontend.json --image backup=trivy-backup.json)
+          python3 ci/scan_report.py "${images[@]}" --max-rows 0 | tee -a "$GITHUB_STEP_SUMMARY"
+          python3 ci/scan_report.py "${images[@]}" > comment.md
+
+      - name: Comment on the pull request
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          # Marker keeps one comment per PR: find it, edit it, or post the first.
+          printf '\n<!-- tinycrm-image-scan -->\n' >> comment.md
+          comment_id=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" \
+            --jq '[.[] | select(.body | contains("<!-- tinycrm-image-scan -->"))] | last | .id // empty')
+          if [ -n "$comment_id" ]; then
+            gh api --method PATCH "repos/${{ github.repository }}/issues/comments/$comment_id" \
+              -F body=@comment.md > /dev/null
+            echo "Updated comment $comment_id"
+          else
+            gh api --method POST "repos/${{ github.repository }}/issues/$PR/comments" \
+              -F body=@comment.md > /dev/null
+            echo "Posted a new comment"
+          fi
+
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
   integration:
     name: Integration test
     needs: [changes, meta, build-backend, build-frontend]
