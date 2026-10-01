@@ -6,6 +6,10 @@ name: Release
 # sha-<short> by promote.yml when it merged. Here they get their version tags and
 # the version is written into deploy/flux/prod/, which is the only thing that
 # moves production (#114).
+#
+# Each released digest is also signed keyless with cosign and gets a signed
+# syft SBOM attestation, both before production is pointed at it — so a cluster
+# that verifies signatures never sees an unsigned release.
 on:
   push:
     tags: ["v[0-9]+.[0-9]+.[0-9]+"]
@@ -15,6 +19,9 @@ permissions:
   # the DEPLOY_KEY deploy key, as in promote.yml — see the checkout step.
   contents: write
   packages: write
+  # Keyless cosign: the workflow's OIDC token is exchanged for a short-lived
+  # Fulcio certificate naming this workflow and the tag it ran for.
+  id-token: write
 
 concurrency:
   group: release
@@ -25,6 +32,10 @@ env:
   # GHCR rejects uppercase in a path, so this is not github.repository_owner.
   REGISTRY: ghcr.io/niecke/tiny-crm
   RELEASE: deploy/flux/prod/helmrelease.yaml
+  # renovate: datasource=github-releases depName=sigstore/cosign
+  COSIGN_VERSION: v3.1.3
+  # renovate: datasource=github-releases depName=anchore/syft
+  SYFT_VERSION: v1.52.0
 
 jobs:
   release:
@@ -151,6 +162,42 @@ jobs:
             done
           done
 
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: ${{ env.COSIGN_VERSION }}
+
+      - uses: anchore/sbom-action/download-syft@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        id: syft
+        with:
+          syft-version: ${{ env.SYFT_VERSION }}
+
+      # By digest, like the tagging: a signature belongs to a digest, not a tag,
+      # so it covers every name this digest carries — sha-<short> included.
+      # The certificate names release.yml and the vX.Y.Z ref, which is what a
+      # verifier pins to. Re-running adds another signature; that is harmless.
+      #
+      # The SBOM is read from the registry, not a local daemon: syft resolves
+      # the index to the linux/amd64 image, and the attestation goes on the
+      # index digest that the HelmRelease and Kyverno resolve the tag to.
+      - name: Sign the images and attest their SBOMs
+        env:
+          SYFT: ${{ steps.syft.outputs.cmd }}
+          BACKEND: ${{ steps.images.outputs.backend }}
+          FRONTEND: ${{ steps.images.outputs.frontend }}
+          BACKUP: ${{ steps.images.outputs.backup }}
+        run: |
+          set -euo pipefail
+          for image in backend frontend backup; do
+            var="${image^^}"
+            ref="$REGISTRY/$image@${!var}"
+            sbom="sbom-$image.spdx.json"
+
+            cosign sign --yes "$ref"
+
+            "$SYFT" scan "registry:$ref" --output "spdx-json=$sbom"
+            cosign attest --yes --type spdxjson --predicate "$sbom" "$ref"
+          done
+
       # The push races promote's own deploy commit for the same merge — both
       # start from the release merge. They touch different files, so a rebase
       # always applies cleanly. promote's job-level `if:` skips this commit.
@@ -195,10 +242,12 @@ jobs:
 
       # release-please creates the Release and the tag in one call, so it should
       # exist already; the retry covers GitHub's eventual consistency. Everything
-      # from the marker down is this workflow's, which keeps a re-run idempotent.
-      - name: Attach the image digests to the GitHub Release
+      # from the marker down is this workflow's, which keeps a re-run idempotent,
+      # as does --clobber on the SBOM assets.
+      - name: Attach the image digests and SBOMs to the GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+          IDENTITY: https://github.com/${{ github.workflow_ref }}
           TAG: ${{ github.ref_name }}
           VERSION: ${{ steps.release.outputs.version }}
           COMMIT: ${{ steps.release.outputs.commit }}
@@ -234,7 +283,20 @@ jobs:
             echo "| \`$REGISTRY/backend:$VERSION\` | \`$BACKEND\` |"
             echo "| \`$REGISTRY/frontend:$VERSION\` | \`$FRONTEND\` |"
             echo "| \`$REGISTRY/backup:$VERSION\` | \`$BACKUP\` |"
+            echo
+            echo "Signed keyless with cosign; each image carries a signed SPDX SBOM"
+            echo "attestation, also attached below. To verify:"
+            echo
+            echo '```sh'
+            echo "cosign verify $REGISTRY/backend:$VERSION \\"
+            echo "  --certificate-identity '$IDENTITY' \\"
+            echo "  --certificate-oidc-issuer https://token.actions.githubusercontent.com"
+            echo "cosign verify-attestation --type spdxjson $REGISTRY/backend:$VERSION \\"
+            echo "  --certificate-identity '$IDENTITY' \\"
+            echo "  --certificate-oidc-issuer https://token.actions.githubusercontent.com"
+            echo '```'
           } > "$notes"
 
           gh release edit "$TAG" --notes-file "$notes"
+          gh release upload "$TAG" sbom-backend.spdx.json sbom-frontend.spdx.json sbom-backup.spdx.json --clobber
           cat "$notes" >> "$GITHUB_STEP_SUMMARY"

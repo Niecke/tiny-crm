@@ -353,6 +353,11 @@ jobs:
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ needs.meta.outputs.commit }}
           tags: ${{ env.REGISTRY }}/backend:${{ needs.meta.outputs.tag }}
+          # SLSA provenance, attached to the image index as an attestation
+          # manifest — imagetools carries it along when promote and release
+          # retag. mode=max records the build args too, so none of them may
+          # ever be a secret (#114).
+          provenance: mode=max
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -390,6 +395,7 @@ jobs:
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ needs.meta.outputs.commit }}
           tags: ${{ env.REGISTRY }}/frontend:${{ needs.meta.outputs.tag }}
+          provenance: mode=max
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -426,6 +432,7 @@ jobs:
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ needs.meta.outputs.commit }}
           tags: ${{ env.REGISTRY }}/backup:${{ needs.meta.outputs.tag }}
+          provenance: mode=max
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
