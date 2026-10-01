@@ -83,7 +83,7 @@ backend:
 
   # Transactional mail through Brevo: account invites (`python -m app.cli
   # create-user`) and password-reset links, which point at
-  # https://<ingress.host>/next/reset-password — so mail needs frontendNext too.
+  # https://<ingress.host>/reset-password, a page of the React frontend.
   # Optional — without brevoApiKey and fromAddress nothing is sent: a reset
   # request is logged and dropped, and the CLI refuses to invite.
   mail:
@@ -100,6 +100,8 @@ backend:
     limits:
       memory: 512Mi
 
+# The React client, built from frontend-next/ (#122). The image name stayed
+# from the Flutter client it replaced, which is no longer built.
 frontend:
   image:
     repository: ghcr.io/niecke/tiny-crm/frontend
@@ -113,26 +115,6 @@ frontend:
       memory: 32Mi
     limits:
       memory: 128Mi
-
-# The React client replacing the Flutter one (#122), served at /next/* beside it
-# until the cutover. Off by default: production stays Flutter-only until the
-# release workflow (#114) carries a frontend-next tag too. It reads the same
-# config.json ConfigMap as the Flutter frontend.
-frontendNext:
-  enabled: false
-  image:
-    repository: ghcr.io/niecke/tiny-crm/frontend-next
-    tag: ""
-    pullPolicy: IfNotPresent
-  replicas: 1
-
-  # Caddy serving static files, like the Flutter image.
-  resources:
-    requests:
-      cpu: 5m
-      memory: 16Mi
-    limits:
-      memory: 64Mi
 
 # ---------------------------------------------------------------------------
 # The morning briefing: overdue tasks, today's plan and the sources due to be

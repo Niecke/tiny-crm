@@ -35,7 +35,6 @@ const queryClient = new QueryClient({
 
 const router = createRouter({
   routeTree,
-  basepath: '/next',
   context: { api, config, queryClient },
   // Route loaders go through the query cache, so the router's own cache would
   // only hold a second, staler copy of the same data.

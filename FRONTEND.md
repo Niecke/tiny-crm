@@ -1,9 +1,11 @@
 # Frontend
 
-The React client in `frontend-next/` replaces the Flutter app in `frontend/`
-([#122](https://github.com/Niecke/tiny-crm/issues/122)). It is built in
-parallel, served at `/next/` on staging, and takes over in a single cutover
-commit once the criteria at the end of this file are met.
+The React client in `frontend-next/` has replaced the Flutter app in
+`frontend/` ([#122](https://github.com/Niecke/tiny-crm/issues/122)). It was
+built in parallel and previewed at `/next/` on staging; since the cutover it is
+the `frontend` image, served at `/`. The Flutter code is no longer built,
+tested or deployed, and stays in the repository for now — see Cutover at the
+end of this file.
 
 This file holds the decisions — what was chosen, why, and what would make it
 worth revisiting. How to run and build the app is in
@@ -23,7 +25,7 @@ worth revisiting. How to run and build the app is in
 | Forms | react-hook-form + zod |
 | API client | Generated from the backend's OpenAPI schema (`openapi-typescript` + `openapi-fetch`) |
 | Lint | oxlint |
-| Serving | Caddy, static files only, in the `frontend-next` image |
+| Serving | Caddy, static files only, in the `frontend` image |
 
 ## Decisions
 
@@ -198,7 +200,7 @@ the `queryOptions` pattern unchanged.
   (`backend/scripts/export_openapi.py` — imports the app, needs no database
   or environment) and regenerates the types. Both files are committed, so an
   API change is visible as a diff in the pull request that makes it.
-- CI regenerates both in *Frontend next checks* and fails if they differ from
+- CI regenerates both in *Frontend checks* and fails if they differ from
   what is committed. A backend change that alters the API has to regenerate
   the client in the same pull request.
 - Calls go through `unwrap()`, which returns the typed `data` or throws an
@@ -258,26 +260,26 @@ through `src/token.ts`, so this side of it touches one file. React escapes all
 rendered text, nothing uses `dangerouslySetInnerHTML`, and a strict
 Content-Security-Policy on the Caddy image is the cheap next mitigation.
 
-### Serving: a static image at `/next`
+### Serving: a static image at `/`
 
-The app is built with `base: '/next/'` and served by Caddy from
-`/srv/next` in its own image (`frontend-next/Dockerfile`). Its own Deployment
-in the chart, off by default and enabled only on staging, with `/next` routed
-to it on the Flutter app's Ingress, so staging's basic auth and `noindex`
-cover it too. Hashed assets are cached for a year; everything else
-revalidates. The API URL comes from `/next/config.json`, mounted from the same
-ConfigMap as the Flutter app's.
+The app is built with Vite's default base (`/`) and served by Caddy from
+`/srv` in the `frontend` image (`frontend-next/Dockerfile`), the image name
+the Flutter client had. Hashed assets are cached for a year; everything else
+revalidates. The API URL comes from `/config.json`, mounted from the chart's
+frontend ConfigMap at the path the Flutter image used, so the chart runs
+either image — a release still pinned to a Flutter tag keeps working until its
+tag moves.
 
-Why a separate image rather than a second directory in the Flutter image:
-either app can roll, fail or be removed without the other, and the cutover is
-a routing change rather than a rebuild.
+During the preview the app lived under `/next/` in its own Deployment. Caddy
+now redirects `/next/…` to the same path at the root, so password-reset mails
+sent then, bookmarks and the preview's installed app still arrive.
 
 ### Installable app and Android share target: manifest, no service worker
 
 **Decision.** The app is an installable PWA with a manifest
 (`public/manifest.json`) and no service worker. The manifest declares a
 `share_target`, so once installed on Android, "Share → tinyCRM next" from
-LinkedIn, Chrome or any other app opens `/next/capture?title=…&text=…&url=…`,
+LinkedIn, Chrome or any other app opens `/capture?title=…&text=…&url=…`,
 which saves the share to the inbox and says so.
 
 **Why no service worker.** The share target uses `GET`: the phone simply opens
@@ -296,18 +298,13 @@ are service-worker jobs.
   signed out goes through `/login` and comes back with its parameters intact.
 - It saves once on arrival, then replaces its URL with `?saved=<id>`, so a
   reload or the back button shows the result instead of filing it twice.
-- Scope, start URL and id are `/next/`, and the name is "tinyCRM next", so it
-  installs *beside* the Flutter app and the share sheet tells the two apart.
-  The icons use this app's palette for the same reason.
+- Scope, start URL and id are `/`, and the name is "tinyCRM". The id equals
+  the Flutter app's (its start URL, `/`), so an installed Flutter app is
+  updated in place into this one rather than needing a reinstall. The
+  "tinyCRM next" install from the preview is an orphan to uninstall.
 - `<link rel="manifest" crossorigin="use-credentials">`: staging is behind
   basic auth, and a manifest is otherwise fetched without the browser's saved
   credentials — the install prompt would silently never appear.
-
-**Open question — where shares land.** `/next` runs on staging only, so until
-the cutover a share from the phone files into *staging's* disposable database,
-not production's. Daily use of the React inbox before the cutover (criterion 7)
-means either accepting that, or enabling `frontendNext` in the production
-HelmRelease as well. Not decided yet.
 
 **Not yet verified on a device.** The manifest, share URL and icons are checked
 in CI (`ci/smoke.sh`); installing on a real Android phone behind staging's basic
@@ -350,10 +347,15 @@ The React app replaces Flutter at `/` when all of these hold:
 7. **Daily use.** A week of normal daily use on staging's `/next` without
    falling back to the Flutter app.
 
-The cutover itself is one commit: `frontend/` deleted, `frontend-next/` served
-at `/` (Vite `base`, the Ingress path, the Caddy root), and the Flutter image
-dropped from CI and promote. The manifest moves too: `id`, `scope`,
-`start_url` and the share `action` become `/`, the name "tinyCRM". With
-`id` equal to the Flutter app's (its start URL, `/`), an installed Flutter app
-is updated in place into the React one rather than needing a reinstall; the
-"tinyCRM next" install from the preview is then an orphan to uninstall.
+## Cutover
+
+Done, except for deleting the Flutter code. `frontend-next/` is served at `/`
+(Vite `base`, the Caddy root, the chart's `frontend` Deployment and Ingress),
+and the Flutter image is dropped from CI and promote: building it was the
+slowest job in the pipeline. The manifest moved too: `id`, `scope`,
+`start_url` and the share `action` are `/`, the name "tinyCRM".
+
+Still to do: delete `frontend/`, and with it the Flutter parts of
+`ci/pr_report.py`, the `frontend/pubspec.yaml` entry in
+`release-please-config.json` and the `frontend/**` rule in `renovate.json`.
+Renaming `frontend-next/` to `frontend/` can follow in the same change.
