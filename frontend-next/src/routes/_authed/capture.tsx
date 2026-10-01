@@ -6,7 +6,7 @@ import { captureQuery, createCapture, invalidateAfterCapture } from '../../captu
 import { QuickCaptureDialog } from '../../components/QuickCapture'
 import { Button } from '../../components/ui/Button'
 
-// Where Android's share sheet lands: /next/capture?title=…&text=…&url=…,
+// Where Android's share sheet lands: /capture?title=…&text=…&url=…,
 // declared as the share_target in public/manifest.json. "Share → tinyCRM"
 // from LinkedIn or Chrome files a person without opening the app first.
 //

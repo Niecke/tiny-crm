@@ -8,7 +8,7 @@ name: CI
 # twice. Open the PR as a draft as soon as work starts and dev commits are
 # covered from the first push. workflow_dispatch runs the tests on demand.
 #
-# The tests, the test report, the four builds and the integration test are
+# The tests, the test report, the three builds and the integration test are
 # required checks in .github/ruleset/protect_main.json — add new gating jobs
 # there too.
 on:
@@ -73,7 +73,7 @@ jobs:
           changed="$(git diff --name-only "$BASE...$HEAD")"
           echo "$changed"
 
-          if echo "$changed" | grep -qE '^(backend/|frontend/|frontend-next/|backup/|ci/|compose\.ci\.yml|\.github/workflows/ci\.yml)'; then
+          if echo "$changed" | grep -qE '^(backend/|frontend-next/|backup/|ci/|compose\.ci\.yml|\.github/workflows/ci\.yml)'; then
             echo "code=true" >> "$GITHUB_OUTPUT"
             echo "Application code touched — running the full pipeline." >> "$GITHUB_STEP_SUMMARY"
           else
@@ -190,51 +190,14 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
-  frontend-tests:
-    name: Frontend tests
-    needs: changes
-    if: needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    # Same SDK digest the frontend image builds with (see frontend/Dockerfile),
-    # so the gate cannot pass on a different Flutter than the one that ships.
-    container:
-      image: ghcr.io/adrianjagielak/flutter:3.47.2@sha256:083e197fd1382da5d8da14a0f9dfef7ae11b44e00f26e977ddd30d5897c81d51
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-
-      - name: Resolve dependencies
-        working-directory: frontend
-        run: flutter pub get
-
-      - name: Analyze
-        working-directory: frontend
-        run: flutter analyze
-
-      - name: Test
-        working-directory: frontend
-        # widget_test.dart is @TestOn('browser') and is skipped here; the unit
-        # tests run on the VM.
-        run: flutter test --coverage --file-reporter=json:test-results.json
-
-      - name: Upload reports
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: frontend-reports
-          path: |
-            frontend/test-results.json
-            frontend/coverage/lcov.info
-          if-no-files-found: warn
-          retention-days: 7
-
-  # The React client (#122). No test suite yet, so the gate is what `npm run
-  # build` enforces — the TypeScript type-check — plus the linter, and that its
-  # generated API types match the backend. Node comes from setup-node rather
-  # than the Dockerfile's image: JavaScript actions such as checkout cannot run
-  # inside an Alpine container.
-  frontend-next-checks:
-    name: Frontend next checks
+  # The React client in frontend-next/ (#122). The Flutter client in frontend/
+  # is no longer built, tested or shipped. No test suite yet, so the gate is
+  # what `npm run build` enforces — the TypeScript type-check — plus the
+  # linter, and that its generated API types match the backend. Node comes from
+  # setup-node rather than the Dockerfile's image: JavaScript actions such as
+  # checkout cannot run inside an Alpine container.
+  frontend-checks:
+    name: Frontend checks
     needs: changes
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
@@ -286,7 +249,7 @@ jobs:
 
   report:
     name: Test report
-    needs: [changes, backend-tests, frontend-tests]
+    needs: [changes, backend-tests]
     # Runs even when a suite failed — that is when the summary is worth reading.
     if: always() && github.event_name == 'pull_request' && needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
@@ -311,8 +274,6 @@ jobs:
           python3 ci/pr_report.py \
             --backend-junit reports/junit.xml \
             --backend-coverage reports/coverage.xml \
-            --frontend-report reports/test-results.json \
-            --frontend-coverage reports/coverage/lcov.info \
             > comment.md
           cat comment.md >> "$GITHUB_STEP_SUMMARY"
 
@@ -338,7 +299,7 @@ jobs:
 
   build-backend:
     name: Build backend
-    needs: [changes, meta, backend-tests, frontend-tests, frontend-next-checks]
+    needs: [changes, meta, backend-tests, frontend-checks]
     # A fork PR's GITHUB_TOKEN is read-only whatever this block asks for, and a
     # manual run has no PR head to tag images with — both fall back to running
     # the tests only.
@@ -376,42 +337,12 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  # The image keeps the name `frontend` it had as the Flutter client: the chart,
+  # promote.yml and the HelmReleases all know it by that name, and the React
+  # build serves config.json and version.json at the same paths.
   build-frontend:
     name: Build frontend
-    needs: [changes, meta, backend-tests, frontend-tests, frontend-next-checks]
-    if: github.event.pull_request.head.repo.full_name == github.repository && needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-
-      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
-        with:
-          registry: ${{ env.REGISTRY_HOST }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
-
-      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
-        with:
-          context: ./frontend
-          push: true
-          build-args: |
-            GIT_COMMIT=${{ needs.meta.outputs.commit }}
-          labels: |
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.revision=${{ needs.meta.outputs.commit }}
-          tags: ${{ env.REGISTRY }}/frontend:${{ needs.meta.outputs.tag }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  build-frontend-next:
-    name: Build frontend next
-    needs: [changes, meta, backend-tests, frontend-tests, frontend-next-checks]
+    needs: [changes, meta, backend-tests, frontend-checks]
     if: github.event.pull_request.head.repo.full_name == github.repository && needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -439,16 +370,16 @@ jobs:
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ needs.meta.outputs.commit }}
-          tags: ${{ env.REGISTRY }}/frontend-next:${{ needs.meta.outputs.tag }}
+          tags: ${{ env.REGISTRY }}/frontend:${{ needs.meta.outputs.tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # Built alongside the others so all four images always exist at the same
+  # Built alongside the others so all three images always exist at the same
   # ci-<sha>: promote checks for the whole set before retagging any of it, and a
   # partially-built tag would make it skip the release entirely.
   build-backup:
     name: Build backup
-    needs: [changes, meta, backend-tests, frontend-tests, frontend-next-checks]
+    needs: [changes, meta, backend-tests, frontend-checks]
     if: github.event.pull_request.head.repo.full_name == github.repository && needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -481,7 +412,7 @@ jobs:
 
   integration:
     name: Integration test
-    needs: [changes, meta, build-backend, build-frontend, build-frontend-next]
+    needs: [changes, meta, build-backend, build-frontend]
     if: github.event.pull_request.head.repo.full_name == github.repository && needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20

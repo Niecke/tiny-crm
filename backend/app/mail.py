@@ -37,10 +37,11 @@ BREVO_SEND_URL = "https://api.brevo.com/v3/smtp/email"
 # request gives up rather than hangs; the user can simply ask again.
 BREVO_TIMEOUT_SECONDS = 10
 
-# Where the links land: frontend-next's page (src/routes/reset-password.tsx),
-# which is served under /next until the cutover (#122) — drop the prefix then.
-# It posts the token with the new password to /auth/reset-password.
-RESET_PATH = "/next/reset-password"
+# Where the links land: the frontend's page (src/routes/reset-password.tsx in
+# frontend-next/). It posts the token with the new password to
+# /auth/reset-password. Links sent while the page lived under /next still work:
+# the frontend redirects that prefix to the root.
+RESET_PATH = "/reset-password"
 
 # One .txt and one .html per mail. StrictUndefined turns a misspelt variable
 # into an error in the tests instead of a blank in someone's inbox.
