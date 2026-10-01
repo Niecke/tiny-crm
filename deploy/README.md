@@ -11,20 +11,22 @@ merge to main
   └─ source-controller     fetches the commit
        ├─ kustomize-ctrl   applies deploy/flux/ — so the committed tag
        │                   actually reaches the HelmRelease objects
-       └─ helm-controller  re-renders charts/tinycrm, upgrades the releases
+       └─ helm-controller  re-renders charts/tinycrm, upgrades staging
 
 merge the release-please pull request → tag vX.Y.Z
   └─ release.yml           retags sha-<short> as X.Y.Z, X.Y, X, stable,
-                           signs it and attests its SBOM (cosign keyless),
-                           commits X.Y.Z into deploy/flux/prod/helmrelease.yaml
+                           pushes charts/tinycrm as the OCI chart X.Y.Z,
+                           signs both and attests the SBOMs (cosign keyless),
+                           commits X.Y.Z into deploy/flux/prod/ — images in
+                           helmrelease.yaml, chart in ocirepository.yaml
 ```
 
 Two environments on the one k3s node, one HelmRelease each:
 
-| | Namespace | Host | Image tag written by |
-|---|---|---|---|
-| `deploy/flux/staging/` | `tinycrm-staging` | `crm-staging.niecke-it.de` | `promote.yml`, every merge |
-| `deploy/flux/prod/` | `tinycrm` | `crm.niecke-it.de` | `release.yml`, every `vX.Y.Z` tag |
+| | Namespace | Host | Chart from | Image tag written by |
+|---|---|---|---|---|
+| `deploy/flux/staging/` | `tinycrm-staging` | `crm-staging.niecke-it.de` | `charts/tinycrm` on `main` | `promote.yml`, every merge |
+| `deploy/flux/prod/` | `tinycrm` | `crm.niecke-it.de` | `oci://ghcr.io/niecke/tiny-crm/charts/tinycrm`, pinned to the release | `release.yml`, every `vX.Y.Z` tag |
 
 `deploy/flux/base/` holds the shared GitRepository and the Flux Kustomization.
 The entry point stays `deploy/flux/kustomization.yaml`, the path that
@@ -35,13 +37,16 @@ its manifest in git changes nothing until something applies it. Without that
 controller the images get tagged, the sha lands in git, and the cluster silently
 keeps running the previous release.
 
-Two things trigger a redeploy, and both are just commits on `main`:
+Staging redeploys on two kinds of commit on `main`:
 
-- a chart change under `charts/tinycrm/` — picked up because the HelmRelease
-  sets `reconcileStrategy: Revision`, so Flux keys off the git commit rather
-  than `Chart.yaml`'s version
-- a new image — `promote.yml` writes `sha-<short>` into the staging HelmRelease,
-  `release.yml` writes `X.Y.Z` into the production one
+- a chart change under `charts/tinycrm/` — picked up because the staging
+  HelmRelease sets `reconcileStrategy: Revision`, so Flux keys off the git
+  commit rather than `Chart.yaml`'s version
+- a new image — `promote.yml` writes `sha-<short>` into the staging HelmRelease
+
+Production redeploys only on `release.yml`'s `Deploy X.Y.Z to production`
+commit, which moves the chart and the images together. A chart change on
+`main` reaches production with the next release, never before.
 
 ## Releasing
 
@@ -55,10 +60,12 @@ the production decision:
    release-please, which tags `vX.Y.Z` and publishes the GitHub Release.
 3. The tag runs `release.yml`. It waits for `sha-<short>` on all three images
    and fails if they never appear — it never builds. Then it tags that digest
-   `X.Y.Z`, `X.Y`, `X` and `stable`, signs each digest with cosign (keyless,
-   GitHub OIDC) and attaches a signed syft SPDX SBOM as an attestation, commits
-   `Deploy X.Y.Z to production`, and appends the image digests, the SBOM files
-   and the `cosign verify` commands to the GitHub Release.
+   `X.Y.Z`, `X.Y`, `X` and `stable`, packages `charts/tinycrm` as the tag has
+   it and pushes it to `oci://ghcr.io/niecke/tiny-crm/charts` (failing if
+   `Chart.yaml` is not at `X.Y.Z`), signs every digest with cosign (keyless,
+   GitHub OIDC) and attaches a signed syft SPDX SBOM to each image, commits
+   `Deploy X.Y.Z to production`, and appends the image and chart digests, the
+   SBOM files and the `cosign verify` commands to the GitHub Release.
 
 Every image also carries SLSA provenance (`mode=max`) from its build on the
 pull request; the retags copy it along with the digest. It records the build
@@ -70,12 +77,13 @@ newest release gets its `X.Y.Z` and nothing else.
 ### Rolling back
 
 ```bash
-# flips production back to the previous release's tag
+# flips production's images and chart back to the previous release
 git revert <Deploy X.Y.Z to production commit>   # through a pull request
 ```
 
-Or edit the tags in `deploy/flux/prod/helmrelease.yaml` directly, then
-`flux -n tinycrm reconcile helmrelease tinycrm --with-source`. To freeze the
+Or edit the image tags in `deploy/flux/prod/helmrelease.yaml` and the chart tag
+in `deploy/flux/prod/ocirepository.yaml` directly — keep all four on the same
+release — then `flux -n tinycrm reconcile helmrelease tinycrm --with-source`. To freeze the
 cluster where it stands: `flux -n tinycrm suspend helmrelease tinycrm`.
 
 > [!WARNING]
@@ -225,6 +233,13 @@ at the push step, images are tagged but the deployed sha never moves, and
 staging silently keeps running the previous build.
 
 `release.yml` pushes its `Deploy X.Y.Z to production` commit the same way.
+
+The chart package `tiny-crm/charts/tinycrm` on GHCR must be **public**: the
+production `OCIRepository` pulls it anonymously, like the kubelet pulls the
+images. GHCR creates a package private on its first push, and there is no API
+to change that — after the first release, set it under the package's settings,
+*Change visibility*. Until then the `OCIRepository` reports an authentication
+error and production stays on the release it already runs.
 
 Unlike a `GITHUB_TOKEN` push, a deploy-key push does trigger workflows. promote
 skips both kinds of `Deploy …` commit with a job-level `if:`.

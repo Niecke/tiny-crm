@@ -5,16 +5,11 @@ metadata:
   namespace: tinycrm
 spec:
   interval: 5m
-  chart:
-    spec:
-      chart: ./charts/tinycrm
-      sourceRef:
-        kind: GitRepository
-        name: tinycrm
-      # Without this, Flux only redeploys when Chart.yaml's version changes, so
-      # a template edit merged without a version bump would sit in git and never
-      # reach the cluster. Revision keys off the git commit instead.
-      reconcileStrategy: Revision
+  # The released chart from GHCR, pinned in ocirepository.yaml — not
+  # charts/tinycrm on main, which is staging's.
+  chartRef:
+    kind: OCIRepository
+    name: tinycrm-chart
   # Off by default, which is why a manual `kubectl scale` on the backend
   # survived a suspend/resume cycle: without this, helm-controller only acts
   # when the chart revision or the values change, never on a live object being
