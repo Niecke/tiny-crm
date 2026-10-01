@@ -5,6 +5,8 @@ either feels instant or feels like a form. Every rule here is allowed to be
 wrong on an odd input; none of them is allowed to lose `raw`.
 """
 
+import time
+
 from app.captures import name_from_profile_url, parse_capture
 
 
@@ -122,3 +124,21 @@ def test_an_explicit_name_beats_the_slug_guess() -> None:
 def test_a_malformed_url_never_raises() -> None:
     # A capture is never worth a 500, and `raw` still holds whatever this was.
     assert name_from_profile_url("https://[oops/in/jane") is None
+
+
+def test_a_long_interior_noise_run_parses_quickly() -> None:
+    # #210: the trailing-edge trim used to be quadratic in a noise run that
+    # stops short of the end. 100k tabs took minutes; now it is linear.
+    started = time.perf_counter()
+    assert parse_capture("a" + "\t" * 100_000 + "a https://example.com") == (
+        "a a",
+        "https://example.com",
+    )
+    assert time.perf_counter() - started < 1.0
+
+
+def test_noise_around_the_link_is_still_trimmed_on_both_sides() -> None:
+    assert parse_capture("Jane Doe — https://example.com/x | met at the meetup ·") == (
+        "Jane Doe met at the meetup",
+        "https://example.com/x",
+    )

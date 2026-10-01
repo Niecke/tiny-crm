@@ -20,7 +20,13 @@ CaptureStatus = Literal["new", "converted", "dismissed"]
 # The whole input contract of the quick-add box. Stripped, because a trailing
 # newline is what pasting from a phone gives you, and non-empty, because a
 # blank capture is a row that can never be triaged and never be recognised.
-RawCapture = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+# Capped, because a capture is one line: anything longer is a mis-paste, and the
+# cap bounds what the parser's regexes ever have to chew through.
+RAW_CAPTURE_MAX_LENGTH = 2000
+RawCapture = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=RAW_CAPTURE_MAX_LENGTH),
+]
 
 
 class CaptureCreate(BaseModel):
