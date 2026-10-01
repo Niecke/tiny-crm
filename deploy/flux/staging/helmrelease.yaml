@@ -59,7 +59,7 @@ spec:
     backend:
       image:
         # Managed by .github/workflows/promote.yml — do not edit by hand.
-        tag: sha-2ad401c
+        tag: sha-6ef8937
       resources:
         requests:
           cpu: 50m
@@ -68,7 +68,7 @@ spec:
           memory: 256Mi
     frontend:
       image:
-        tag: sha-2ad401c
+        tag: sha-6ef8937
       resources:
         requests:
           cpu: 5m
@@ -83,4 +83,4 @@ spec:
     backup:
       enabled: false
       image:
-        tag: sha-2ad401c
+        tag: sha-6ef8937
