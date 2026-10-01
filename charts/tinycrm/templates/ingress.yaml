@@ -15,13 +15,42 @@ spec:
     prefixes:
       - /api
 ---
+# Neither Caddy nor uvicorn compresses, so this is the only place it happens —
+# for both Ingresses. Traefik skips anything that already carries a
+# Content-Encoding and any body under minResponseBodyBytes, where the gzip
+# framing would cost more than it saves. Formats that are compressed already
+# (photos, document previews, woff2, archives) only burn CPU, so they are left
+# alone; main.dart.js and main.dart.wasm are what this is really for.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ $fullName }}-compress
+  labels:
+    {{- include "tinycrm.labels" . | nindent 4 }}
+spec:
+  compress:
+    minResponseBodyBytes: 1024
+    excludedContentTypes:
+      - image/jpeg
+      - image/png
+      - image/gif
+      - image/webp
+      - image/avif
+      - font/woff
+      - font/woff2
+      - application/zip
+      - application/gzip
+      - application/x-gzip
+      - application/grpc
+---
 {{- /*
 Extra Traefik middlewares, off by default. Staging turns both on so a
 non-production copy neither shows up in search results nor opens to anyone who
 guesses the hostname.
 */}}
-{{- $frontendMiddlewares := list }}
-{{- $apiMiddlewares := list (printf "%s-%s-strip-api@kubernetescrd" .Release.Namespace $fullName) }}
+{{- $compressRef := printf "%s-%s-compress@kubernetescrd" .Release.Namespace $fullName }}
+{{- $frontendMiddlewares := list $compressRef }}
+{{- $apiMiddlewares := list $compressRef (printf "%s-%s-strip-api@kubernetescrd" .Release.Namespace $fullName) }}
 {{- if .Values.ingress.noindex }}
 {{- $ref := printf "%s-%s-noindex@kubernetescrd" .Release.Namespace $fullName }}
 {{- $frontendMiddlewares = append $frontendMiddlewares $ref }}

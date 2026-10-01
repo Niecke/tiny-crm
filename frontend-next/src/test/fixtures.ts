@@ -1,0 +1,55 @@
+import type { DealRead, WatchRead } from '../api/types'
+
+// Complete records as the API returns them, with only the fields a test is
+// about overridden. Typed against the generated schema, so a field the
+// backend adds or drops shows up here first.
+export const deal = (overrides: Partial<DealRead> = {}): DealRead => ({
+  id: 'deal-1',
+  title: 'Platform migration',
+  value_type: 'fixed',
+  fixed_value: null,
+  rate: null,
+  rate_unit: null,
+  estimated_volume: null,
+  volume_unit: null,
+  expected_value: null,
+  is_open_ended: false,
+  currency: 'EUR',
+  stage: 'lead',
+  expected_close_date: null,
+  probability: null,
+  lost_reason: null,
+  closed_at: null,
+  notes: null,
+  contact_id: null,
+  organization_id: null,
+  contact_name: null,
+  organization_name: null,
+  is_open: true,
+  is_won: false,
+  is_active: true,
+  created_at: '2026-09-01T08:00:00Z',
+  updated_at: '2026-09-01T08:00:00Z',
+  ...overrides,
+})
+
+export const watch = (overrides: Partial<WatchRead> = {}): WatchRead => ({
+  id: 'watch-1',
+  name: 'freelance.de',
+  url: 'https://www.freelance.de',
+  kind: 'job_board',
+  query_note: null,
+  notes: null,
+  organization_id: null,
+  organization_name: null,
+  recurrence_rule: 'weekly',
+  recurrence_interval: 1,
+  last_checked_at: '2026-09-24T08:00:00Z',
+  next_due_at: '2026-10-01T08:00:00Z',
+  active: true,
+  found_count: 0,
+  check_count: 1,
+  created_at: '2026-09-01T08:00:00Z',
+  updated_at: '2026-09-01T08:00:00Z',
+  ...overrides,
+})
