@@ -20,6 +20,7 @@ export const deal = (overrides: Partial<DealRead> = {}): DealRead => ({
   probability: null,
   lost_reason: null,
   closed_at: null,
+  stage_changed_at: '2026-09-01T08:00:00Z',
   notes: null,
   contact_id: null,
   organization_id: null,

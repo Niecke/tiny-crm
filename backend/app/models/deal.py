@@ -3,7 +3,7 @@ from decimal import Decimal
 from uuid import UUID, uuid4
 
 from sqlalchemy import Computed, Date, DateTime, ForeignKey, Numeric, String, func
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, WriteOnlyMapped, mapped_column, relationship
 
 from app.db import Base
 from app.models.contact import Contact
@@ -106,6 +106,12 @@ class Deal(Base):
     # When it was decided. expected_close_date is the forecast and stays put for
     # comparison — "did we call it right?" needs both.
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # When the deal entered its current stage — the clock behind "how long has
+    # this been in proposal?". Stamped by apply_stage and nowhere else, and only
+    # when the stage actually changes, so editing the title does not reset it.
+    # No default on purpose: a code path that creates a deal without going
+    # through apply_stage fails on insert instead of quietly starting the clock.
+    stage_changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     notes: Mapped[str | None]
 
     # SET NULL on both, like Contact.organization_id: deleting the person or the
@@ -126,6 +132,13 @@ class Deal(Base):
     # rendered with who it is with, and a page of 50 would be 100 extra queries.
     contact: Mapped[Contact | None] = relationship(lazy="selectin")
     organization: Mapped[Organization | None] = relationship(lazy="selectin")
+
+    # Write-only: apply_stage appends to it, nothing reads it through the ORM.
+    # passive_deletes leaves removing the history to the FK's ON DELETE CASCADE
+    # rather than loading every event just to delete it.
+    stage_events: WriteOnlyMapped["DealStageEvent"] = relationship(
+        cascade="all, delete-orphan", passive_deletes=True
+    )
 
     @property
     def contact_name(self) -> str | None:
@@ -159,3 +172,31 @@ class Deal(Base):
         plus 2 open-ended" instead of quietly counting these as zero.
         """
         return self.value_type != "fixed" and self.estimated_volume is None
+
+
+class DealStageEvent(Base):
+    """One move of one deal between stages. Append-only.
+
+    `Deal.stage_changed_at` answers "how long in the current stage"; it cannot
+    answer "how many deals entered proposal this quarter" or "of those that
+    reached proposal, how many were won", because each move overwrites it. This
+    log keeps every move, so a deal moved back writes a second row rather than
+    editing the first.
+
+    A deal's creation is its first event, with `from_stage` NULL: a deal that
+    was entered straight into `lead` has entered `lead` as much as one dragged
+    there, and a conversion rate that forgets it starts from the wrong count.
+    """
+
+    __tablename__ = "deal_stage_events"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    # CASCADE: the history is part of the deal, not an independent record.
+    deal_id: Mapped[UUID] = mapped_column(ForeignKey("deals.id", ondelete="CASCADE"), index=True)
+    # NULL only on the event that records the deal being created.
+    from_stage: Mapped[str | None]
+    to_stage: Mapped[str]
+    changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    # What the deal was lost for at the time, kept here because the column on
+    # the deal is cleared the moment it is reopened.
+    lost_reason: Mapped[str | None]

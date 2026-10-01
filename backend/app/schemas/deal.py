@@ -30,6 +30,10 @@ RateUnit = Literal["hour", "day", "week", "month"]
 # what is done with.
 DealStatus = Literal["open", "active", "won", "finished"]
 
+# How the list is ordered. Expected close date is the working order; stage age
+# puts the deals that have sat longest in their current stage first.
+DealSort = Literal["expected_close_date", "stage_changed_at"]
+
 # Currency and Money live in schemas/common.py: a contact's known day rate is
 # the same kind of number as a deal's rate, and two definitions would drift.
 
@@ -65,7 +69,7 @@ class DealCreate(DealValueFields):
     stage: DealStage = "lead"
     expected_close_date: date | None = None
     probability: Probability | None = None
-    # Rejected unless the deal is actually lost — see _apply_stage in the router.
+    # Rejected unless the deal is actually lost — see apply_stage in the router.
     lost_reason: str | None = None
     notes: str | None = None
     # Both optional: an inbound enquiry is a deal before it is a person, and a
@@ -126,6 +130,9 @@ class DealRead(BaseModel):
     probability: int | None
     lost_reason: str | None
     closed_at: datetime | None
+    # When the deal entered its current stage. Deals that existed before this
+    # was recorded carry their creation time — a floor, not the real move.
+    stage_changed_at: datetime
     notes: str | None
 
     contact_id: UUID | None

@@ -15,6 +15,7 @@ from app.models.contact import Contact
 from app.models.deal import Deal
 from app.models.interaction import Interaction
 from app.models.organization import Organization
+from app.routers.deals import apply_stage
 from app.schemas.capture import (
     CaptureConvert,
     CaptureConvertResult,
@@ -255,10 +256,6 @@ async def convert_capture(
         deal = Deal(
             user_id=user.id,
             title=body.deal.title,
-            # Explicit even though it is the column default: a deal born from
-            # the inbox is at the start of the pipeline by definition, and
-            # saying so here is cheaper than inferring it later.
-            stage="lead",
             # The lead is always against the person it came from. Without this
             # the deal board shows a title and no one to write to.
             contact_id=contact.id,
@@ -266,6 +263,10 @@ async def convert_capture(
             organization_id=body.deal.organization_id or contact.organization_id,
             notes=body.deal.notes,
         )
+        # A deal born from the inbox is at the start of the pipeline by
+        # definition. Set through apply_stage rather than as a column, so the
+        # clock starts and its entry into the pipeline is on record.
+        apply_stage(deal, "lead", None)
         session.add(deal)
 
     # The links below need a real deal id.

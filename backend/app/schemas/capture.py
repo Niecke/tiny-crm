@@ -43,7 +43,7 @@ class CaptureUpdate(BaseModel):
     """Fixing up a capture before working it.
 
     `status` is deliberately absent. It moves through /convert and /dismiss and
-    nowhere else — the same funnel Deal.stage has through `_apply_stage`, so
+    nowhere else — the same funnel Deal.stage has through `apply_stage`, so
     that arriving at an ending always stamps everything that ending implies.
     """
 

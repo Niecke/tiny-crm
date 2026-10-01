@@ -18,11 +18,13 @@ from app.models.deal import (
     OPEN_STAGES,
     WON_STAGES,
     Deal,
+    DealStageEvent,
 )
 from app.models.organization import Organization
 from app.schemas.deal import (
     DealCreate,
     DealRead,
+    DealSort,
     DealStage,
     DealStageChange,
     DealStatus,
@@ -135,22 +137,27 @@ def _decided_side(stage: str) -> str | None:
     return "lost" if stage == "lost" else "won"
 
 
-def _apply_stage(deal: Deal, stage: str, lost_reason: str | None) -> None:
+def apply_stage(deal: Deal, stage: str, lost_reason: str | None) -> None:
     """Move a deal to `stage` and bring everything that depends on it along.
 
     The single place a stage is ever assigned. Both PATCH and the stage endpoint
     route through here, so the two can never apply different rules — which is
-    the whole reason the stage endpoint exists rather than a bare PATCH.
+    the whole reason the stage endpoint exists rather than a bare PATCH. Deals
+    born from a capture or a watch sweep come through here too, so their first
+    stage is recorded like any other.
+
+    A new deal has no stage yet (None), so creating one counts as a move.
     """
     previous = deal.stage
     deal.stage = stage
+    now = datetime.now(UTC)
 
     if stage in DECIDED_STAGES:
         # `closed_at` is when the deal was *decided*, so winning it stamps the
         # date and starting or finishing the work afterwards does not move it.
         # Flipping between won and lost is a new decision, so that does.
         if _decided_side(previous) != _decided_side(stage) or deal.closed_at is None:
-            deal.closed_at = datetime.now(UTC)
+            deal.closed_at = now
         # A settled deal is 100% or 0%. Anything else leaves a weighted pipeline
         # forecasting money that is already banked, or already gone.
         deal.probability = 0 if stage == "lost" else 100
@@ -159,6 +166,20 @@ def _apply_stage(deal: Deal, stage: str, lost_reason: str | None) -> None:
         # Back in play, so the decision and its reason go with it.
         deal.closed_at = None
         deal.lost_reason = None
+
+    # Only an actual move starts the clock. PATCH routes every edit through
+    # here, and a deal whose title was fixed has not been in proposal any less
+    # long for it.
+    if stage != previous:
+        deal.stage_changed_at = now
+        deal.stage_events.add(
+            DealStageEvent(
+                from_stage=previous,
+                to_stage=stage,
+                changed_at=now,
+                lost_reason=deal.lost_reason,
+            )
+        )
 
 
 @router.get("/", response_model=Page[DealRead])
@@ -173,6 +194,7 @@ async def list_deals(
     status: DealStatus | None = Query(default=None),
     contact_id: UUID | None = Query(default=None),
     organization_id: UUID | None = Query(default=None),
+    sort: DealSort = Query(default="expected_close_date"),
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> Page[DealRead]:
@@ -189,15 +211,17 @@ async def list_deals(
         q = q.where(Deal.organization_id == organization_id)
 
     total = await count_rows(session, q)
-    # Soonest expected close first, because that is the order the operator has
-    # to work them in. A deal with no date is not urgent, so it sorts last
-    # rather than first, which is where NULLs would land by default on ASC.
+    if sort == "stage_changed_at":
+        # Longest in its current stage first — the deal that has gone quiet is
+        # the one to look at. Never NULL, so no placement rule is needed.
+        order = Deal.stage_changed_at.asc()
+    else:
+        # Soonest expected close first, because that is the order the operator
+        # has to work them in. A deal with no date is not urgent, so it sorts
+        # last rather than first, which is where NULLs would land on ASC.
+        order = nulls_last(Deal.expected_close_date.asc())
     # id breaks the tie so paging stays stable.
-    result = await session.execute(
-        q.order_by(nulls_last(Deal.expected_close_date.asc()), Deal.id.asc())
-        .offset(skip)
-        .limit(limit)
-    )
+    result = await session.execute(q.order_by(order, Deal.id.asc()).offset(skip).limit(limit))
     return Page[DealRead](
         items=[DealRead.model_validate(d) for d in result.scalars().all()],
         total=total,
@@ -235,10 +259,12 @@ async def create_deal(
         body.volume_unit,
     )
 
-    deal = Deal(**body.model_dump(), user_id=user.id)
+    # stage and lost_reason are left for apply_stage, so the deal starts with
+    # no stage and entering its first one is recorded like any later move.
+    deal = Deal(**body.model_dump(exclude={"stage", "lost_reason"}), user_id=user.id)
     # A deal can be entered already won, or already running — work agreed before
     # anyone opened the CRM — so the decided-stage bookkeeping runs on create.
-    _apply_stage(deal, body.stage, body.lost_reason)
+    apply_stage(deal, body.stage, body.lost_reason)
 
     session.add(deal)
     await session.commit()
@@ -270,7 +296,7 @@ async def update_deal(
 
     _merge_value_fields(deal, updates)
 
-    # stage and lost_reason are handed to _apply_stage instead of being set
+    # stage and lost_reason are handed to apply_stage instead of being set
     # directly, so a stage change made through PATCH obeys the same rules as one
     # made through the stage endpoint.
     stage = updates.pop("stage", deal.stage)
@@ -286,7 +312,7 @@ async def update_deal(
         setattr(deal, field, value)
     # Runs last, so a probability sent alongside a close is overridden by the
     # 100/0 the decided stage implies rather than the other way round.
-    _apply_stage(deal, stage, lost_reason)
+    apply_stage(deal, stage, lost_reason)
 
     await session.commit()
     await session.refresh(deal)
@@ -336,7 +362,7 @@ async def change_stage(
         raise HTTPException(status_code=404, detail="Deal not found")
 
     _reject_orphan_lost_reason(body.stage, body.lost_reason)
-    _apply_stage(deal, body.stage, body.lost_reason)
+    apply_stage(deal, body.stage, body.lost_reason)
 
     await session.commit()
     await session.refresh(deal)

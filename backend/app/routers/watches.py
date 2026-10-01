@@ -15,6 +15,7 @@ from app.models.organization import Organization
 from app.models.task import Task
 from app.models.watch import Watch, WatchCheck
 from app.recurrence import RecurrenceRule, next_due_date
+from app.routers.deals import apply_stage
 from app.schemas.page import Page
 from app.schemas.watch import (
     WatchCheckCreate,
@@ -269,6 +270,9 @@ async def log_check(
             organization_id=organization_id,
             notes=body.create_deal.notes,
         )
+        # Through the same path as every other stage, so a find has a
+        # stage_changed_at and its entry into the pipeline is on record.
+        apply_stage(deal, "lead", None)
         session.add(deal)
 
     task: Task | None = None
