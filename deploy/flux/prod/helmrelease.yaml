@@ -42,9 +42,8 @@ spec:
       host: crm.niecke-it.de
     backend:
       image:
-        # Frozen. promote.yml now writes deploy/flux/staging/ only; this file
-        # moves when release.yml lands (#114 step 4) and writes the release
-        # tag here. Until then production changes only through an edited PR.
+        # Written by release.yml from a vX.Y.Z tag — a merge to main never
+        # moves production. Rolling back is reverting that Deploy commit.
         tag: sha-5f36949
     frontend:
       image:
