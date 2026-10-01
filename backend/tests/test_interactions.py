@@ -86,6 +86,28 @@ async def test_filtering_by_contact_and_kind(client: AsyncClient, alice: Account
     assert [i["subject"] for i in by_kind.json()["items"]] == ["Unlinked"]
 
 
+async def test_an_event_is_a_kind_of_its_own(client: AsyncClient, alice: Account) -> None:
+    # A conference or meetup: the people met there go on as contacts, so an
+    # event needs no entity of its own — only a kind the filter can find.
+    contact = await create_resource(client, alice, "/contacts/", {"name": "Grace Hopper"})
+    await create_resource(
+        client,
+        alice,
+        "/interactions/",
+        {
+            "subject": "DevOpsCon",
+            "kind": "event",
+            "occurred_at": PAST,
+            "contact_ids": [contact["id"]],
+        },
+    )
+    await create_resource(client, alice, "/interactions/", {"subject": "Call", "occurred_at": PAST})
+
+    by_kind = await client.get("/interactions/?kind=event", headers=alice.headers)
+    [event] = by_kind.json()["items"]
+    assert (event["subject"], event["contact_ids"]) == ("DevOpsCon", [contact["id"]])
+
+
 async def test_an_unknown_kind_is_rejected(client: AsyncClient, alice: Account) -> None:
     response = await client.post(
         "/interactions/",

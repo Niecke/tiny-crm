@@ -2689,6 +2689,7 @@
                   "enum": [
                     "call",
                     "meeting",
+                    "event",
                     "email",
                     "note",
                     "other"
@@ -4159,6 +4160,7 @@
             "enum": [
               "call",
               "meeting",
+              "event",
               "email",
               "note",
               "other"
@@ -4790,6 +4792,7 @@
             "enum": [
               "call",
               "meeting",
+              "event",
               "email",
               "note",
               "other"
@@ -6928,6 +6931,7 @@
             "enum": [
               "call",
               "meeting",
+              "event",
               "email",
               "note",
               "other"
@@ -7035,6 +7039,7 @@
             "enum": [
               "call",
               "meeting",
+              "event",
               "email",
               "note",
               "other"
@@ -7118,6 +7123,7 @@
                 "enum": [
                   "call",
                   "meeting",
+                  "event",
                   "email",
                   "note",
                   "other"
