@@ -25,6 +25,7 @@ worth revisiting. How to run and build the app is in
 | Forms | react-hook-form + zod |
 | API client | Generated from the backend's OpenAPI schema (`openapi-typescript` + `openapi-fetch`) |
 | Lint | oxlint |
+| Tests | Vitest + Testing Library, the API faked with MSW (`openapi-msw`) |
 | Serving | Caddy, static files only, in the `frontend` image |
 
 ## Decisions
@@ -260,6 +261,33 @@ through `src/token.ts`, so this side of it touches one file. React escapes all
 rendered text, nothing uses `dangerouslySetInnerHTML`, and a strict
 Content-Security-Policy on the Caddy image is the cheap next mitigation.
 
+### Tests: Vitest, with the API faked from its schema
+
+**Decision.** Unit tests run on Vitest, which reads `vite.config.ts` and so
+builds the code the way the app does. They sit next to what they test
+(`src/format.test.ts` beside `src/format.ts`); shared helpers are in
+`src/test/`. The DOM is jsdom — React Aria's own tests run on it.
+
+What is tested, in order of value: the pure logic (dates, money, labels — what
+the Flutter app's tests covered), the API client's token renewal
+(`src/api/client.test.ts`), and hooks that change the cache (`useMoveDeal`).
+Route pages are not unit-tested; the smoke test drives them through the real
+build.
+
+The backend is faked at the network level with MSW, so `openapi-fetch` and
+the auth middleware run as they do in the browser. Handlers come from
+`openapi-msw` and are typed from `src/api/schema.d.ts`: a fake that answers a
+path, a body or a status the API does not have fails the type-check, like the
+client itself would. A request no test handler answers fails the test.
+
+The timezone and locale are pinned (`America/New_York`, `en-US`) so a run
+gives the same strings everywhere. The zone is west of Greenwich on purpose:
+that is where a date read as UTC midnight shows as the day before.
+
+Coverage is reported in the pull request's test report (`ci/pr_report.py`,
+beside the backend's), not enforced: a threshold invites
+tests written for the number.
+
 ### Serving: a static image at `/`
 
 The app is built with Vite's default base (`/`) and served by Caddy from
@@ -355,7 +383,6 @@ and the Flutter image is dropped from CI and promote: building it was the
 slowest job in the pipeline. The manifest moved too: `id`, `scope`,
 `start_url` and the share `action` are `/`, the name "tinyCRM".
 
-Still to do: delete `frontend/`, and with it the Flutter parts of
-`ci/pr_report.py`, the `frontend/pubspec.yaml` entry in
+Still to do: delete `frontend/`, and with it the `frontend/pubspec.yaml` entry in
 `release-please-config.json` and the `frontend/**` rule in `renovate.json`.
 Renaming `frontend-next/` to `frontend/` can follow in the same change.
