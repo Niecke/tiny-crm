@@ -190,48 +190,10 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
-  frontend-tests:
-    name: Frontend tests
-    needs: changes
-    if: needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    # Same SDK digest the frontend image builds with (see frontend/Dockerfile),
-    # so the gate cannot pass on a different Flutter than the one that ships.
-    container:
-      image: ghcr.io/adrianjagielak/flutter:3.47.2@sha256:083e197fd1382da5d8da14a0f9dfef7ae11b44e00f26e977ddd30d5897c81d51
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-
-      - name: Resolve dependencies
-        working-directory: frontend
-        run: flutter pub get
-
-      - name: Analyze
-        working-directory: frontend
-        run: flutter analyze
-
-      - name: Test
-        working-directory: frontend
-        # widget_test.dart is @TestOn('browser') and is skipped here; the unit
-        # tests run on the VM.
-        run: flutter test --coverage --file-reporter=json:test-results.json
-
-      - name: Upload reports
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: frontend-reports
-          path: |
-            frontend/test-results.json
-            frontend/coverage/lcov.info
-          if-no-files-found: warn
-          retention-days: 7
-
   # The React client in frontend-next/ (#122). The Flutter client in frontend/
-  # is no longer built, tested or shipped. No test suite yet, so the gate is
-  # what `npm run build` enforces — the TypeScript type-check — plus the
-  # linter, and that its generated API types match the backend. Node comes from
+  # is no longer built, tested or shipped. The gate is the unit tests, what
+  # `npm run build` enforces — the TypeScript type-check — plus the linter, and
+  # that its generated API types match the backend. Node comes from
   # setup-node rather than the Dockerfile's image: JavaScript actions such as
   # checkout cannot run inside an Alpine container.
   frontend-checks:
