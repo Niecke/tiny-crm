@@ -45,8 +45,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       );
       // ErrorInterceptor turns anything from 400 up into a DioException, so
       // reaching this line means the login succeeded.
-      final token = resp.data['access_token'] as String;
-      await ref.read(authProvider.notifier).setToken(token);
+      await ref.read(authProvider.notifier).setTokens(
+        resp.data['access_token'] as String,
+        resp.data['refresh_token'] as String,
+      );
     } on DioException catch (e) {
       setState(
         // fastapi-users answers bad credentials with 400 LOGIN_BAD_CREDENTIALS;

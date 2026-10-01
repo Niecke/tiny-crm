@@ -69,8 +69,21 @@ async def test_a_reset_replaces_the_password(
     )
     assert new.status_code == 200
 
-    profile = await client.get("/users/me", headers=alice.headers)
+    fresh = {"Authorization": f"Bearer {new.json()['access_token']}"}
+    profile = await client.get("/users/me", headers=fresh)
     assert profile.json()["password_changed_at"] is not None
+
+
+async def test_a_reset_signs_out_every_session(
+    client: AsyncClient, alice: Account, outbox: Outbox
+) -> None:
+    """#133: whoever reset the password need not be whoever is signed in."""
+    token = await _reset_token(client, alice.email, outbox)
+    await client.post("/auth/reset-password", json={"token": token, "password": NEW_PASSWORD})
+
+    assert (await client.get("/users/me", headers=alice.headers)).status_code == 401
+    refresh = await client.post("/auth/jwt/refresh", json={"refresh_token": alice.refresh_token})
+    assert refresh.status_code == 401
 
 
 async def test_an_unknown_address_gets_the_same_answer(
@@ -179,7 +192,12 @@ async def test_a_reset_verifies_the_address(
 
     await client.post("/auth/reset-password", json={"token": token, "password": NEW_PASSWORD})
 
-    profile = await client.get("/users/me", headers=alice.headers)
+    # The reset ended Alice's old session; sign in with the new password.
+    login = await client.post(
+        "/auth/jwt/login", data={"username": alice.email, "password": NEW_PASSWORD}
+    )
+    fresh = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    profile = await client.get("/users/me", headers=fresh)
     assert profile.json()["is_verified"] is True
 
 

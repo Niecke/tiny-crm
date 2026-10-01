@@ -3430,13 +3430,13 @@
         "tags": [
           "auth"
         ],
-        "summary": "Auth:Jwt.Login",
-        "operationId": "auth_jwt_login_auth_jwt_login_post",
+        "summary": "Login",
+        "operationId": "login_auth_jwt_login_post",
         "requestBody": {
           "content": {
             "application/x-www-form-urlencoded": {
               "schema": {
-                "$ref": "#/components/schemas/Body_auth_jwt_login_auth_jwt_login_post"
+                "$ref": "#/components/schemas/Body_login_auth_jwt_login_post"
               }
             }
           },
@@ -3448,11 +3448,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BearerResponse"
-                },
-                "example": {
-                  "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoiOTIyMWZmYzktNjQwZi00MzcyLTg2ZDMtY2U2NDJjYmE1NjAzIiwiYXVkIjoiZmFzdGFwaS11c2VyczphdXRoIiwiZXhwIjoxNTcxNTA0MTkzfQ.M10bjOe45I5Ncu_uXvOmVV8QxnL-nZfcH96U90JaocI",
-                  "token_type": "bearer"
+                  "$ref": "#/components/schemas/TokenPair"
                 }
               }
             }
@@ -3463,20 +3459,57 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorModel"
-                },
-                "examples": {
-                  "LOGIN_BAD_CREDENTIALS": {
-                    "summary": "Bad credentials or the user is inactive.",
-                    "value": {
-                      "detail": "LOGIN_BAD_CREDENTIALS"
-                    }
-                  },
-                  "LOGIN_USER_NOT_VERIFIED": {
-                    "summary": "The user is not verified.",
-                    "value": {
-                      "detail": "LOGIN_USER_NOT_VERIFIED"
-                    }
-                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/jwt/refresh": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Refresh",
+        "operationId": "refresh_auth_jwt_refresh_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokenBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenPair"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
                 }
               }
             }
@@ -3499,26 +3532,33 @@
         "tags": [
           "auth"
         ],
-        "summary": "Auth:Jwt.Logout",
-        "operationId": "auth_jwt_logout_auth_jwt_logout_post",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
+        "summary": "Logout",
+        "operationId": "logout_auth_jwt_logout_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokenBody"
               }
             }
           },
-          "401": {
-            "description": "Missing token or inactive user."
-          }
+          "required": true
         },
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
-        ]
+        }
       }
     },
     "/auth/forgot-password": {
@@ -3762,6 +3802,7 @@
           "users"
         ],
         "summary": "Change Password",
+        "description": "Change the password and sign out every other session.\n\nThis one stays signed in: the caller just proved they know the password.\nEvery other device has to sign in again with the new one — which is the\npoint when the reason for the change is a lost laptop.",
         "operationId": "change_password_users_me_password_post",
         "requestBody": {
           "content": {
@@ -3866,25 +3907,7 @@
   },
   "components": {
     "schemas": {
-      "BearerResponse": {
-        "properties": {
-          "access_token": {
-            "type": "string",
-            "title": "Access Token"
-          },
-          "token_type": {
-            "type": "string",
-            "title": "Token Type"
-          }
-        },
-        "type": "object",
-        "required": [
-          "access_token",
-          "token_type"
-        ],
-        "title": "BearerResponse"
-      },
-      "Body_auth_jwt_login_auth_jwt_login_post": {
+      "Body_login_auth_jwt_login_post": {
         "properties": {
           "grant_type": {
             "anyOf": [
@@ -3941,7 +3964,7 @@
           "username",
           "password"
         ],
-        "title": "Body_auth_jwt_login_auth_jwt_login_post"
+        "title": "Body_login_auth_jwt_login_post"
       },
       "Body_replace_document_content_documents__document_id__content_put": {
         "properties": {
@@ -8095,6 +8118,20 @@
         "type": "object",
         "title": "ProjectUpdate"
       },
+      "RefreshTokenBody": {
+        "properties": {
+          "refresh_token": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Refresh Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "refresh_token"
+        ],
+        "title": "RefreshTokenBody"
+      },
       "TaskCompletionRead": {
         "properties": {
           "contact_id": {
@@ -8763,6 +8800,36 @@
         },
         "type": "object",
         "title": "TaskUpdate"
+      },
+      "TokenPair": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "token_type": {
+            "type": "string",
+            "const": "bearer",
+            "title": "Token Type",
+            "default": "bearer"
+          },
+          "expires_in": {
+            "type": "integer",
+            "title": "Expires In"
+          },
+          "refresh_token": {
+            "type": "string",
+            "title": "Refresh Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "expires_in",
+          "refresh_token"
+        ],
+        "title": "TokenPair",
+        "description": "What a login or a refresh hands out (app/auth/sessions.py)."
       },
       "UserRead": {
         "properties": {

@@ -172,8 +172,10 @@ All API data goes through the query cache. Query definitions are
 updates the cache all use the same key. After a write: seed the detail from
 the response with `setQueryData`, invalidate the lists.
 
-A 401 anywhere drops the token and sends the user to `/login` with a redirect
-back (`src/main.tsx`). Queries do not retry on 4xx.
+An expired access token never reaches a query: the API client renews it (see
+Token storage). A 401 that does get through means the session is over; the
+tokens are dropped and the user goes to `/login` with a redirect back
+(`src/main.tsx`). Queries do not retry on 4xx.
 
 ### API client: generated from OpenAPI
 
@@ -202,7 +204,8 @@ the `queryOptions` pattern unchanged.
 - Calls go through `unwrap()`, which returns the typed `data` or throws an
   `ApiError` with the status and FastAPI's `detail` — TanStack Query only sees
   a failure when the promise rejects. The client's middleware adds the bearer
-  token and drops it on a 401.
+  token, renews it when it is about to expire, and drops it when the session
+  is over.
 - The client lives in the router context (`context.api`), created once from
   the runtime `config.json`.
 - `src/api/types.ts` holds short aliases for the few schemas a screen names
@@ -214,32 +217,46 @@ TypeScript 5; this project is on TypeScript 6. `package.json` has an
 `overrides` entry pointing it at our TypeScript — the generator only uses the
 printer API, which 6 keeps. Drop the override once a release supports 6.
 
-### Token storage: `localStorage`
+### Token storage: `localStorage`, short-lived
 
-**Decision.** The JWT is stored in `localStorage` under `tinycrm.token`
-(`src/token.ts`), so a login survives a closed tab, as it does in the Flutter
-app.
+**Decision.** A login is a pair (#133, `backend/app/auth/sessions.py`): a
+15-minute access token and a refresh token. Both are stored in `localStorage`
+under `tinycrm.token` and `tinycrm.refresh` (`src/token.ts`), so a login
+survives a closed tab, as it does in the Flutter app, and all tabs share one
+session.
+
+**Renewal** lives in the API client's middleware (`src/api/client.ts`):
+
+- Before a request goes out, an access token within 30 s of its `exp` is
+  renewed first. One refresh at a time per tab; requests that need one wait
+  for it.
+- A 401 anyway (clock skew, rotated secret) gets one refresh and one retry of
+  the request. Only if that fails too are the tokens dropped.
+- Tabs racing each other need no lock: the backend answers a refresh token
+  rotated less than 60 s ago with the same new pair, so every tab ends up
+  storing the same one.
+- Refresh and sign-out go through a second client without the middleware, so
+  a refresh never triggers a refresh.
+
+**Sign-out** (`logout()` in `src/auth.ts`) sends the refresh token to
+`/auth/jwt/logout`, which deletes the session: the tokens stop working at
+once, wherever a copy of them is. It drops the local tokens first, so an
+unreachable API still signs the browser out.
 
 **The risk, stated plainly.** Any script running on the origin can read
-`localStorage`. The token is valid for about 270 days (T24) and there is no
-refresh token or server-side revocation, so a token stolen through an XSS is
-usable for months. The browser has no equivalent of Flutter's
-`flutter_secure_storage`.
+`localStorage`, and the browser has no equivalent of Flutter's
+`flutter_secure_storage`. What an XSS steals is now a session, not a 9-month
+token: the access token dies in 15 minutes, the next refresh by either holder
+exposes a copied refresh token (the session ends for both), and signing out
+or changing the password ends it server-side.
 
-**Why it is still the choice for now.** The alternative that removes the
-exposure — an `HttpOnly` cookie set by the backend — is a backend change
-(cookie transport in fastapi-users, CSRF protection, same-site setup) and
-belongs with the auth work in #147. Until then:
-
-- the exposure is the same as the Flutter app's today, not new;
-- React escapes all rendered text, and nothing uses
-  `dangerouslySetInnerHTML`;
-- all storage access goes through `src/token.ts`, so moving to a cookie
-  touches one file on this side.
-
-**Revisit** before the cutover: either shorten the token lifetime (T24) or
-move to an `HttpOnly` cookie. A strict Content-Security-Policy on the Caddy
-image is the cheap mitigation in the meantime.
+**Not done: an `HttpOnly` cookie** for the refresh token. It would keep the
+refresh token out of script reach entirely, at the cost of cookie transport,
+CSRF protection and credentialed CORS on the API's origin. Still worth doing
+if the exposure above is ever not good enough; all storage access goes
+through `src/token.ts`, so this side of it touches one file. React escapes all
+rendered text, nothing uses `dangerouslySetInnerHTML`, and a strict
+Content-Security-Policy on the Caddy image is the cheap next mitigation.
 
 ### Serving: a static image at `/next`
 
@@ -324,8 +341,8 @@ The React app replaces Flutter at `/` when all of these hold:
    (`/next/capture`, see above); still to be confirmed on a real phone.
 3. **Generated API client.** No hand-written response types remain — true
    since the client moved to `openapi-fetch`; CI keeps it true.
-4. **Token decision revisited** (see Token storage) — lifetime shortened or
-   cookie in place.
+4. **Token decision revisited** (see Token storage) — lifetime shortened to
+   15 minutes with refresh and server-side sign-out (#133).
 5. **Stale-client reload.** An open tab picks up a new deploy by itself, as the
    Flutter app does via `version.json`.
 6. **CI.** The integration test drives a real workflow through the React build,

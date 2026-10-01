@@ -25,7 +25,8 @@ from httpx2 import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app import ratelimit
-from app.auth.users import User, UserManager, get_jwt_strategy
+from app.auth.sessions import open_session
+from app.auth.users import User, UserManager
 from app.config import settings
 from app.db import Base, get_session
 from app.mail import Mail, MailDeliveryError, get_mail_sender
@@ -151,6 +152,7 @@ class Account:
     email: str
     password: str
     headers: dict[str, str]
+    refresh_token: str
 
 
 async def _create_account(session_factory: async_sessionmaker[AsyncSession], email: str) -> Account:
@@ -165,15 +167,15 @@ async def _create_account(session_factory: async_sessionmaker[AsyncSession], ema
     async with session_factory() as session:
         session.add(user)
         await session.commit()
-
-    # Minting the token directly keeps the password hash out of the hot path;
-    # the login endpoint itself is covered in test_auth.py.
-    token = await get_jwt_strategy().write_token(user)
+        # Opening the session directly keeps the password hash out of the hot
+        # path; the login endpoint itself is covered in test_auth.py.
+        tokens = await open_session(session, user.id)
     return Account(
         id=user.id,
         email=email,
         password=TEST_PASSWORD,
-        headers={"Authorization": f"Bearer {token}"},
+        headers={"Authorization": f"Bearer {tokens.access_token}"},
+        refresh_token=tokens.refresh_token,
     )
 
 
