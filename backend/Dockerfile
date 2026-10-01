@@ -1,20 +1,41 @@
-FROM docker.io/library/python:3.14-slim@sha256:51dafde81dbdb6ebde285137a295cf18a47ca95234fe388a343719cb97305b3d
+# Two stages so the tools that build the environment stay out of the image that
+# runs it: uv (and the Rust crates compiled into it) and the base image's pip
+# (with its vendored setuptools, msgpack and urllib3) are needed to install, never
+# to serve — and every one of them is something the image scan in ci.yml would
+# otherwise have to keep clean.
+FROM docker.io/library/python:3.14-slim@sha256:51dafde81dbdb6ebde285137a295cf18a47ca95234fe388a343719cb97305b3d AS build
 
 # uv handles dependency management; copy its static binary from the official image.
-COPY --from=ghcr.io/astral-sh/uv:0.11.25@sha256:1e3808aa9023d0980e7c15b1fa7c1ac16ff35925780cf5c459858b2d693f01a9 /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:0.11.25@sha256:1e3808aa9023d0980e7c15b1fa7c1ac16ff35925780cf5c459858b2d693f01a9 /uv /bin/
 
 WORKDIR /app
 
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
-    UV_PYTHON_DOWNLOADS=0 \
-    PATH="/app/.venv/bin:$PATH"
+    UV_PYTHON_DOWNLOADS=0
 
 # Install locked dependencies first. This layer is cached unless the lockfile
 # or pyproject changes, so app-code edits don't re-resolve the environment.
 COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
+
+FROM docker.io/library/python:3.14-slim@sha256:51dafde81dbdb6ebde285137a295cf18a47ca95234fe388a343719cb97305b3d
+
+# Debian security updates land in the archive days before the python image is
+# rebuilt on top of them, so take them here rather than wait.
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y \
+    && rm -rf /var/lib/apt/lists/* \
+    && python -m pip uninstall --yes --root-user-action=ignore pip
+
+WORKDIR /app
+
+ENV PATH="/app/.venv/bin:$PATH"
+
+# Same path as in the build stage: the venv's scripts and its python symlink
+# point at absolute paths, and the interpreter they point at is the same one.
+COPY --from=build /app/.venv /app/.venv
 
 COPY app/ app/
 COPY alembic/ alembic/

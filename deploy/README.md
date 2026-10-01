@@ -1,8 +1,8 @@
 # Deploying tinyCRM
 
-Merges to `main` reach the cluster through Flux. Nothing pushes: the cluster
-pulls, so no GitHub workflow holds cluster credentials and the k3s API stays
-unpublished.
+Merges to `main` reach staging, release tags reach production, both through
+Flux. Nothing pushes: the cluster pulls, so no GitHub workflow holds cluster
+credentials and the k3s API stays unpublished.
 
 ```
 merge to main
@@ -11,15 +11,22 @@ merge to main
   └─ source-controller     fetches the commit
        ├─ kustomize-ctrl   applies deploy/flux/ — so the committed tag
        │                   actually reaches the HelmRelease objects
-       └─ helm-controller  re-renders charts/tinycrm, upgrades the releases
+       └─ helm-controller  re-renders charts/tinycrm, upgrades staging
+
+merge the release-please pull request → tag vX.Y.Z
+  └─ release.yml           retags sha-<short> as X.Y.Z, X.Y, X, stable,
+                           pushes charts/tinycrm as the OCI chart X.Y.Z,
+                           signs both and attests the SBOMs (cosign keyless),
+                           commits X.Y.Z into deploy/flux/prod/ — images in
+                           helmrelease.yaml, chart in ocirepository.yaml
 ```
 
 Two environments on the one k3s node, one HelmRelease each:
 
-| | Namespace | Host | Image tag written by |
-|---|---|---|---|
-| `deploy/flux/staging/` | `tinycrm-staging` | `crm-staging.niecke-it.de` | `promote.yml`, every merge |
-| `deploy/flux/prod/` | `tinycrm` | `crm.niecke-it.de` | frozen until the release workflow (#114 step 4) |
+| | Namespace | Host | Chart from | Image tag written by |
+|---|---|---|---|---|
+| `deploy/flux/staging/` | `tinycrm-staging` | `crm-staging.niecke-it.de` | `charts/tinycrm` on `main` | `promote.yml`, every merge |
+| `deploy/flux/prod/` | `tinycrm` | `crm.niecke-it.de` | `oci://ghcr.io/niecke/tiny-crm/charts/tinycrm`, pinned to the release | `release.yml`, every `vX.Y.Z` tag |
 
 `deploy/flux/base/` holds the shared GitRepository and the Flux Kustomization.
 The entry point stays `deploy/flux/kustomization.yaml`, the path that
@@ -30,12 +37,59 @@ its manifest in git changes nothing until something applies it. Without that
 controller the images get tagged, the sha lands in git, and the cluster silently
 keeps running the previous release.
 
-Two things trigger a redeploy, and both are just commits on `main`:
+Staging redeploys on two kinds of commit on `main`:
 
-- a chart change under `charts/tinycrm/` — picked up because the HelmRelease
-  sets `reconcileStrategy: Revision`, so Flux keys off the git commit rather
-  than `Chart.yaml`'s version
+- a chart change under `charts/tinycrm/` — picked up because the staging
+  HelmRelease sets `reconcileStrategy: Revision`, so Flux keys off the git
+  commit rather than `Chart.yaml`'s version
 - a new image — `promote.yml` writes `sha-<short>` into the staging HelmRelease
+
+Production redeploys only on `release.yml`'s `Deploy X.Y.Z to production`
+commit, which moves the chart and the images together. A chart change on
+`main` reaches production with the next release, never before.
+
+## Releasing
+
+release-please keeps a `chore(main): release X.Y.Z` pull request open against
+`main`, collecting the conventional commits since the last tag. Merging it is
+the production decision:
+
+1. CI builds and tests the release pull request like any other — its images
+   report the plain `vX.Y.Z`.
+2. The merge runs `promote.yml` (images tagged `sha-<short>`, staging moves) and
+   release-please, which tags `vX.Y.Z` and publishes the GitHub Release.
+3. The tag runs `release.yml`. It waits for `sha-<short>` on all three images
+   and fails if they never appear — it never builds. Then it tags that digest
+   `X.Y.Z`, `X.Y`, `X` and `stable`, packages `charts/tinycrm` as the tag has
+   it and pushes it to `oci://ghcr.io/niecke/tiny-crm/charts` (failing if
+   `Chart.yaml` is not at `X.Y.Z`), signs every digest with cosign (keyless,
+   GitHub OIDC) and attaches a signed syft SPDX SBOM to each image, commits
+   `Deploy X.Y.Z to production`, and appends the image and chart digests, the
+   SBOM files and the `cosign verify` commands to the GitHub Release.
+
+Every image also carries SLSA provenance (`mode=max`) from its build on the
+pull request; the retags copy it along with the digest. It records the build
+args, so a build arg must never carry a secret.
+
+`stable`, `X`, `X.Y` and production only move forward: a tag older than the
+newest release gets its `X.Y.Z` and nothing else.
+
+### Rolling back
+
+```bash
+# flips production's images and chart back to the previous release
+git revert <Deploy X.Y.Z to production commit>   # through a pull request
+```
+
+Or edit the image tags in `deploy/flux/prod/helmrelease.yaml` and the chart tag
+in `deploy/flux/prod/ocirepository.yaml` directly — keep all four on the same
+release — then `flux -n tinycrm reconcile helmrelease tinycrm --with-source`. To freeze the
+cluster where it stands: `flux -n tinycrm suspend helmrelease tinycrm`.
+
+> [!WARNING]
+> Migrations do not roll back with the image. Every Alembic migration has to
+> work with release N−1: add and backfill in one release, stop writing the old
+> column in the next, drop it in a third.
 
 ## One-time cluster setup
 
@@ -178,8 +232,20 @@ secret — a write deploy key on this repository. Without it the promote job fai
 at the push step, images are tagged but the deployed sha never moves, and
 staging silently keeps running the previous build.
 
+`release.yml` pushes its `Deploy X.Y.Z to production` commit the same way.
+
+The chart package `tiny-crm/charts/tinycrm` on GHCR must be **public**: the
+production `OCIRepository` pulls it anonymously, like the kubelet pulls the
+images. GHCR creates a package private on its first push, and there is no API
+to change that — after the first release, set it under the package's settings,
+*Change visibility*. Until then the `OCIRepository` reports an authentication
+error and production stays on the release it already runs.
+
 Unlike a `GITHUB_TOKEN` push, a deploy-key push does trigger workflows. promote
-skips its own `Deploy <sha> to staging` commits with a job-level `if:`.
+skips both kinds of `Deploy …` commit with a job-level `if:`.
+
+The tag that starts `release.yml` must come from `RELEASE_PLEASE_TOKEN`, not
+`GITHUB_TOKEN` — GitHub starts no workflows for a tag pushed with the latter.
 
 ## Cutover
 

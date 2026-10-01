@@ -1,0 +1,13 @@
+# Findings the image scan in ci.yml accepts. Every entry needs a statement
+# saying why it does not apply here, is scoped to the one path it was found in,
+# and expires — after expired_at the finding fails the scan again, so it gets
+# re-checked instead of forgotten.
+vulnerabilities:
+  - id: CVE-2026-84445
+    paths:
+      - usr/local/bin/rclone
+    statement: >-
+      Only servers created with grpc-go's xds.NewGRPCServer() are affected.
+      rclone runs here as a client in the backup CronJob and never serves gRPC.
+      rclone 1.75.1 is the newest release and still links grpc 1.84.0-dev.
+    expired_at: 2026-11-01

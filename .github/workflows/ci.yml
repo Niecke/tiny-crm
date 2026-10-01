@@ -353,6 +353,11 @@ jobs:
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ needs.meta.outputs.commit }}
           tags: ${{ env.REGISTRY }}/backend:${{ needs.meta.outputs.tag }}
+          # SLSA provenance, attached to the image index as an attestation
+          # manifest — imagetools carries it along when promote and release
+          # retag. mode=max records the build args too, so none of them may
+          # ever be a secret (#114).
+          provenance: mode=max
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -390,6 +395,7 @@ jobs:
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ needs.meta.outputs.commit }}
           tags: ${{ env.REGISTRY }}/frontend:${{ needs.meta.outputs.tag }}
+          provenance: mode=max
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -426,8 +432,126 @@ jobs:
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ needs.meta.outputs.commit }}
           tags: ${{ env.REGISTRY }}/backup:${{ needs.meta.outputs.tag }}
+          provenance: mode=max
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # The images as pushed, so the scan sees exactly the digest promote will
+  # retag. It reports HIGH/CRITICAL findings with a fixed version available and
+  # never blocks the merge. A blocking gate fails every pull request the moment
+  # upstream publishes a fix — hours before Renovate's minimum release age lets
+  # that fix in — and leaves the choice between waiting and a workaround (#114).
+  # Fixes arrive the usual way: Renovate digest and lock file updates.
+  #
+  # exit-code 0 keeps findings from failing the job; a scan that cannot run at
+  # all (registry, database download) still does. One job, three steps rather
+  # than a matrix: `!cancelled()` lets all three images report regardless.
+  #
+  # trivy-action is pinned to v0.36.0, an immutable release published after the
+  # March 2026 tag hijack (GHSA-69fq-xp46-6x23); it pins setup-trivy by sha
+  # itself. The Trivy binary is pinned separately in TRIVY_VERSION — the
+  # action's own default lags behind several Trivy advisories.
+  scan:
+    name: Image scan
+    needs: [changes, meta, build-backend, build-frontend, build-backup]
+    if: github.event.pull_request.head.repo.full_name == github.repository && needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
+      pull-requests: write
+    env:
+      # renovate: datasource=github-releases depName=aquasecurity/trivy
+      TRIVY_VERSION: v0.74.0
+      # Renovate moves TRIVY_VERSION; the "newer version available" notice is
+      # noise that ends up as the last log line of a failing scan.
+      TRIVY_SKIP_VERSION_CHECK: "true"
+      IMAGE_TAG: ${{ needs.meta.outputs.tag }}
+    steps:
+      # The accepted findings (each with a reason and an expiry date) and the
+      # script that renders the report.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          sparse-checkout: |
+            .trivyignore.yaml
+            ci/scan_report.py
+          sparse-checkout-cone-mode: false
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ${{ env.REGISTRY_HOST }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Scan backend
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+          image-ref: ${{ env.REGISTRY }}/backend:${{ env.IMAGE_TAG }}
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "0"
+          trivyignores: .trivyignore.yaml
+          format: json
+          output: trivy-backend.json
+
+      - name: Scan frontend
+        if: ${{ !cancelled() }}
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+          image-ref: ${{ env.REGISTRY }}/frontend:${{ env.IMAGE_TAG }}
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "0"
+          trivyignores: .trivyignore.yaml
+          format: json
+          output: trivy-frontend.json
+
+      - name: Scan backup
+        if: ${{ !cancelled() }}
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+          image-ref: ${{ env.REGISTRY }}/backup:${{ env.IMAGE_TAG }}
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "0"
+          trivyignores: .trivyignore.yaml
+          format: json
+          output: trivy-backup.json
+
+      - name: Render the report
+        if: ${{ !cancelled() }}
+        run: |
+          images=(--image backend=trivy-backend.json --image frontend=trivy-frontend.json --image backup=trivy-backup.json)
+          python3 ci/scan_report.py "${images[@]}" --max-rows 0 | tee -a "$GITHUB_STEP_SUMMARY"
+          python3 ci/scan_report.py "${images[@]}" > comment.md
+
+      - name: Comment on the pull request
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          # Marker keeps one comment per PR: find it, edit it, or post the first.
+          printf '\n<!-- tinycrm-image-scan -->\n' >> comment.md
+          comment_id=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" \
+            --jq '[.[] | select(.body | contains("<!-- tinycrm-image-scan -->"))] | last | .id // empty')
+          if [ -n "$comment_id" ]; then
+            gh api --method PATCH "repos/${{ github.repository }}/issues/comments/$comment_id" \
+              -F body=@comment.md > /dev/null
+            echo "Updated comment $comment_id"
+          else
+            gh api --method POST "repos/${{ github.repository }}/issues/$PR/comments" \
+              -F body=@comment.md > /dev/null
+            echo "Posted a new comment"
+          fi
 
   integration:
     name: Integration test

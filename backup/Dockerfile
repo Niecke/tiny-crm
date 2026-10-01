@@ -13,8 +13,11 @@ FROM ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie@sha256:99bc64e413d59b0
 # quay.io (#112).
 COPY --from=docker.io/rclone/rclone:1.75.1@sha256:45401ad7410db1d67ffdb58e19059ad20b0d8e0285a60e38bbec55cc1019c7a5 /usr/local/bin/rclone /usr/local/bin/rclone
 
+# The upgrade takes Debian security updates that landed after the CNPG image was
+# last rebuilt, the same as the backend image does.
 USER root
 RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y \
     && apt-get install -y --no-install-recommends brotli \
     && rm -rf /var/lib/apt/lists/*
 

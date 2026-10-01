@@ -35,6 +35,18 @@
       "security"
     ]
   },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Tool versions pinned in workflow env, marked with a `# renovate:` comment on the line above (TRIVY_VERSION in ci.yml).",
+      "managerFilePatterns": [
+        "/^\\.github/workflows/[^/]+\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+[A-Z_]+:\\s*(?<currentValue>\\S+)"
+      ]
+    }
+  ],
   "packageRules": [
     {
       "description": "Never group unrelated packages into one PR - each update stays individually reviewable.",
