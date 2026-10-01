@@ -1177,7 +1177,7 @@ export interface components {
          * @description Fixing up a capture before working it.
          *
          *     `status` is deliberately absent. It moves through /convert and /dismiss and
-         *     nowhere else — the same funnel Deal.stage has through `_apply_stage`, so
+         *     nowhere else — the same funnel Deal.stage has through `apply_stage`, so
          *     that arriving at an ending always stamps everything that ending implies.
          */
         CaptureUpdate: {
@@ -1443,6 +1443,11 @@ export interface components {
             lost_reason: string | null;
             /** Closed At */
             closed_at: string | null;
+            /**
+             * Stage Changed At
+             * Format: date-time
+             */
+            stage_changed_at: string;
             /** Notes */
             notes: string | null;
             /** Contact Id */
@@ -3059,6 +3064,7 @@ export interface operations {
                 status?: ("open" | "active" | "won" | "finished") | null;
                 contact_id?: string | null;
                 organization_id?: string | null;
+                sort?: "expected_close_date" | "stage_changed_at";
             };
             header?: never;
             path?: never;

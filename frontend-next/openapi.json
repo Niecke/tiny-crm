@@ -1217,6 +1217,20 @@
               ],
               "title": "Organization Id"
             }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "expected_close_date",
+                "stage_changed_at"
+              ],
+              "type": "string",
+              "default": "expected_close_date",
+              "title": "Sort"
+            }
           }
         ],
         "responses": {
@@ -5057,7 +5071,7 @@
         },
         "type": "object",
         "title": "CaptureUpdate",
-        "description": "Fixing up a capture before working it.\n\n`status` is deliberately absent. It moves through /convert and /dismiss and\nnowhere else — the same funnel Deal.stage has through `_apply_stage`, so\nthat arriving at an ending always stamps everything that ending implies."
+        "description": "Fixing up a capture before working it.\n\n`status` is deliberately absent. It moves through /convert and /dismiss and\nnowhere else — the same funnel Deal.stage has through `apply_stage`, so\nthat arriving at an ending always stamps everything that ending implies."
       },
       "ContactCreate": {
         "properties": {
@@ -6277,6 +6291,11 @@
             ],
             "title": "Closed At"
           },
+          "stage_changed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Stage Changed At"
+          },
           "notes": {
             "anyOf": [
               {
@@ -6375,6 +6394,7 @@
           "probability",
           "lost_reason",
           "closed_at",
+          "stage_changed_at",
           "notes",
           "contact_id",
           "organization_id",

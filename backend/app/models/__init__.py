@@ -17,7 +17,7 @@ instead, and gets the whole registry from one import.
 
 from app.models.capture import Capture
 from app.models.contact import Contact
-from app.models.deal import Deal
+from app.models.deal import Deal, DealStageEvent
 from app.models.document import Document
 from app.models.interaction import Interaction
 from app.models.organization import Organization
@@ -29,6 +29,7 @@ __all__ = [
     "Capture",
     "Contact",
     "Deal",
+    "DealStageEvent",
     "Document",
     "Interaction",
     "Organization",

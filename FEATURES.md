@@ -107,14 +107,23 @@ it derives from. It is **NULL, never 0**, when no total exists: open-ended
 deals must not be summed in as zeros. **Units are never converted** — a day
 rate against a volume in months derives nothing rather than inventing a factor.
 
-**A stage is not a label.** `_apply_stage()` is the one code path (both the
+**A stage is not a label.** `apply_stage()` is the one code path (both the
 stage endpoint and PATCH route through it): arriving in a decided stage stamps
 `closed_at`, pins `probability` to 100 or 0, and decides whether `lost_reason`
 may exist. Sending a `lost_reason` with any stage but `lost` is a 422; one
-already stored on a deal being won or reopened is cleared.
+already stored on a deal being won or reopened is cleared. Deals created from a
+capture or a watch sweep go through it too.
+
+**Stage history.** `stage_changed_at` is when the deal entered its current
+stage, stamped **only when the stage actually changes** — a PATCH of the title
+does not reset the clock. Every move, including creation (`from_stage` NULL),
+appends a row to `deal_stage_events` (`from_stage`, `to_stage`, `changed_at`,
+`lost_reason`); moving back adds a row rather than editing one, and deleting a
+deal cascades to its events. Deals that predate this carry `created_at` as
+their `stage_changed_at` — a floor, not the real move — and have no events.
 
 **Ordering.** Expected close date ascending, **NULLs last** — an undated deal
-is not urgent.
+is not urgent. `?sort=stage_changed_at` puts the longest-waiting deal first.
 
 **Filters.** `?search` (title) · `?stage` · `?status` · `?contact_id` ·
 `?organization_id`.
