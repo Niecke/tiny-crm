@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 """Render one markdown summary of the test suites.
 
-Reads whatever CI produced — pytest's JUnit XML and coverage XML, and, when
-passed, flutter test's JSON report and its lcov file — and writes a table to
+Reads whatever CI produced — a JUnit XML and a Cobertura coverage XML per suite,
+from pytest for the backend and Vitest for the frontend — and writes a table to
 stdout. Missing inputs are reported as such rather than skipped, because a suite
-that did not produce a report usually means the job died before running it. The
-Flutter suite is the exception: CI no longer runs it (#122), so it is only part
-of the table when --frontend-report is given at all.
+that did not produce a report usually means the job died before running it.
 
     python3 ci/pr_report.py --backend-junit backend/junit.xml ... > comment.md
 """
@@ -14,7 +12,6 @@ of the table when --frontend-report is given at all.
 from __future__ import annotations
 
 import argparse
-import json
 import xml.etree.ElementTree as ElementTree
 from dataclasses import dataclass
 from pathlib import Path
@@ -43,107 +40,58 @@ class Suite:
 
 
 def _read_junit(path: Path, suite: Suite) -> None:
-    """pytest --junitxml: one <testsuite> with counts as attributes."""
+    """JUnit XML: pytest writes one <testsuite>, Vitest one per test file."""
     root = ElementTree.parse(path).getroot()
-    element = root if root.tag == "testsuite" else root.find("testsuite")
-    if element is None:
+    elements = [root] if root.tag == "testsuite" else root.findall("testsuite")
+    if not elements:
         suite.note = f"no testsuite element in {path.name}"
         return
 
-    total = int(element.get("tests", 0))
-    failed = int(element.get("failures", 0)) + int(element.get("errors", 0))
-    skipped = int(element.get("skipped", 0))
+    total = sum(int(e.get("tests", 0)) for e in elements)
+    failed = sum(int(e.get("failures", 0)) + int(e.get("errors", 0)) for e in elements)
+    skipped = sum(int(e.get("skipped", 0)) for e in elements)
     suite.failed = failed
     suite.skipped = skipped
     suite.passed = total - failed - skipped
-    duration = element.get("time")
-    suite.duration = float(duration) if duration else None
+    # Vitest's files run in parallel, so their times add up to more than the
+    # run took; its root element has the wall time. pytest's root has none.
+    duration = root.get("time") if root.tag == "testsuites" else None
+    if duration is None:
+        times = [float(t) for e in elements if (t := e.get("time"))]
+        suite.duration = sum(times) if times else None
+    else:
+        suite.duration = float(duration)
 
     suite.failures = [
         f"{case.get('classname', '')}::{case.get('name', '')}".lstrip(":")
-        for case in element.iter("testcase")
+        for e in elements
+        for case in e.iter("testcase")
         if case.find("failure") is not None or case.find("error") is not None
     ]
 
 
 def _read_coverage_xml(path: Path, suite: Suite) -> None:
-    """coverage.py --cov-report=xml: line-rate on the root element."""
+    """Cobertura XML (coverage.py, Vitest): line-rate on the root element."""
     root = ElementTree.parse(path).getroot()
     line_rate = root.get("line-rate")
     if line_rate is not None:
         suite.coverage = float(line_rate) * 100
 
 
-def _read_flutter_json(path: Path, suite: Suite) -> None:
-    """flutter test --file-reporter=json: one JSON event per line."""
-    results: dict[str, str] = {}
-    names: dict[str, str] = {}
-    hidden: set[str] = set()
-    elapsed = 0
-
-    for line in path.read_text().splitlines():
-        line = line.strip()
-        if not line.startswith("{"):
-            continue
-        event = json.loads(line)
-        kind = event.get("type")
-        if kind == "testStart":
-            test = event["test"]
-            names[str(test["id"])] = test.get("name", "")
-            # Flutter reports its own loading/compiling steps as hidden tests.
-            if test.get("name", "").startswith(("loading ", "compiling ")):
-                hidden.add(str(test["id"]))
-        elif kind == "testDone":
-            test_id = str(event["testID"])
-            if event.get("hidden") or test_id in hidden:
-                continue
-            results[test_id] = "skipped" if event.get("skipped") else event.get("result", "error")
-        elif kind == "done":
-            elapsed = event.get("time", 0)
-
-    suite.passed = sum(1 for r in results.values() if r == "success")
-    suite.skipped = sum(1 for r in results.values() if r == "skipped")
-    suite.failed = sum(1 for r in results.values() if r not in {"success", "skipped"})
-    suite.duration = elapsed / 1000 if elapsed else None
-    suite.failures = [
-        names.get(test_id, test_id)
-        for test_id, result in results.items()
-        if result not in {"success", "skipped"}
-    ]
-
-
-def _read_lcov(path: Path, suite: Suite) -> None:
-    """lcov.info: LF is lines found, LH lines hit, per file."""
-    found = hit = 0
-    for line in path.read_text().splitlines():
-        if line.startswith("LF:"):
-            found += int(line[3:])
-        elif line.startswith("LH:"):
-            hit += int(line[3:])
-    if found:
-        suite.coverage = hit / found * 100
-
-
-def _collect(name: str, results: Path | None, coverage: Path | None, flutter: bool) -> Suite:
+def _collect(name: str, results: Path | None, coverage: Path | None) -> Suite:
     suite = Suite(name=name)
     if results is None or not results.exists():
         suite.note = "no test report — the job did not get that far"
         return suite
 
     try:
-        if flutter:
-            _read_flutter_json(results, suite)
-        else:
-            _read_junit(results, suite)
-    except (ElementTree.ParseError, json.JSONDecodeError, KeyError) as exc:
+        _read_junit(results, suite)
+    except ElementTree.ParseError as exc:
         suite.note = f"unreadable report ({type(exc).__name__})"
         return suite
 
     if coverage is not None and coverage.exists():
-        if flutter:
-            _read_lcov(coverage, suite)
-        else:
-            _read_coverage_xml(coverage, suite)
+        _read_coverage_xml(coverage, suite)
     return suite
 
 
@@ -173,12 +121,10 @@ def render(suites: list[Suite]) -> str:
             if len(suite.failures) > 10:
                 lines.append(f"- …and {len(suite.failures) - 10} more")
 
-    footer = "Line coverage, as a rough signal — it is not a gate."
-    if any(suite.name == "Frontend" for suite in suites):
-        footer += (
-            " The frontend figure covers only the libraries its tests import, so it reads"
-            " higher than the app as a whole."
-        )
+    footer = (
+        "Line coverage, as a rough signal — it is not a gate. The frontend figure leaves"
+        " out the route pages, which the integration test drives instead."
+    )
     lines += ["", f"<sub>{footer}</sub>"]
     return "\n".join(lines)
 
@@ -187,15 +133,14 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--backend-junit", type=Path)
     parser.add_argument("--backend-coverage", type=Path)
-    parser.add_argument("--frontend-report", type=Path)
+    parser.add_argument("--frontend-junit", type=Path)
     parser.add_argument("--frontend-coverage", type=Path)
     args = parser.parse_args()
 
-    suites = [_collect("Backend", args.backend_junit, args.backend_coverage, flutter=False)]
-    if args.frontend_report is not None:
-        suites.append(
-            _collect("Frontend", args.frontend_report, args.frontend_coverage, flutter=True)
-        )
+    suites = [
+        _collect("Backend", args.backend_junit, args.backend_coverage),
+        _collect("Frontend", args.frontend_junit, args.frontend_coverage),
+    ]
     print(render(suites))
     return 0
 

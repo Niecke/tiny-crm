@@ -191,9 +191,9 @@ jobs:
           retention-days: 7
 
   # The React client in frontend-next/ (#122). The Flutter client in frontend/
-  # is no longer built, tested or shipped. No test suite yet, so the gate is
-  # what `npm run build` enforces — the TypeScript type-check — plus the
-  # linter, and that its generated API types match the backend. Node comes from
+  # is no longer built, tested or shipped. The gate is the unit tests, what
+  # `npm run build` enforces — the TypeScript type-check — plus the linter, and
+  # that its generated API types match the backend. Node comes from
   # setup-node rather than the Dockerfile's image: JavaScript actions such as
   # checkout cannot run inside an Alpine container.
   frontend-checks:
@@ -243,13 +243,30 @@ jobs:
         working-directory: frontend-next
         run: npm run lint
 
+      # Coverage is reported, not enforced (FRONTEND.md, "Tests").
+      - name: Unit tests
+        working-directory: frontend-next
+        run: npm run test:coverage -- --reporter=default --reporter=junit --outputFile.junit=junit.xml
+
+      - name: Upload reports
+        # The report job needs these precisely when the tests failed.
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: frontend-reports
+          path: |
+            frontend-next/junit.xml
+            frontend-next/coverage/cobertura-coverage.xml
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Build and type-check
         working-directory: frontend-next
         run: npm run build
 
   report:
     name: Test report
-    needs: [changes, backend-tests]
+    needs: [changes, backend-tests, frontend-checks]
     # Runs even when a suite failed — that is when the summary is worth reading.
     if: always() && github.event_name == 'pull_request' && needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
@@ -261,19 +278,21 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # A suite that died before writing a report leaves nothing to download;
-      # the summary says so rather than the job failing here.
+      # the summary says so rather than the job failing here. Each artifact
+      # lands in its own folder: both suites write a junit.xml.
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         continue-on-error: true
         with:
           path: reports
-          merge-multiple: true
 
       - name: Render the summary
         run: |
           mkdir -p reports
           python3 ci/pr_report.py \
-            --backend-junit reports/junit.xml \
-            --backend-coverage reports/coverage.xml \
+            --backend-junit reports/backend-reports/junit.xml \
+            --backend-coverage reports/backend-reports/coverage.xml \
+            --frontend-junit reports/frontend-reports/junit.xml \
+            --frontend-coverage reports/frontend-reports/coverage/cobertura-coverage.xml \
             > comment.md
           cat comment.md >> "$GITHUB_STEP_SUMMARY"
 

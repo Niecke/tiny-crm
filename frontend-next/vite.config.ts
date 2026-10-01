@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { tanstackRouter } from '@tanstack/router-plugin/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
@@ -12,4 +13,21 @@ export default defineConfig({
     tanstackRouter({ target: 'react', autoCodeSplitting: true }),
     react(),
   ],
+  // Unit tests (FRONTEND.md, "Tests"). Dates and numbers are formatted in the
+  // browser's timezone and locale, so both are pinned: the same run gives the
+  // same strings on a laptop in Vienna and on a CI runner in UTC. The zone is
+  // west of Greenwich on purpose — that is where a date read as UTC midnight
+  // turns into the day before, the bug src/format.ts exists to avoid.
+  test: {
+    environment: 'jsdom',
+    env: { TZ: 'America/New_York', LANG: 'en_US.UTF-8', LC_ALL: 'en_US.UTF-8' },
+    setupFiles: ['src/test/setup.ts'],
+    coverage: {
+      provider: 'v8',
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: ['src/routeTree.gen.ts', 'src/api/schema.d.ts', 'src/routes/**', 'src/test/**', 'src/**/*.test.{ts,tsx}'],
+      // cobertura: the XML ci/pr_report.py reads, as it does the backend's.
+      reporter: ['text', 'cobertura'],
+    },
+  },
 })

@@ -16,6 +16,7 @@ npm install
 npm run dev      # http://localhost:5173/
 npm run build    # dist/, then type-check
 npm run lint
+npm test         # unit tests; test:watch while working, test:coverage for the report
 ```
 
 The API URL comes from `/config.json` at runtime. Without one (plain `npm run dev`) it falls back to
