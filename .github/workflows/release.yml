@@ -3,13 +3,15 @@ name: Release
 # release-please tags vX.Y.Z when its release pull request merges. That merge is
 # the production decision; this workflow carries it out. It never builds: the
 # images were built once on the release pull request, tested there, and retagged
-# sha-<short> by promote.yml when it merged. Here they get their version tags and
-# the version is written into deploy/flux/prod/, which is the only thing that
-# moves production (#114).
+# sha-<short> by promote.yml when it merged. Here they get their version tags,
+# the chart as of the tag is pushed to GHCR as an OCI artifact, and the version
+# is written into deploy/flux/prod/, which is the only thing that moves
+# production (#114).
 #
-# Each released digest is also signed keyless with cosign and gets a signed
-# syft SBOM attestation, both before production is pointed at it — so a cluster
-# that verifies signatures never sees an unsigned release.
+# Each released digest — images and chart — is also signed keyless with cosign,
+# and each image gets a signed syft SBOM attestation, all before production is
+# pointed at it, so a cluster that verifies signatures never sees an unsigned
+# release.
 on:
   push:
     tags: ["v[0-9]+.[0-9]+.[0-9]+"]
@@ -32,6 +34,11 @@ env:
   # GHCR rejects uppercase in a path, so this is not github.repository_owner.
   REGISTRY: ghcr.io/niecke/tiny-crm
   RELEASE: deploy/flux/prod/helmrelease.yaml
+  CHART_SOURCE: deploy/flux/prod/ocirepository.yaml
+  # helm push appends the chart name: this is ghcr.io/niecke/tiny-crm/charts/tinycrm.
+  CHART_REGISTRY: ghcr.io/niecke/tiny-crm/charts
+  # renovate: datasource=github-releases depName=helm/helm
+  HELM_VERSION: v4.3.0
   # renovate: datasource=github-releases depName=sigstore/cosign
   COSIGN_VERSION: v3.1.3
   # renovate: datasource=github-releases depName=anchore/syft
@@ -162,6 +169,58 @@ jobs:
             done
           done
 
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      # The chart as the tag has it — the checkout is main, which may already be
+      # ahead. release-please bumped Chart.yaml in the release pull request, so
+      # its version must be this release; anything else means the extra-files
+      # config broke, and production would pin a chart named after the wrong
+      # release.
+      #
+      # A chart version is pushed once. A re-run finds it and reads its digest
+      # rather than pushing a fresh package, whose timestamps would give the
+      # same version a new digest under an existing signature.
+      - name: Publish the chart
+        id: chart
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.release.outputs.version }}
+          COMMIT: ${{ steps.release.outputs.commit }}
+        run: |
+          set -euo pipefail
+          src="$RUNNER_TEMP/chart-src"
+          mkdir -p "$src"
+          git archive "$COMMIT" charts/tinycrm | tar -x -C "$src"
+
+          chart_version=$(yq '.version' "$src/charts/tinycrm/Chart.yaml")
+          if [ "$chart_version" != "$VERSION" ]; then
+            echo "::error::charts/tinycrm/Chart.yaml at $COMMIT is $chart_version, expected $VERSION." \
+                 "Check the Chart.yaml entry in release-please-config.json."
+            exit 1
+          fi
+
+          echo "$GH_TOKEN" | helm registry login "$REGISTRY_HOST" \
+            --username "${{ github.actor }}" --password-stdin
+
+          ref="oci://$CHART_REGISTRY/tinycrm"
+          if helm show chart "$ref" --version "$VERSION" >/dev/null 2>&1; then
+            echo "tinycrm:$VERSION already published — reading its digest"
+            out=$(helm pull "$ref" --version "$VERSION" --destination "$RUNNER_TEMP" 2>&1)
+          else
+            helm package "$src/charts/tinycrm" --destination "$RUNNER_TEMP"
+            out=$(helm push "$RUNNER_TEMP/tinycrm-$VERSION.tgz" "oci://$CHART_REGISTRY" 2>&1)
+          fi
+          echo "$out"
+
+          digest=$(echo "$out" | sed -n 's/^Digest: *//p')
+          if ! [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::Could not read the digest of $CHART_REGISTRY/tinycrm:$VERSION from helm's output."
+            exit 1
+          fi
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
       - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
         with:
           cosign-release: ${{ env.COSIGN_VERSION }}
@@ -179,14 +238,20 @@ jobs:
       # The SBOM is read from the registry, not a local daemon: syft resolves
       # the index to the linux/amd64 image, and the attestation goes on the
       # index digest that the HelmRelease and Kyverno resolve the tag to.
-      - name: Sign the images and attest their SBOMs
+      #
+      # The chart is signed the same way. It has no SBOM: it is templates, not
+      # packages.
+      - name: Sign the images and the chart, attest the images' SBOMs
         env:
           SYFT: ${{ steps.syft.outputs.cmd }}
           BACKEND: ${{ steps.images.outputs.backend }}
           FRONTEND: ${{ steps.images.outputs.frontend }}
           BACKUP: ${{ steps.images.outputs.backup }}
+          CHART: ${{ steps.chart.outputs.digest }}
         run: |
           set -euo pipefail
+          cosign sign --yes "$CHART_REGISTRY/tinycrm@$CHART"
+
           for image in backend frontend backup; do
             var="${image^^}"
             ref="$REGISTRY/$image@${!var}"
@@ -201,6 +266,10 @@ jobs:
       # The push races promote's own deploy commit for the same merge — both
       # start from the release merge. They touch different files, so a rebase
       # always applies cleanly. promote's job-level `if:` skips this commit.
+      #
+      # Chart and images move in one commit, so production never renders one
+      # release's chart with another's images, and reverting the commit rolls
+      # back both.
       - name: Record the release for Flux
         if: steps.release.outputs.latest == 'true'
         env:
@@ -214,15 +283,16 @@ jobs:
             .spec.values.frontend.image.tag = strenv(TAG) |
             .spec.values.backup.image.tag = strenv(TAG)
           ' "$RELEASE"
+          TAG="$VERSION" yq -i '.spec.ref.tag = strenv(TAG)' "$CHART_SOURCE"
 
-          if git diff --quiet -- "$RELEASE"; then
+          if git diff --quiet -- "$RELEASE" "$CHART_SOURCE"; then
             echo "Production already at $VERSION — nothing to commit."
             exit 0
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "$RELEASE"
+          git add "$RELEASE" "$CHART_SOURCE"
           git commit -m "Deploy $VERSION to production"
 
           for attempt in 1 2 3 4 5; do
@@ -255,6 +325,7 @@ jobs:
           BACKEND: ${{ steps.images.outputs.backend }}
           FRONTEND: ${{ steps.images.outputs.frontend }}
           BACKUP: ${{ steps.images.outputs.backup }}
+          CHART: ${{ steps.chart.outputs.digest }}
         run: |
           set -euo pipefail
           for attempt in 1 2 3 4 5 6; do
@@ -283,8 +354,9 @@ jobs:
             echo "| \`$REGISTRY/backend:$VERSION\` | \`$BACKEND\` |"
             echo "| \`$REGISTRY/frontend:$VERSION\` | \`$FRONTEND\` |"
             echo "| \`$REGISTRY/backup:$VERSION\` | \`$BACKUP\` |"
+            echo "| \`$CHART_REGISTRY/tinycrm:$VERSION\` (Helm chart) | \`$CHART\` |"
             echo
-            echo "Signed keyless with cosign; each image carries a signed SPDX SBOM"
+            echo "All signed keyless with cosign; each image carries a signed SPDX SBOM"
             echo "attestation, also attached below. To verify:"
             echo
             echo '```sh'
