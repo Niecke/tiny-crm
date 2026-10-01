@@ -4686,6 +4686,7 @@
         "properties": {
           "raw": {
             "type": "string",
+            "maxLength": 2000,
             "minLength": 1,
             "title": "Raw"
           },
@@ -5007,6 +5008,7 @@
             "anyOf": [
               {
                 "type": "string",
+                "maxLength": 2000,
                 "minLength": 1
               },
               {
