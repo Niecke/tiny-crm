@@ -17,9 +17,10 @@ from app.auth.users import User
 from app.briefing import Briefing, DayWindow, gather_briefing
 from app.config import settings
 from app.db import get_session
-from app.models import Capture, Interaction, Task, Watch
+from app.models import Capture, Deal, Interaction, Task, Watch
 from app.schemas.briefing import (
     BriefingCapture,
+    BriefingDeal,
     BriefingInteraction,
     BriefingRead,
     BriefingTask,
@@ -85,6 +86,18 @@ def _capture(capture: Capture, window: DayWindow) -> BriefingCapture:
     )
 
 
+def _deal(deal: Deal, window: DayWindow) -> BriefingDeal:
+    return BriefingDeal(
+        id=deal.id,
+        title=deal.title,
+        stage=deal.stage,
+        contact_name=deal.contact_name,
+        organization_name=deal.organization_name,
+        stage_changed_at=deal.stage_changed_at,
+        days_in_stage=window.days_late(deal.stage_changed_at),
+    )
+
+
 def to_read(briefing: Briefing) -> BriefingRead:
     window = briefing.window
     return BriefingRead(
@@ -98,6 +111,7 @@ def to_read(briefing: Briefing) -> BriefingRead:
         ],
         watches_due=[_watch(w, window) for w in briefing.watches_due],
         captures_waiting=[_capture(c, window) for c in briefing.captures_waiting],
+        stalled_deals=[_deal(d, window) for d in briefing.stalled_deals],
     )
 
 

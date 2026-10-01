@@ -41,7 +41,9 @@ from app.config import settings
 from app.main import app
 from app.models.capture import Capture
 from app.models.contact import Contact
+from app.models.deal import Deal
 from app.models.interaction import Interaction
+from app.models.organization import Organization
 from app.models.task import Task
 from app.models.watch import Watch
 from app.routers.briefing import current_time
@@ -107,6 +109,16 @@ def _capture(account: Account, raw: str, created_at: datetime, **fields: Any) ->
         created_at=created_at,
         **fields,
     )
+
+
+def _deal(account: Account, title: str, since: datetime, **fields: Any) -> Deal:
+    """A deal that entered its current stage at `since`.
+
+    Built directly, not through `apply_stage`: the age is the thing under
+    test, and the router would stamp it with the real clock.
+    """
+    fields.setdefault("stage", "proposal")
+    return Deal(user_id=account.id, title=title, stage_changed_at=since, **fields)
 
 
 # --- The day boundary --------------------------------------------------------
@@ -263,6 +275,98 @@ async def test_a_waiting_capture_says_how_long_it_has_waited(
     assert "<https://example.com/jane|Jane Doe>" in text
     # And the preview line counts them.
     assert "3 to write" in payload["text"]
+
+
+async def test_open_deals_with_no_next_step_are_listed_longest_waiting_first(
+    session_factory: async_sessionmaker[AsyncSession], alice: Account, bob: Account
+) -> None:
+    quiet = _deal(alice, "Quiet proposal", berlin("2026-08-01T09:00"))
+    older = _deal(alice, "Older lead", berlin("2026-07-01T09:00"), stage="lead")
+    tasked = _deal(alice, "Has a task", berlin("2026-06-01T09:00"))
+    undated = _deal(alice, "Has an undated task", berlin("2026-06-01T09:00"))
+    finished_task = _deal(alice, "Task already done", berlin("2026-08-15T09:00"))
+    meeting_next_week = _deal(alice, "Meeting next week", berlin("2026-06-01T09:00"))
+    meeting_this_morning = _deal(alice, "Meeting this morning", berlin("2026-06-01T09:00"))
+    only_history = _deal(alice, "Only past calls", berlin("2026-08-20T09:00"))
+    running = _deal(alice, "Running engagement", berlin("2026-05-01T09:00"), stage="running")
+    lost = _deal(alice, "Lost", berlin("2026-05-01T09:00"), stage="lost")
+    await _seed(
+        session_factory,
+        quiet,
+        older,
+        tasked,
+        undated,
+        finished_task,
+        meeting_next_week,
+        meeting_this_morning,
+        only_history,
+        running,
+        lost,
+        _deal(bob, "Bob's quiet deal", berlin("2026-05-01T09:00")),
+        _task(alice, "Chase", berlin("2026-09-01T23:59"), deal=tasked),
+        _task(alice, "Someday", None, deal=undated),
+        _task(alice, "Sent it", berlin("2026-08-20T23:59"), deal=finished_task, done=True),
+        _interaction(alice, "Workshop", berlin("2026-09-08T10:00"), deals=[meeting_next_week]),
+        # 06:00 today, an hour before the briefing, not yet ticked: on today's
+        # calendar, so the deal has not been forgotten.
+        _interaction(alice, "Early call", berlin("2026-09-04T06:00"), deals=[meeting_this_morning]),
+        # Yesterday and never confirmed: that is the "planned, never
+        # confirmed" section's problem — it is not a next step.
+        _interaction(alice, "Missed call", berlin("2026-09-03T10:00"), deals=[only_history]),
+        _interaction(alice, "Intro", berlin("2026-08-20T10:00"), deals=[only_history], done=True),
+    )
+
+    briefing = await _briefing_for(session_factory, alice)
+
+    assert [d.title for d in briefing.stalled_deals] == [
+        "Older lead",
+        "Quiet proposal",
+        "Task already done",
+        "Only past calls",
+    ]
+
+
+async def test_a_stalled_deal_alone_makes_a_briefing_worth_sending(
+    session_factory: async_sessionmaker[AsyncSession], alice: Account
+) -> None:
+    await _seed(session_factory, _deal(alice, "Forgotten", berlin("2026-08-01T09:00")))
+
+    briefing = await _briefing_for(session_factory, alice)
+
+    assert not briefing.is_empty
+
+
+async def test_a_stalled_deal_says_who_it_is_with_and_how_long_it_has_sat(
+    session_factory: async_sessionmaker[AsyncSession], alice: Account
+) -> None:
+    """The issue's done-when: seed a forgotten deal, and the briefing names it."""
+    maria = Contact(user_id=alice.id, name="Maria")
+    acme = Organization(user_id=alice.id, name="ACME & Sons")
+    await _seed(
+        session_factory,
+        _deal(
+            alice,
+            "Website <relaunch>",
+            berlin("2026-08-23T09:00"),
+            contact=maria,
+            organization=acme,
+        ),
+        _deal(alice, "Tender", berlin("2026-09-03T15:00"), stage="qualified", organization=acme),
+        _deal(alice, "Inbound enquiry", berlin("2026-09-04T06:30"), stage="lead"),
+    )
+
+    briefing = await _briefing_for(session_factory, alice)
+    payload = render_slack(briefing)
+    text = _text_of(payload)
+
+    assert "*Deals with no next step* (3)" in text
+    assert "• *Website &lt;relaunch&gt;* · Maria · ACME &amp; Sons · _12 days in proposal_" in text
+    # Singular, not "1 days".
+    assert "• *Tender* · ACME &amp; Sons · _1 day in qualified_" in text
+    # Entered this morning, with nobody named on it yet.
+    assert "• *Inbound enquiry* · _in lead since today_" in text
+    # The notification preview counts them, or they never show in it.
+    assert payload["text"] == "Fri 4 Sep: 3 with no next step"
 
 
 async def test_a_clear_day_is_empty(
@@ -583,6 +687,7 @@ async def test_the_endpoint_serves_todays_briefing_with_its_day_counts(
         _interaction(alice, "Forgotten follow-up", berlin("2026-09-01T11:00")),
         _watch(alice, "karriere", berlin("2026-09-04T15:00")),
         _capture(alice, "Jane Doe", berlin("2026-08-20T09:00"), url="https://example.com/jane"),
+        _deal(alice, "Quiet proposal", berlin("2026-08-23T09:00"), contact=contact),
     )
 
     response = await client.get("/briefing/", headers=alice.headers)
@@ -611,6 +716,14 @@ async def test_the_endpoint_serves_todays_briefing_with_its_day_counts(
 
     [capture] = body["captures_waiting"]
     assert (capture["display_name"], capture["days_waiting"]) == ("Jane Doe", 15)
+
+    [deal] = body["stalled_deals"]
+    assert (deal["title"], deal["stage"], deal["contact_name"], deal["days_in_stage"]) == (
+        "Quiet proposal",
+        "proposal",
+        "Maria",
+        12,
+    )
 
 
 async def test_the_endpoints_today_is_the_operators_not_utcs(
@@ -644,6 +757,7 @@ async def test_the_endpoint_shows_nobody_elses_day(
         _interaction(alice, "Alice's meeting", berlin("2026-09-04T10:00")),
         _watch(alice, "alices", berlin("2026-09-01T09:00")),
         _capture(alice, "Alice's capture", berlin("2026-09-01T09:00")),
+        _deal(alice, "Alice's deal", berlin("2026-09-01T09:00")),
     )
 
     body = (await client.get("/briefing/", headers=bob.headers)).json()
@@ -655,5 +769,6 @@ async def test_the_endpoint_shows_nobody_elses_day(
         "unconfirmed_interactions",
         "watches_due",
         "captures_waiting",
+        "stalled_deals",
     ):
         assert body[section] == [], section

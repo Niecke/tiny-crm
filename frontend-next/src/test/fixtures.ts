@@ -29,6 +29,7 @@ export const deal = (overrides: Partial<DealRead> = {}): DealRead => ({
   is_open: true,
   is_won: false,
   is_active: true,
+  has_next_step: false,
   created_at: '2026-09-01T08:00:00Z',
   updated_at: '2026-09-01T08:00:00Z',
   ...overrides,

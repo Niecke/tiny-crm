@@ -1,5 +1,6 @@
 from datetime import date, datetime
 from decimal import Decimal
+from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from sqlalchemy import Computed, Date, DateTime, ForeignKey, Numeric, String, func
@@ -139,6 +140,12 @@ class Deal(Base):
     stage_events: WriteOnlyMapped["DealStageEvent"] = relationship(
         cascade="all, delete-orphan", passive_deletes=True
     )
+
+    if TYPE_CHECKING:
+        # An open task, or a planned interaction from now on. Computed per
+        # query, never stored, and attached by app/models/next_step.py: the
+        # expression needs Task and Interaction, which both import this module.
+        has_next_step: Mapped[bool]
 
     @property
     def contact_name(self) -> str | None:

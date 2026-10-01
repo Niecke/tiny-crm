@@ -4,7 +4,7 @@ from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import nulls_last, select
+from sqlalchemy import not_, nulls_last, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import current_active_user
@@ -194,7 +194,11 @@ async def list_deals(
     status: DealStatus | None = Query(default=None),
     contact_id: UUID | None = Query(default=None),
     organization_id: UUID | None = Query(default=None),
-    sort: DealSort = Query(default="expected_close_date"),
+    # Open, with no open task and nothing planned: the deals nothing in the app
+    # would ever bring up again. Implies the stage-age order unless `sort` says
+    # otherwise — the one that has sat longest is the one to rescue first.
+    stalled: bool = Query(default=False),
+    sort: DealSort | None = Query(default=None),
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> Page[DealRead]:
@@ -209,8 +213,12 @@ async def list_deals(
         q = q.where(Deal.contact_id == contact_id)
     if organization_id is not None:
         q = q.where(Deal.organization_id == organization_id)
+    if stalled:
+        q = q.where(Deal.stage.in_(OPEN_STAGES), not_(Deal.has_next_step))
 
     total = await count_rows(session, q)
+    if sort is None:
+        sort = "stage_changed_at" if stalled else "expected_close_date"
     if sort == "stage_changed_at":
         # Longest in its current stage first — the deal that has gone quiet is
         # the one to look at. Never NULL, so no placement rule is needed.

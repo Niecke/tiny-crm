@@ -42,7 +42,9 @@ from app.auth.users import User
 # `Interaction.projects` unable to resolve "Project" and the first query
 # fails. See app/models/__init__.py — the API is only safe here because it
 # imports every router.
-from app.models import Capture, Interaction, Task, Watch
+from app.models import Capture, Deal, Interaction, Task, Watch
+from app.models.deal import OPEN_STAGES
+from app.models.next_step import next_step_exists
 
 logger = logging.getLogger(__name__)
 
@@ -127,6 +129,10 @@ class Briefing:
     # needs to be here. Nothing else in the app would ever surface one, so an
     # inbox nobody opens is invisible until the names in it are cold.
     captures_waiting: list[Capture] = field(default_factory=list)
+    # Open deals with no open task and nothing planned from today on, longest
+    # in their stage first. The same blind spot as a capture: no date of its
+    # own, so nothing else would ever bring it up again.
+    stalled_deals: list[Deal] = field(default_factory=list)
 
     @property
     def recipient(self) -> str:
@@ -141,6 +147,7 @@ class Briefing:
             or self.unconfirmed_interactions
             or self.watches_due
             or self.captures_waiting
+            or self.stalled_deals
         )
 
 
@@ -182,6 +189,20 @@ async def gather_briefing(session: AsyncSession, user: User, window: DayWindow) 
         .order_by(Capture.created_at.asc(), Capture.id.asc())
     )
 
+    # Planned from the start of today, not from this instant: a meeting earlier
+    # today that is still unconfirmed is in the calendar section above, so the
+    # deal it is about has not been forgotten. And the briefing's clock is the
+    # window's, not the database's `now()` that `Deal.has_next_step` reads.
+    stalled_deals = await session.scalars(
+        select(Deal)
+        .where(
+            Deal.user_id == user.id,
+            Deal.stage.in_(OPEN_STAGES),
+            ~next_step_exists(window.start),
+        )
+        .order_by(Deal.stage_changed_at.asc(), Deal.id.asc())
+    )
+
     return Briefing(
         user=user,
         window=window,
@@ -191,6 +212,7 @@ async def gather_briefing(session: AsyncSession, user: User, window: DayWindow) 
         unconfirmed_interactions=list(unconfirmed),
         watches_due=list(watches_due),
         captures_waiting=list(captures_waiting),
+        stalled_deals=list(stalled_deals),
     )
 
 
@@ -271,6 +293,27 @@ def _capture_line(capture: Capture, window: DayWindow) -> str:
     return "• " + " · ".join(parts)
 
 
+def _stalled_deal_line(deal: Deal, window: DayWindow) -> str:
+    """One deal nobody is working: what, with whom, and how long it has sat.
+
+    Built like `_capture_line`, and for the same reason the age is the point:
+    a deal two days into `lead` is a deal just entered, one six weeks into
+    `proposal` is one the other side has stopped thinking about.
+    """
+    parts = [f"*{escape(deal.title)}*"]
+    who = " · ".join(escape(p) for p in (deal.contact_name, deal.organization_name) if p)
+    if who:
+        parts.append(who)
+    # Calendar days since it entered its current stage — the same question
+    # `days_late` answers for a due date.
+    days = window.days_late(deal.stage_changed_at)
+    if days == 0:
+        parts.append(f"_in {deal.stage} since today_")
+    else:
+        parts.append(f"_{_count(days, 'day')} in {deal.stage}_")
+    return "• " + " · ".join(parts)
+
+
 def _capped(lines: list[str]) -> list[str]:
     if len(lines) <= MAX_LINES:
         return lines
@@ -318,6 +361,10 @@ def render_slack(briefing: Briefing, *, app_url: str | None = None) -> dict[str,
             "People to write to",
             [_capture_line(c, window) for c in briefing.captures_waiting],
         ),
+        (
+            "Deals with no next step",
+            [_stalled_deal_line(d, window) for d in briefing.stalled_deals],
+        ),
     ]
 
     blocks: list[dict[str, Any]] = [
@@ -331,7 +378,8 @@ def render_slack(briefing: Briefing, *, app_url: str | None = None) -> dict[str,
                     "type": "mrkdwn",
                     "text": (
                         "Nothing due, nothing overdue, nothing to sweep, "
-                        "nobody waiting to be written to. Clear day."
+                        "nobody waiting to be written to, no deal left "
+                        "without a next step. Clear day."
                     ),
                 },
             }
@@ -359,6 +407,7 @@ def render_slack(briefing: Briefing, *, app_url: str | None = None) -> dict[str,
             (len(briefing.unconfirmed_interactions), "unconfirmed"),
             (len(briefing.watches_due), "to sweep"),
             (len(briefing.captures_waiting), "to write"),
+            (len(briefing.stalled_deals), "with no next step"),
         ]
         summary = " · ".join(f"{n} {label}" for n, label in counts if n)
     text = f"{window.today:%a} {window.today.day} {window.today:%b}: {summary}"
