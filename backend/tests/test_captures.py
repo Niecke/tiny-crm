@@ -5,6 +5,7 @@ from typing import Any
 
 from httpx2 import AsyncClient
 
+from app.schemas.capture import RAW_CAPTURE_MAX_LENGTH
 from tests.conftest import Account, create_resource
 
 
@@ -82,6 +83,18 @@ async def test_a_blank_capture_is_rejected(client: AsyncClient, alice: Account) 
     for raw in ("", "   ", "\n\t "):
         response = await client.post("/captures/", json={"raw": raw}, headers=alice.headers)
         assert response.status_code == 422, raw
+
+
+async def test_an_overlong_capture_is_rejected(client: AsyncClient, alice: Account) -> None:
+    # A capture is one line. The cap also bounds what the parser has to scan.
+    at_limit = await client.post(
+        "/captures/", json={"raw": "x" * RAW_CAPTURE_MAX_LENGTH}, headers=alice.headers
+    )
+    assert at_limit.status_code == 201
+    over = await client.post(
+        "/captures/", json={"raw": "x" * (RAW_CAPTURE_MAX_LENGTH + 1)}, headers=alice.headers
+    )
+    assert over.status_code == 422
 
 
 async def test_an_unknown_source_is_rejected(client: AsyncClient, alice: Account) -> None:

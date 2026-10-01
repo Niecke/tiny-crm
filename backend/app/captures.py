@@ -32,7 +32,12 @@ _ID_SEGMENT = re.compile(r"^(?:[0-9]+|[0-9a-f]{4,})$", re.IGNORECASE)
 # the URL out of the middle of a line leaves these stranded at the splice, so
 # each side is trimmed on the edge that faced the URL as well as on its outer
 # edge.
-_EDGE_NOISE = re.compile(r"^[\s\-–—|•·,;:/]+|[\s\-–—|•·,;:/]+$")
+#
+# The lookbehind lets a trailing match start only where a noise run starts.
+# Without it, a long run that stops short of the end is retried from every
+# position inside it and scanned to the end each time — quadratic, and enough
+# to stall the worker on one bad paste (#210).
+_EDGE_NOISE = re.compile(r"^[\s\-–—|•·,;:/]+|(?<![\s\-–—|•·,;:/])[\s\-–—|•·,;:/]+$")
 
 
 def name_from_profile_url(url: str) -> str | None:
