@@ -1,7 +1,7 @@
 # frontend-next
 
-The React client replacing the Flutter app in `frontend/`. Built in parallel and
-served under `/next/` until a single cutover commit — see
+The tinyCRM web client. It replaced the Flutter app in `frontend/`, which is
+no longer built or deployed and stays in the repository for now — see
 [#122](https://github.com/Niecke/tiny-crm/issues/122).
 
 Vite + React + TypeScript, TanStack Query for server state, TanStack Router
@@ -13,13 +13,12 @@ criteria, are in [`FRONTEND.md`](../FRONTEND.md).
 
 ```sh
 npm install
-npm run dev      # http://localhost:5173/next/
+npm run dev      # http://localhost:5173/
 npm run build    # dist/, then type-check
 npm run lint
 ```
 
-The API URL comes from `/next/config.json` at runtime, with the same content
-as the Flutter app's `/config.json`. Without one (plain `npm run dev`) it falls back to
+The API URL comes from `/config.json` at runtime. Without one (plain `npm run dev`) it falls back to
 `http://localhost:8000`, i.e. the backend from `compose.yml`.
 
 ## API types
@@ -36,16 +35,16 @@ they are out of date. Details in [`FRONTEND.md`](../FRONTEND.md).
 ## Container
 
 `Dockerfile` builds the bundle with Node and ships only the static files in
-Caddy, under `/srv/next` because the app is served at `/next/`. Hashed
-`assets/` are cached for a year; everything else revalidates. `config.json` is
-mounted at `/srv/next/config.json` by the chart.
+Caddy, under `/srv`. Hashed `assets/` are cached for a year; everything else
+revalidates. `config.json` is mounted at `/srv/config.json` by the chart. Old
+`/next/…` links from the preview redirect to the same page at the root.
 
 ```sh
-podman build -t frontend-next --build-arg GIT_COMMIT=$(git rev-parse --short HEAD) .
-podman run --rm -p 8081:8080 frontend-next   # http://localhost:8081/next/
+podman build -t frontend --build-arg GIT_COMMIT=$(git rev-parse --short HEAD) .
+podman run --rm -p 8080:8080 frontend   # http://localhost:8080/
 ```
 
-CI builds it as `frontend-next:ci-<sha>` next to the other images. `promote.yml`
+CI builds it as the `frontend:ci-<sha>` image next to the other images. `promote.yml`
 retags it and writes the tag into the staging HelmRelease; see
 `deploy/README.md`.
 

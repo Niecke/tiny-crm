@@ -1,27 +1,34 @@
-# Static file server inside the frontend-next container. The ingress routes
-# /next/* here with the prefix intact and everything else to the Flutter image;
-# TLS, basic auth and noindex all happen in front of it.
+# Static file server inside the frontend container. The ingress routes
+# everything but /api/* here; TLS, basic auth and noindex all happen in front
+# of it.
 :8080 {
 	root * /srv
 
-	# Only reachable directly (compose, port-forward): the app lives under /next.
-	redir / /next/
+	# The app spent its preview under /next/ (#122). Password-reset mails sent
+	# then, bookmarks and the preview's installed app still point there, so the
+	# prefix redirects to the same page at the root. The fragment (a reset
+	# token) is not sent to the server; the browser carries it across.
+	redir /next /
+	@preview path_regexp preview ^/next(/.*)$
+	redir @preview {re.preview.1}{?query}
 
 	# Vite puts a content hash in every filename under assets/, so a changed
 	# file is a new URL and these can be cached for good. No SPA fallback here:
 	# a chunk from an older build that no longer exists must be a 404, not
 	# index.html served as JavaScript.
-	handle /next/assets/* {
+	handle /assets/* {
 		header Cache-Control "public, max-age=31536000, immutable"
 		file_server
 	}
 
-	# index.html, config.json and version.json keep their names across builds,
-	# so they always revalidate — the same reasoning as the Flutter Caddyfile.
+	# index.html, config.json, manifest.json and version.json keep their names
+	# across builds, so they always revalidate: without an explicit
+	# Cache-Control the browser falls back to heuristic freshness and keeps
+	# serving an old index.html from disk, even across a normal reload.
 	# Unknown paths fall back to index.html so deep links survive a reload.
 	handle {
 		header Cache-Control "no-cache"
-		try_files {path} /next/index.html
+		try_files {path} /index.html
 		file_server
 	}
 

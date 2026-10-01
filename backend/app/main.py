@@ -102,7 +102,7 @@ app = FastAPI(
     **api_docs_urls(settings.environment),
 )
 
-# CORS lets the browser-hosted Flutter app call this API.
+# CORS lets the browser-hosted frontend call this API.
 # allow_origins=["*"] during local dev; set CORS_ORIGINS env var in prod.
 app.add_middleware(
     CORSMiddleware,

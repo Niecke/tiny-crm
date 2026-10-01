@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Render one markdown summary of both test suites.
+"""Render one markdown summary of the test suites.
 
-Reads whatever CI produced — pytest's JUnit XML and coverage XML, flutter test's
-JSON report and its lcov file — and writes a table to stdout. Missing inputs are
-reported as such rather than skipped, because a suite that did not produce a
-report usually means the job died before running it.
+Reads whatever CI produced — pytest's JUnit XML and coverage XML, and, when
+passed, flutter test's JSON report and its lcov file — and writes a table to
+stdout. Missing inputs are reported as such rather than skipped, because a suite
+that did not produce a report usually means the job died before running it. The
+Flutter suite is the exception: CI no longer runs it (#122), so it is only part
+of the table when --frontend-report is given at all.
 
     python3 ci/pr_report.py --backend-junit backend/junit.xml ... > comment.md
 """
@@ -171,12 +173,13 @@ def render(suites: list[Suite]) -> str:
             if len(suite.failures) > 10:
                 lines.append(f"- …and {len(suite.failures) - 10} more")
 
-    lines += [
-        "",
-        "<sub>Line coverage, as a rough signal — it is not a gate. The frontend figure "
-        "covers only the libraries its tests import, so it reads higher than the app as "
-        "a whole.</sub>",
-    ]
+    footer = "Line coverage, as a rough signal — it is not a gate."
+    if any(suite.name == "Frontend" for suite in suites):
+        footer += (
+            " The frontend figure covers only the libraries its tests import, so it reads"
+            " higher than the app as a whole."
+        )
+    lines += ["", f"<sub>{footer}</sub>"]
     return "\n".join(lines)
 
 
@@ -188,10 +191,11 @@ def main() -> int:
     parser.add_argument("--frontend-coverage", type=Path)
     args = parser.parse_args()
 
-    suites = [
-        _collect("Backend", args.backend_junit, args.backend_coverage, flutter=False),
-        _collect("Frontend", args.frontend_report, args.frontend_coverage, flutter=True),
-    ]
+    suites = [_collect("Backend", args.backend_junit, args.backend_coverage, flutter=False)]
+    if args.frontend_report is not None:
+        suites.append(
+            _collect("Frontend", args.frontend_report, args.frontend_coverage, flutter=True)
+        )
     print(render(suites))
     return 0
 

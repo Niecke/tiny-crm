@@ -1,8 +1,6 @@
 // Runtime configuration, read the same way the Flutter app reads it: one image
 // runs in staging and production, so the API URL cannot be baked in at build
-// time. The chart mounts config.json into this image at /next/config.json —
-// its own copy, not the Flutter one at the root, so /next keeps working when
-// the Flutter pod is down and nothing changes at the cutover.
+// time. The chart mounts config.json into this image at /config.json.
 export type AppConfig = {
   apiUrl: string
 }

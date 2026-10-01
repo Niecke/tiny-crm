@@ -158,19 +158,17 @@ priority so the kubelet evicts it before production, and is sized to about
 250 Mi of real memory. Its first admin comes from `python -m app.cli create-user`
 exactly as in production, with `-n tinycrm-staging`.
 
-### The React client at `/next`
+### The frontend image
 
-Staging also runs the React client (#122) from the `frontend-next` image, at
-`https://crm-staging.niecke-it.de/next/`. It is a path on the Flutter app's
-own Ingress, so the same basic auth and `noindex` apply, and it reads the
-same `config.json` ConfigMap (mounted at `/srv/next/config.json`).
+The `frontend` image is the React client, built from `frontend-next/` (#122).
+It kept the name of the Flutter client it replaced, which CI no longer builds;
+its code stays in `frontend/` for now. Tags promoted before the cutover are
+still Flutter builds, and both kinds run on the current chart: each serves at
+`/` and reads `config.json` from `/srv/config.json`.
 
-`frontendNext.enabled` is `false` in the chart and set only in the staging
-HelmRelease; production gets it with the cutover. `promote.yml` writes its tag
-alongside the others. With the flag on but no tag yet, the chart leaves the
-client out instead of failing the render. That covers the merge commit that
-introduces it, which reaches Flux before the Deploy commit that writes the
-first tag.
+So production switches when its `frontend.image.tag` moves to a sha built
+after the cutover, together with the backend tag of the same build. The React
+image redirects the preview's old `/next/…` URLs to the same page at the root.
 
 ## Repository settings this depends on
 
@@ -287,10 +285,9 @@ backend:
 The from-address is not secret; set `backend.mail.fromAddress` under `values:`
 in `deploy/flux/prod/helmrelease.yaml`.
 
-Links point at `https://<ingress.host>/next/reset-password`: the page exists
-only in the React client, so mail needs `frontendNext.enabled: true` too
-(staging has it; production does not yet). Without it, an invite lands on the
-Flutter app, which has no such page.
+Links point at `https://<ingress.host>/reset-password`: the page exists only
+in the React client, so a release still running a Flutter `frontend` tag lands
+invites on an app that has no such page.
 
 ### Creating a user
 
@@ -326,8 +323,6 @@ helm upgrade --install tinycrm ./charts/tinycrm \
   --set backend.image.tag=sha-<short> \
   --set frontend.image.tag=sha-<short> \
   --set backup.image.tag=sha-<short>
-  # optional, the React client at /next:
-  #   --set frontendNext.enabled=true --set frontendNext.image.tag=sha-<short>
 ```
 
 The chart has no default image tag, so leaving these out fails the render.

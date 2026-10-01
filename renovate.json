@@ -9,7 +9,7 @@
     "main"
   ],
   "semanticCommits": "enabled",
-  "minimumReleaseAge": "3 days",
+  "minimumReleaseAge": "2 days",
   "internalChecksFilter": "strict",
   "pinDigests": true,
   "osvVulnerabilityAlerts": true,
@@ -63,20 +63,20 @@
       "description": "Base images ship inside the release images, so updating them is a fix(deps): it cuts a patch release instead of waiting for the next feat or fix.",
       "matchFileNames": [
         "backend/Dockerfile",
-        "frontend/Dockerfile",
+        "frontend-next/Dockerfile",
         "backup/Dockerfile"
       ],
       "semanticCommitType": "fix"
     },
     {
-      "description": "The React client (#122) runs on staging only until the cutover, so nothing in frontend-next/ ships in a release yet: its updates stay chore(deps) instead of cutting patch releases. Move frontend-next/Dockerfile into the rule above and delete this one at the cutover.",
+      "description": "The Flutter client in frontend/ is no longer built or shipped since the React cutover (#122), so its updates stay chore(deps) instead of cutting patch releases.",
       "matchFileNames": [
-        "frontend-next/**"
+        "frontend/**"
       ],
       "semanticCommitType": "chore"
     },
     {
-      "description": "Backend runtime dependencies ship in the image too. Dev dependency groups stay chore(deps). pubspec `dependencies` already get fix from config:recommended.",
+      "description": "Backend runtime dependencies ship in the image too. Dev dependency groups stay chore(deps). npm `dependencies` in frontend-next/ already get fix from config:recommended.",
       "matchManagers": [
         "pep621"
       ],

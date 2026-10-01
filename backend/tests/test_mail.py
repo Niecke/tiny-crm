@@ -76,7 +76,7 @@ def test_the_html_escapes_the_name_and_the_text_does_not() -> None:
     assert mail.text.startswith("Hello Alice <Admin>,\n\n")
     assert "Hello Alice &lt;Admin&gt;," in mail.html
     assert "<Admin>" not in mail.html
-    assert mail.html.count('href="https://crm.example.com/next/reset-password#token=tok.en"') == 2
+    assert mail.html.count('href="https://crm.example.com/reset-password#token=tok.en"') == 2
 
 
 def test_no_sender_without_the_api_key() -> None:

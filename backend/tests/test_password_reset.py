@@ -25,7 +25,7 @@ def token_from(mail: Mail) -> str:
     link = next(line for line in mail.text.splitlines() if line.startswith("https://"))
     parsed = urlparse(link)
     assert f"{parsed.scheme}://{parsed.netloc}" == "https://crm.example.com"
-    assert parsed.path == "/next/reset-password"
+    assert parsed.path == "/reset-password"
     # In the fragment, which the browser never sends to a server.
     assert parsed.query == ""
     return parse_qs(parsed.fragment)["token"][0]

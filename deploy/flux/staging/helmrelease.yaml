@@ -59,7 +59,7 @@ spec:
     backend:
       image:
         # Managed by .github/workflows/promote.yml — do not edit by hand.
-        tag: sha-e324b00
+        tag: sha-0298ada
       resources:
         requests:
           cpu: 50m
@@ -68,20 +68,13 @@ spec:
           memory: 256Mi
     frontend:
       image:
-        tag: sha-e324b00
+        tag: sha-0298ada
       resources:
         requests:
           cpu: 5m
           memory: 16Mi
         limits:
           memory: 64Mi
-    # The React client at /next (#122). Staging only until the cutover.
-    frontendNext:
-      enabled: true
-      image:
-        # Written by promote.yml like the tags above. Empty until the first
-        # Deploy commit after this landed; the chart skips the client until then.
-        tag: "sha-e324b00"
     # Neither has anything to do on disposable data: the backup would copy it
     # off-site next to production's archives, and the briefing would post
     # staging's tasks into the real Slack channel.
@@ -90,4 +83,4 @@ spec:
     backup:
       enabled: false
       image:
-        tag: sha-e324b00
+        tag: sha-0298ada
