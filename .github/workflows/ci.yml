@@ -430,12 +430,15 @@ jobs:
           cache-to: type=gha,mode=max
 
   # The images as pushed, so the scan sees exactly the digest promote will
-  # retag. Only HIGH/CRITICAL with a fixed version available fail it: those are
-  # the ones a pull request can act on (a base image digest, a lock file bump).
-  # Unfixed findings would block every merge until upstream ships something.
+  # retag. It reports HIGH/CRITICAL findings with a fixed version available and
+  # never blocks the merge. A blocking gate fails every pull request the moment
+  # upstream publishes a fix — hours before Renovate's minimum release age lets
+  # that fix in — and leaves the choice between waiting and a workaround (#114).
+  # Fixes arrive the usual way: Renovate digest and lock file updates.
   #
-  # One job, three steps rather than a matrix: one required check name, and
-  # `!cancelled()` lets all three images report before the job fails.
+  # exit-code 0 keeps findings from failing the job; a scan that cannot run at
+  # all (registry, database download) still does. One job, three steps rather
+  # than a matrix: `!cancelled()` lets all three images report regardless.
   #
   # trivy-action is pinned to v0.36.0, an immutable release published after the
   # March 2026 tag hijack (GHSA-69fq-xp46-6x23); it pins setup-trivy by sha
@@ -453,8 +456,17 @@ jobs:
     env:
       # renovate: datasource=github-releases depName=aquasecurity/trivy
       TRIVY_VERSION: v0.74.0
+      # Renovate moves TRIVY_VERSION; the "newer version available" notice is
+      # noise that ends up as the last log line of a failing scan.
+      TRIVY_SKIP_VERSION_CHECK: "true"
       IMAGE_TAG: ${{ needs.meta.outputs.tag }}
     steps:
+      # Only the accepted findings, each with a reason and an expiry date.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          sparse-checkout: .trivyignore.yaml
+          sparse-checkout-cone-mode: false
+
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           registry: ${{ env.REGISTRY_HOST }}
@@ -469,7 +481,8 @@ jobs:
           scanners: vuln
           severity: HIGH,CRITICAL
           ignore-unfixed: true
-          exit-code: "1"
+          exit-code: "0"
+          trivyignores: .trivyignore.yaml
           output: trivy-backend.txt
 
       - name: Scan frontend
@@ -481,7 +494,8 @@ jobs:
           scanners: vuln
           severity: HIGH,CRITICAL
           ignore-unfixed: true
-          exit-code: "1"
+          exit-code: "0"
+          trivyignores: .trivyignore.yaml
           output: trivy-frontend.txt
 
       - name: Scan backup
@@ -493,14 +507,22 @@ jobs:
           scanners: vuln
           severity: HIGH,CRITICAL
           ignore-unfixed: true
-          exit-code: "1"
+          exit-code: "0"
+          trivyignores: .trivyignore.yaml
           output: trivy-backup.txt
 
+      # `output:` sends Trivy's table to a file instead of the scan step's log,
+      # so print it here for the log and the step summary both. A warning
+      # annotation puts findings on the pull request's checks page without
+      # failing anything.
       - name: Summarize findings
         if: ${{ !cancelled() }}
         run: |
           for image in backend frontend backup; do
             report="trivy-$image.txt"
+            if [ -f "$report" ] && grep -qE '^Total: [1-9]' "$report"; then
+              echo "::warning title=Image scan::$image has fixable HIGH/CRITICAL findings — see the job summary."
+            fi
             {
               echo "### $image"
               if [ -f "$report" ]; then
@@ -510,7 +532,7 @@ jobs:
               else
                 echo "No report — the scan failed before Trivy wrote one; see the step log."
               fi
-            } >> "$GITHUB_STEP_SUMMARY"
+            } | tee -a "$GITHUB_STEP_SUMMARY"
           done
 
   integration:
