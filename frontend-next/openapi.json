@@ -1219,16 +1219,32 @@
             }
           },
           {
+            "name": "stalled",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Stalled"
+            }
+          },
+          {
             "name": "sort",
             "in": "query",
             "required": false,
             "schema": {
-              "enum": [
-                "expected_close_date",
-                "stage_changed_at"
+              "anyOf": [
+                {
+                  "enum": [
+                    "expected_close_date",
+                    "stage_changed_at"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
               ],
-              "type": "string",
-              "default": "expected_close_date",
               "title": "Sort"
             }
           }
@@ -4162,6 +4178,75 @@
         ],
         "title": "BriefingCapture"
       },
+      "BriefingDeal": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "stage": {
+            "type": "string",
+            "enum": [
+              "lead",
+              "qualified",
+              "proposal",
+              "negotiation",
+              "won",
+              "running",
+              "completed",
+              "lost"
+            ],
+            "title": "Stage"
+          },
+          "contact_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Name"
+          },
+          "organization_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Name"
+          },
+          "stage_changed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Stage Changed At"
+          },
+          "days_in_stage": {
+            "type": "integer",
+            "title": "Days In Stage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "stage",
+          "contact_name",
+          "organization_name",
+          "stage_changed_at",
+          "days_in_stage"
+        ],
+        "title": "BriefingDeal"
+      },
       "BriefingInteraction": {
         "properties": {
           "id": {
@@ -4277,6 +4362,13 @@
             },
             "type": "array",
             "title": "Captures Waiting"
+          },
+          "stalled_deals": {
+            "items": {
+              "$ref": "#/components/schemas/BriefingDeal"
+            },
+            "type": "array",
+            "title": "Stalled Deals"
           }
         },
         "type": "object",
@@ -4288,7 +4380,8 @@
           "interactions_today",
           "unconfirmed_interactions",
           "watches_due",
-          "captures_waiting"
+          "captures_waiting",
+          "stalled_deals"
         ],
         "title": "BriefingRead"
       },
@@ -6367,6 +6460,10 @@
             "type": "boolean",
             "title": "Is Active"
           },
+          "has_next_step": {
+            "type": "boolean",
+            "title": "Has Next Step"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -6405,6 +6502,7 @@
           "is_open",
           "is_won",
           "is_active",
+          "has_next_step",
           "created_at",
           "updated_at"
         ],

@@ -12,6 +12,7 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
+from app.schemas.deal import DealStage
 from app.schemas.interaction import InteractionKind
 
 
@@ -64,6 +65,17 @@ class BriefingCapture(BaseModel):
     days_waiting: int
 
 
+class BriefingDeal(BaseModel):
+    id: UUID
+    title: str
+    stage: DealStage
+    contact_name: str | None
+    organization_name: str | None
+    stage_changed_at: datetime
+    # Calendar days since it entered its current stage; 0 for today.
+    days_in_stage: int
+
+
 class BriefingRead(BaseModel):
     # The day this is for, and whose day: echoed so a client can say "today"
     # and mean the same day the briefing meant.
@@ -75,3 +87,5 @@ class BriefingRead(BaseModel):
     unconfirmed_interactions: list[BriefingInteraction]
     watches_due: list[BriefingWatch]
     captures_waiting: list[BriefingCapture]
+    # Open deals with no open task and nothing planned, longest in stage first.
+    stalled_deals: list[BriefingDeal]

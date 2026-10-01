@@ -15,6 +15,9 @@ instead, and gets the whole registry from one import.
 *Adding a model file? Add it here*, and every entry point picks it up.
 """
 
+# Attaches Deal.has_next_step, which needs Task and Interaction and so cannot
+# live in deal.py. Imported for that side effect; see the module.
+from app.models import next_step  # noqa: F401
 from app.models.capture import Capture
 from app.models.contact import Contact
 from app.models.deal import Deal, DealStageEvent

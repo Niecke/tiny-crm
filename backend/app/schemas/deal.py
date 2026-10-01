@@ -147,6 +147,10 @@ class DealRead(BaseModel):
     is_open: bool
     is_won: bool
     is_active: bool
+    # An open task, or an interaction planned from now on, linked to this deal.
+    # Computed on every read, never stored, so completing a task elsewhere can
+    # never leave it saying yes. False on an open deal is the one to look at.
+    has_next_step: bool
 
     created_at: datetime
     updated_at: datetime

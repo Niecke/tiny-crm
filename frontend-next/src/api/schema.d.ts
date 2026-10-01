@@ -892,6 +892,32 @@ export interface components {
             /** Days Waiting */
             days_waiting: number;
         };
+        /** BriefingDeal */
+        BriefingDeal: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /**
+             * Stage
+             * @enum {string}
+             */
+            stage: "lead" | "qualified" | "proposal" | "negotiation" | "won" | "running" | "completed" | "lost";
+            /** Contact Name */
+            contact_name: string | null;
+            /** Organization Name */
+            organization_name: string | null;
+            /**
+             * Stage Changed At
+             * Format: date-time
+             */
+            stage_changed_at: string;
+            /** Days In Stage */
+            days_in_stage: number;
+        };
         /** BriefingInteraction */
         BriefingInteraction: {
             /**
@@ -939,6 +965,8 @@ export interface components {
             watches_due: components["schemas"]["BriefingWatch"][];
             /** Captures Waiting */
             captures_waiting: components["schemas"]["BriefingCapture"][];
+            /** Stalled Deals */
+            stalled_deals: components["schemas"]["BriefingDeal"][];
         };
         /** BriefingTask */
         BriefingTask: {
@@ -1464,6 +1492,8 @@ export interface components {
             is_won: boolean;
             /** Is Active */
             is_active: boolean;
+            /** Has Next Step */
+            has_next_step: boolean;
             /**
              * Created At
              * Format: date-time
@@ -3064,7 +3094,8 @@ export interface operations {
                 status?: ("open" | "active" | "won" | "finished") | null;
                 contact_id?: string | null;
                 organization_id?: string | null;
-                sort?: "expected_close_date" | "stage_changed_at";
+                stalled?: boolean;
+                sort?: ("expected_close_date" | "stage_changed_at") | null;
             };
             header?: never;
             path?: never;
