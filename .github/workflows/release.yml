@@ -1,0 +1,240 @@
+name: Release
+
+# release-please tags vX.Y.Z when its release pull request merges. That merge is
+# the production decision; this workflow carries it out. It never builds: the
+# images were built once on the release pull request, tested there, and retagged
+# sha-<short> by promote.yml when it merged. Here they get their version tags and
+# the version is written into deploy/flux/prod/, which is the only thing that
+# moves production (#114).
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+
+permissions:
+  # write: editing the GitHub Release body. The deploy commit goes over SSH with
+  # the DEPLOY_KEY deploy key, as in promote.yml — see the checkout step.
+  contents: write
+  packages: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  REGISTRY_HOST: ghcr.io
+  # GHCR rejects uppercase in a path, so this is not github.repository_owner.
+  REGISTRY: ghcr.io/niecke/tiny-crm
+  RELEASE: deploy/flux/prod/helmrelease.yaml
+
+jobs:
+  release:
+    name: Release images
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # main, not the tag: the deploy commit is pushed to main. Over SSH with
+      # DEPLOY_KEY because the protect_main ruleset only exempts deploy keys.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: main
+          fetch-depth: 0
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
+
+      # The floating tags and production only ever move forward. Re-running the
+      # workflow for an older tag, or a patch cut for an older line, still gets
+      # its own x.y.z tag but must not drag `stable` or production back to it —
+      # a rollback is a revert of the deploy commit, not a re-release.
+      - name: Resolve the release
+        id: release
+        run: |
+          set -euo pipefail
+          tag="$GITHUB_REF_NAME"
+          version="${tag#v}"
+          if ! [[ "$version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            echo "::error::$tag is not a vX.Y.Z tag."
+            exit 1
+          fi
+          major="${BASH_REMATCH[1]}"
+          minor="${BASH_REMATCH[2]}"
+
+          commit=$(git rev-parse "refs/tags/$tag^{commit}")
+          if ! git merge-base --is-ancestor "$commit" origin/main; then
+            echo "::error::$tag points at $commit, which is not on main." \
+                 "Only commits that went through a pull request have images."
+            exit 1
+          fi
+
+          newest() {
+            git tag --list "$1" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1
+          }
+          floating=""
+          [ "$(newest "v$major.$minor.*")" = "$tag" ] && floating="$floating $major.$minor"
+          [ "$(newest "v$major.*")" = "$tag" ] && floating="$floating $major"
+          latest=false
+          if [ "$(newest 'v*')" = "$tag" ]; then
+            floating="$floating stable"
+            latest=true
+          fi
+
+          echo "Releasing $version from $commit; floating tags:${floating:- none}"
+          {
+            echo "version=$version"
+            echo "commit=$commit"
+            echo "source=sha-${commit:0:7}"
+            echo "floating=$floating"
+            echo "latest=$latest"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ${{ env.REGISTRY_HOST }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+
+      # promote.yml and release-please both run on the push of the release
+      # merge, and release-please's tag can start this workflow before promote
+      # has added sha-<short>. Wait for it, then fail — never build. A missing
+      # set means the release pull request skipped its builds or promote failed;
+      # either way there is no tested image to release.
+      - name: Find the promoted images
+        id: images
+        env:
+          SOURCE: ${{ steps.release.outputs.source }}
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + 600))
+          for image in backend frontend backup; do
+            until digest=$(docker buildx imagetools inspect "$REGISTRY/$image:$SOURCE" \
+                             --format '{{.Manifest.Digest}}' 2>/dev/null); do
+              if [ "$SECONDS" -ge "$deadline" ]; then
+                echo "::error::$REGISTRY/$image:$SOURCE does not exist." \
+                     "Check the promote.yml run for ${{ steps.release.outputs.commit }}" \
+                     "and the CI builds on the release pull request. Nothing is built here."
+                exit 1
+              fi
+              echo "waiting for $image:$SOURCE"
+              sleep 15
+            done
+            echo "found $image:$SOURCE at $digest"
+            echo "$image=$digest" >> "$GITHUB_OUTPUT"
+          done
+
+      # By digest, not by the sha- tag, so the bytes that were looked up are the
+      # bytes that get tagged. imagetools copies the manifest; the check after
+      # it holds that to the same digest.
+      - name: Tag the release
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          FLOATING: ${{ steps.release.outputs.floating }}
+          BACKEND: ${{ steps.images.outputs.backend }}
+          FRONTEND: ${{ steps.images.outputs.frontend }}
+          BACKUP: ${{ steps.images.outputs.backup }}
+        run: |
+          set -euo pipefail
+          for image in backend frontend backup; do
+            var="${image^^}"
+            digest="${!var}"
+            args=(--tag "$REGISTRY/$image:$VERSION")
+            for tag in $FLOATING; do
+              args+=(--tag "$REGISTRY/$image:$tag")
+            done
+            docker buildx imagetools create "${args[@]}" "$REGISTRY/$image@$digest"
+
+            for tag in "$VERSION" $FLOATING; do
+              got=$(docker buildx imagetools inspect "$REGISTRY/$image:$tag" --format '{{.Manifest.Digest}}')
+              if [ "$got" != "$digest" ]; then
+                echo "::error::$image:$tag is $got, expected $digest."
+                exit 1
+              fi
+            done
+          done
+
+      # The push races promote's own deploy commit for the same merge — both
+      # start from the release merge. They touch different files, so a rebase
+      # always applies cleanly. promote's job-level `if:` skips this commit.
+      - name: Record the release for Flux
+        if: steps.release.outputs.latest == 'true'
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          git pull --ff-only origin main
+
+          TAG="$VERSION" yq -i '
+            .spec.values.backend.image.tag = strenv(TAG) |
+            .spec.values.frontend.image.tag = strenv(TAG) |
+            .spec.values.backup.image.tag = strenv(TAG)
+          ' "$RELEASE"
+
+          if git diff --quiet -- "$RELEASE"; then
+            echo "Production already at $VERSION — nothing to commit."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$RELEASE"
+          git commit -m "Deploy $VERSION to production"
+
+          for attempt in 1 2 3 4 5; do
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            echo "main moved underneath — rebasing (attempt $attempt)"
+            git pull --rebase origin main
+          done
+          echo "::error::Could not push the production deploy commit for $VERSION."
+          exit 1
+
+      - name: Skip production for an older release
+        if: steps.release.outputs.latest != 'true'
+        run: |
+          echo "A newer release is tagged — production stays where it is, \`stable\` was not moved." >> "$GITHUB_STEP_SUMMARY"
+
+      # release-please creates the Release and the tag in one call, so it should
+      # exist already; the retry covers GitHub's eventual consistency. Everything
+      # from the marker down is this workflow's, which keeps a re-run idempotent.
+      - name: Attach the image digests to the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ steps.release.outputs.version }}
+          COMMIT: ${{ steps.release.outputs.commit }}
+          FLOATING: ${{ steps.release.outputs.floating }}
+          BACKEND: ${{ steps.images.outputs.backend }}
+          FRONTEND: ${{ steps.images.outputs.frontend }}
+          BACKUP: ${{ steps.images.outputs.backup }}
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5 6; do
+            if body=$(gh release view "$TAG" --json body --jq .body 2>/dev/null); then
+              break
+            fi
+            if [ "$attempt" -eq 6 ]; then
+              echo "::error::No GitHub Release for $TAG."
+              exit 1
+            fi
+            sleep 10
+          done
+
+          marker='<!-- release-images -->'
+          notes="$RUNNER_TEMP/notes.md"
+          {
+            printf '%s\n' "$body" | sed "/^$marker\$/,\$d"
+            echo "$marker"
+            echo "## Images"
+            echo
+            echo "Built and tested on the release pull request, retagged here — not rebuilt."
+            echo "Commit \`$COMMIT\`. Also tagged:${FLOATING:- (none — a newer release exists)}."
+            echo
+            echo "| Image | Digest |"
+            echo "|---|---|"
+            echo "| \`$REGISTRY/backend:$VERSION\` | \`$BACKEND\` |"
+            echo "| \`$REGISTRY/frontend:$VERSION\` | \`$FRONTEND\` |"
+            echo "| \`$REGISTRY/backup:$VERSION\` | \`$BACKUP\` |"
+          } > "$notes"
+
+          gh release edit "$TAG" --notes-file "$notes"
+          cat "$notes" >> "$GITHUB_STEP_SUMMARY"
