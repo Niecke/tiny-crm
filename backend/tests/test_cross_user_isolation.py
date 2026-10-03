@@ -232,3 +232,22 @@ async def test_document_content_and_preview_are_owner_only(
             headers=bob.headers,
         )
     ).status_code == 404
+
+
+@pytest.mark.parametrize("resource", RESOURCES, ids=RESOURCE_IDS)
+async def test_another_users_rows_are_not_found_by_search(
+    resource: Resource, client: AsyncClient, alice: Account, bob: Account
+) -> None:
+    row = await resource.create(client, alice)
+    # Whichever field the row is called by; every one of them is searchable.
+    title = next(row[f] for f in ("name", "title", "subject", "raw") if row.get(f))
+    params = {"q": title, "type": resource.name}
+
+    mine = await client.get("/search/", params=params, headers=alice.headers)
+    assert mine.status_code == 200
+    assert mine.json()["groups"][0]["total"] == 1
+
+    theirs = await client.get("/search/", params=params, headers=bob.headers)
+    assert theirs.status_code == 200
+    assert theirs.json()["groups"][0]["total"] == 0
+    assert theirs.json()["groups"][0]["items"] == []

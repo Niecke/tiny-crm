@@ -22,6 +22,7 @@ import { Route as AuthedInboxRouteRouteImport } from './routes/_authed/inbox/rou
 import { Route as AuthedInteractionsRouteRouteImport } from './routes/_authed/interactions/route'
 import { Route as AuthedOrganizationsRouteRouteImport } from './routes/_authed/organizations/route'
 import { Route as AuthedProjectsRouteRouteImport } from './routes/_authed/projects/route'
+import { Route as AuthedSearchRouteImport } from './routes/_authed/search'
 import { Route as AuthedSystemRouteImport } from './routes/_authed/system'
 import { Route as AuthedTasksRouteRouteImport } from './routes/_authed/tasks/route'
 import { Route as AuthedWatchesRouteRouteImport } from './routes/_authed/watches/route'
@@ -122,6 +123,11 @@ const AuthedOrganizationsRouteRoute =
 const AuthedProjectsRouteRoute = AuthedProjectsRouteRouteImport.update({
   id: '/projects',
   path: '/projects',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedSearchRoute = AuthedSearchRouteImport.update({
+  id: '/search',
+  path: '/search',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedSystemRoute = AuthedSystemRouteImport.update({
@@ -331,6 +337,7 @@ export interface FileRoutesByFullPath {
   '/tasks': typeof AuthedTasksRouteRouteWithChildren
   '/watches': typeof AuthedWatchesRouteRouteWithChildren
   '/capture': typeof AuthedCaptureRoute
+  '/search': typeof AuthedSearchRoute
   '/system': typeof AuthedSystemRoute
   '/account/password': typeof AuthedAccountPasswordRoute
   '/contacts/new': typeof AuthedContactsNewRoute
@@ -371,6 +378,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/capture': typeof AuthedCaptureRoute
+  '/search': typeof AuthedSearchRoute
   '/system': typeof AuthedSystemRoute
   '/': typeof AuthedIndexRoute
   '/account/password': typeof AuthedAccountPasswordRoute
@@ -423,6 +431,7 @@ export interface FileRoutesById {
   '/_authed/tasks': typeof AuthedTasksRouteRouteWithChildren
   '/_authed/watches': typeof AuthedWatchesRouteRouteWithChildren
   '/_authed/capture': typeof AuthedCaptureRoute
+  '/_authed/search': typeof AuthedSearchRoute
   '/_authed/system': typeof AuthedSystemRoute
   '/_authed/': typeof AuthedIndexRoute
   '/_authed/account/password': typeof AuthedAccountPasswordRoute
@@ -476,6 +485,7 @@ export interface FileRouteTypes {
     | '/tasks'
     | '/watches'
     | '/capture'
+    | '/search'
     | '/system'
     | '/account/password'
     | '/contacts/new'
@@ -516,6 +526,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/reset-password'
     | '/capture'
+    | '/search'
     | '/system'
     | '/'
     | '/account/password'
@@ -567,6 +578,7 @@ export interface FileRouteTypes {
     | '/_authed/tasks'
     | '/_authed/watches'
     | '/_authed/capture'
+    | '/_authed/search'
     | '/_authed/system'
     | '/_authed/'
     | '/_authed/account/password'
@@ -702,6 +714,13 @@ declare module '@tanstack/react-router' {
       path: '/projects'
       fullPath: '/projects'
       preLoaderRoute: typeof AuthedProjectsRouteRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/search': {
+      id: '/_authed/search'
+      path: '/search'
+      fullPath: '/search'
+      preLoaderRoute: typeof AuthedSearchRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/system': {
@@ -1121,6 +1140,7 @@ interface AuthedRouteChildren {
   AuthedTasksRouteRoute: typeof AuthedTasksRouteRouteWithChildren
   AuthedWatchesRouteRoute: typeof AuthedWatchesRouteRouteWithChildren
   AuthedCaptureRoute: typeof AuthedCaptureRoute
+  AuthedSearchRoute: typeof AuthedSearchRoute
   AuthedSystemRoute: typeof AuthedSystemRoute
   AuthedIndexRoute: typeof AuthedIndexRoute
   AuthedAccountPasswordRoute: typeof AuthedAccountPasswordRoute
@@ -1138,6 +1158,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedTasksRouteRoute: AuthedTasksRouteRouteWithChildren,
   AuthedWatchesRouteRoute: AuthedWatchesRouteRouteWithChildren,
   AuthedCaptureRoute: AuthedCaptureRoute,
+  AuthedSearchRoute: AuthedSearchRoute,
   AuthedSystemRoute: AuthedSystemRoute,
   AuthedIndexRoute: AuthedIndexRoute,
   AuthedAccountPasswordRoute: AuthedAccountPasswordRoute,

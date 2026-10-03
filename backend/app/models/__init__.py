@@ -25,6 +25,9 @@ from app.models.document import Document
 from app.models.interaction import Interaction
 from app.models.organization import Organization
 from app.models.project import Project
+
+# Registers the search indexes on the tables above; see the module.
+from app.models.search import SEARCHABLES
 from app.models.task import Task
 from app.models.watch import Watch, WatchCheck
 
@@ -37,6 +40,7 @@ __all__ = [
     "Interaction",
     "Organization",
     "Project",
+    "SEARCHABLES",
     "Task",
     "Watch",
     "WatchCheck",

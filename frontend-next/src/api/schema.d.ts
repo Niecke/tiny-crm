@@ -549,6 +549,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/search/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search */
+        get: operations["search_search__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/briefing/": {
         parameters: {
             query?: never;
@@ -2035,6 +2052,56 @@ export interface components {
         RefreshTokenBody: {
             /** Refresh Token */
             refresh_token: string;
+        };
+        /** SearchGroup */
+        SearchGroup: {
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "contacts" | "organizations" | "deals" | "tasks" | "interactions" | "projects" | "documents" | "watches" | "captures";
+            /** Total */
+            total: number;
+            /** Items */
+            items: components["schemas"]["SearchHit"][];
+        };
+        /** SearchHit */
+        SearchHit: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "contacts" | "organizations" | "deals" | "tasks" | "interactions" | "projects" | "documents" | "watches" | "captures";
+            /** Title */
+            title: string;
+            /** Subtitle */
+            subtitle?: string | null;
+            match?: components["schemas"]["SearchMatch"] | null;
+        };
+        /**
+         * SearchMatch
+         * @description Where a hit matched, when it was not in its title.
+         *
+         *     A contact found by its phone number shows a name that does not contain
+         *     what was typed; this is the line that says why it is in the list.
+         */
+        SearchMatch: {
+            /** Field */
+            field: string;
+            /** Excerpt */
+            excerpt: string;
+        };
+        /** SearchResults */
+        SearchResults: {
+            /** Q */
+            q: string;
+            /** Groups */
+            groups: components["schemas"]["SearchGroup"][];
         };
         /**
          * TaskCompletionRead
@@ -4262,6 +4329,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_WatchCheckRead_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_search__get: {
+        parameters: {
+            query: {
+                q: string;
+                type?: ("contacts" | "organizations" | "deals" | "tasks" | "interactions" | "projects" | "documents" | "watches" | "captures") | null;
+                skip?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchResults"];
                 };
             };
             /** @description Validation Error */

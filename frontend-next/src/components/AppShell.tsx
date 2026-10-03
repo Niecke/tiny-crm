@@ -5,6 +5,7 @@ import { Dialog, Modal, ModalOverlay } from 'react-aria-components'
 import { logout, meQuery } from '../auth'
 import { captureCountQuery } from '../captures'
 import { dueCountQuery } from '../watches'
+import { GlobalSearch } from './GlobalSearch'
 import { QuickCaptureButton } from './QuickCapture'
 import { Button } from './ui/Button'
 
@@ -93,7 +94,14 @@ export function AppShell({ children }: { children: ReactNode }) {
       </ModalOverlay>
 
       <QuickCaptureButton className="quick-note-fab" />
-      <main className="main">{children}</main>
+      <main className="main">
+        {/* Above every page, so finding something never starts with
+            guessing which list it is in. */}
+        <div className="appbar">
+          <GlobalSearch />
+        </div>
+        {children}
+      </main>
     </div>
   )
 }
