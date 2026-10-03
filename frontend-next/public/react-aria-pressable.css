@@ -1,0 +1,7 @@
+/* The rule react-aria's usePress would otherwise inject inline; see the <link>
+   in index.html. It avoids the click delay of double-tap-to-zoom. */
+@layer {
+  [data-react-aria-pressable] {
+    touch-action: pan-x pan-y pinch-zoom;
+  }
+}

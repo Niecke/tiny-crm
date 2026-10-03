@@ -1,8 +1,33 @@
 # Static file server inside the frontend container. The ingress routes
 # everything but /api/* here; TLS, basic auth and noindex all happen in front
 # of it.
+
+# Security headers on every response, error pages included (#155). HSTS is not
+# here: TLS ends at the cluster's Traefik, which sets it for every host it
+# serves (infrastructure: cluster/traefik-config.yaml).
+#
+# The CSP is as tight as the build allows. Vite emits no inline script or style,
+# React's style props go through the CSSOM (which style-src does not govern),
+# and the API is same-origin under /api, so 'self' covers scripts, styles and
+# fetches. The exceptions: blob: images for document previews, data: SVGs
+# that pdf.js uses internally, and the pdf.js worker, which is its own file
+# under /assets/. pdf.js gets no wasmUrl, so it needs no 'wasm-unsafe-eval'.
+# Two libraries needed help to fit: see public/zod-jitless.js and the
+# react-aria <link> in index.html.
+# Markdown images from other hosts are blocked on purpose — a note should not
+# be able to load a tracking pixel.
+(security_headers) {
+	header {
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; font-src 'self'; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+}
+
 :8080 {
 	root * /srv
+	import security_headers
 
 	# The app spent its preview under /next/ (#122). Password-reset mails sent
 	# then, bookmarks and the preview's installed app still point there, so the
@@ -36,6 +61,7 @@
 	# rolling update the new index.html can ask the old pod for a chunk it does
 	# not have yet; cached as immutable, that 404 would outlive the rollout.
 	handle_errors {
+		import security_headers
 		header Cache-Control "no-store"
 		respond "{err.status_code} {err.status_text}"
 	}
