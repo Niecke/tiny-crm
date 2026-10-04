@@ -312,9 +312,13 @@ jobs:
 
       # release-please creates the Release and the tag in one call, so it should
       # exist already; the retry covers GitHub's eventual consistency. Everything
-      # from the marker down is this workflow's, which keeps a re-run idempotent,
-      # as does --clobber on the SBOM assets.
-      - name: Attach the image digests and SBOMs to the GitHub Release
+      # from the marker down is this workflow's, which keeps a re-run idempotent.
+      #
+      # Notes only, no assets: the repository has immutable releases on, which
+      # still allows editing the notes but refuses uploads once the Release is
+      # published. The SBOMs live in GHCR as the signed attestations above, and
+      # the notes say how to pull one out.
+      - name: Attach the image digests to the GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
           IDENTITY: https://github.com/${{ github.workflow_ref }}
@@ -357,7 +361,7 @@ jobs:
             echo "| \`$CHART_REGISTRY/tinycrm:$VERSION\` (Helm chart) | \`$CHART\` |"
             echo
             echo "All signed keyless with cosign; each image carries a signed SPDX SBOM"
-            echo "attestation, also attached below. To verify:"
+            echo "attestation in the registry. To verify, and to extract the SBOM:"
             echo
             echo '```sh'
             echo "cosign verify $REGISTRY/backend:$VERSION \\"
@@ -365,10 +369,10 @@ jobs:
             echo "  --certificate-oidc-issuer https://token.actions.githubusercontent.com"
             echo "cosign verify-attestation --type spdxjson $REGISTRY/backend:$VERSION \\"
             echo "  --certificate-identity '$IDENTITY' \\"
-            echo "  --certificate-oidc-issuer https://token.actions.githubusercontent.com"
+            echo "  --certificate-oidc-issuer https://token.actions.githubusercontent.com \\"
+            echo "  | jq -r .payload | base64 -d | jq .predicate > sbom-backend.spdx.json"
             echo '```'
           } > "$notes"
 
           gh release edit "$TAG" --notes-file "$notes"
-          gh release upload "$TAG" sbom-backend.spdx.json sbom-frontend.spdx.json sbom-backup.spdx.json --clobber
           cat "$notes" >> "$GITHUB_STEP_SUMMARY"
