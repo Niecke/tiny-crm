@@ -88,6 +88,20 @@ location=$(curl -s -o /dev/null -w '%{redirect_url}' "$WEB/next/reset-password?x
 [ "$location" = "$WEB/reset-password?x=1" ] \
   || fail "/next/reset-password redirects to '$location', expected /reset-password?x=1"
 
+# Security headers (#155), on the app and on an error page alike. The CSP is
+# checked for the directives that carry it, not verbatim, so tightening it
+# further does not need a change here.
+for path in / /assets/missing.js; do
+  headers=$(curl -s -o /dev/null -D - "$WEB$path" | tr -d '\r')
+  grep -qi '^x-content-type-options: nosniff$' <<<"$headers" || fail "$path: no X-Content-Type-Options: nosniff"
+  grep -qi '^x-frame-options: deny$' <<<"$headers" || fail "$path: no X-Frame-Options: DENY"
+  grep -qi '^referrer-policy: strict-origin-when-cross-origin$' <<<"$headers" || fail "$path: no Referrer-Policy"
+  csp=$(grep -i '^content-security-policy:' <<<"$headers")
+  for directive in "default-src 'self'" "script-src 'self';" "object-src 'none'" "frame-ancestors 'none'"; do
+    grep -qF "$directive" <<<"$csp" || fail "$path: CSP lacks $directive"
+  done
+done
+
 step "migrations ran and the admin CLI works"
 printf '%s\n' "$PASSWORD" \
   | $COMPOSE exec -T backend python -m app.cli create-user "$EMAIL" --superuser --set-password \

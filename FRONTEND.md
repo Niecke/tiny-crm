@@ -258,8 +258,14 @@ refresh token out of script reach entirely, at the cost of cookie transport,
 CSRF protection and credentialed CORS on the API's origin. Still worth doing
 if the exposure above is ever not good enough; all storage access goes
 through `src/token.ts`, so this side of it touches one file. React escapes all
-rendered text, nothing uses `dangerouslySetInnerHTML`, and a strict
-Content-Security-Policy on the Caddy image is the cheap next mitigation.
+rendered text, nothing uses `dangerouslySetInnerHTML`, and the Caddy image
+sends a strict Content-Security-Policy (#155): scripts, styles and fetches
+from the app's own origin only, no `eval`, no inline script or style. Two
+libraries needed a nudge to live with that — Zod's JIT probe is switched off
+by `public/zod-jitless.js`, and react-aria's injected `<style>` is replaced by
+`public/react-aria-pressable.css`; both files say why. A new dependency that
+evaluates code or injects styles shows up as a `securitypolicyviolation` in
+the browser console.
 
 ### Tests: Vitest, with the API faked from its schema
 
