@@ -321,7 +321,8 @@ Ordering is most-overdue-first, paused sources last.
 `GET /search/?q=` looks through contacts, organizations, deals, tasks,
 interactions, projects, documents, watches and captures at once (#126), and
 answers with one group per type: the best few hits and how many there are.
-`?type=` with `skip`/`limit` pages through one type.
+`?type=` with `skip`/`limit` pages through one type. A query needs at least
+two characters: one matches most of every table and no index helps it look.
 
 - **Every column, not just the name.** Each table has a search document, its
   text columns joined (`app/models/search.py`): a contact by email, phone,

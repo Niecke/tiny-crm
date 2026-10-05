@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import current_active_user
 from app.auth.users import User
-from app.db import count_rows, get_session
+from app.db import contains, count_rows, get_session
 from app.models.contact import Contact
 from app.models.organization import Organization
 from app.schemas.contact import (
@@ -101,7 +101,7 @@ async def list_contacts(
 ) -> Page[ContactRead]:
     q = select(Contact).where(Contact.user_id == user.id)
     if search:
-        q = q.where(Contact.name.ilike(f"%{search}%"))
+        q = q.where(contains(Contact.name, search))
     # "Everyone at ACME" — the question free-text company could never answer.
     if organization_id is not None:
         q = q.where(Contact.organization_id == organization_id)

@@ -10,8 +10,8 @@ sequential scan — so a mismatch costs speed, never results.
 `pg_trgm` ships with Postgres and is a trusted extension, so the database owner
 can create it without superuser rights.
 
-Revision ID: p6q7r8s9t0u1
-Revises: o5p6q7r8s9t0
+Revision ID: q7r8s9t0u1v2
+Revises: p6q7r8s9t0u1
 Create Date: 2026-10-03 10:00:00.000000
 
 """
@@ -21,8 +21,8 @@ from collections.abc import Sequence
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = "p6q7r8s9t0u1"
-down_revision: str | Sequence[str] | None = "o5p6q7r8s9t0"
+revision: str = "q7r8s9t0u1v2"
+down_revision: str | Sequence[str] | None = "p6q7r8s9t0u1"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

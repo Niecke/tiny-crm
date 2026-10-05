@@ -3,6 +3,8 @@
 from typing import Any, get_args
 
 from httpx2 import AsyncClient
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.models.document import Document
@@ -121,6 +123,85 @@ async def test_every_table_answers_one_query(
     assert _group(body, "captures")["items"][0]["subtitle"] == "Waiting"
 
 
+async def test_dates_are_sent_as_values_for_the_client_to_format(
+    client: AsyncClient, alice: Account
+) -> None:
+    # 23:59 in Vienna on 5 Oct: already the 5th there, still the 5th in UTC —
+    # and the 4th's evening in New York. Which day to show is the reader's.
+    due = "2026-10-05T21:59:00Z"
+    await create_resource(client, alice, "/tasks/", {"title": "Yak invoice", "due_date": due})
+    done = await create_resource(
+        client, alice, "/tasks/", {"title": "Yak contract", "due_date": due}
+    )
+    response = await client.patch(
+        f"/tasks/{done['id']}", json={"done": True}, headers=alice.headers
+    )
+    assert response.status_code == 200, response.text
+    await create_resource(
+        client, alice, "/interactions/", {"subject": "Yak intro", "occurred_at": PAST}
+    )
+    await create_resource(
+        client, alice, "/projects/", {"name": "Yak rollout", "start_date": "2026-08-01"}
+    )
+
+    body = await _search(client, alice, "yak")
+    tasks = {hit["title"]: hit for hit in _group(body, "tasks")["items"]}
+    assert tasks["Yak invoice"]["subtitle"] is None
+    assert tasks["Yak invoice"]["date"] == {"label": "Due", "at": due, "day": None}
+    # A finished task's deadline is no longer news.
+    assert tasks["Yak contract"]["subtitle"] == "Done"
+    assert tasks["Yak contract"]["date"] is None
+
+    interaction = _group(body, "interactions")["items"][0]
+    assert interaction["subtitle"] == "Note"
+    assert interaction["date"] == {"label": None, "at": PAST, "day": None}
+
+    project = _group(body, "projects")["items"][0]
+    assert project["date"] == {"label": "Since", "at": None, "day": "2026-08-01"}
+
+
+async def test_a_hit_loads_only_what_its_subtitle_shows(
+    client: AsyncClient, alice: Account
+) -> None:
+    org = await create_resource(client, alice, "/organizations/", {"name": "Okapi Labs"})
+    contact = await create_resource(
+        client, alice, "/contacts/", {"name": "Olive Okapi", "organization_id": org["id"]}
+    )
+    deal = await create_resource(
+        client,
+        alice,
+        "/deals/",
+        {"title": "Okapi relaunch", "contact_id": contact["id"], "organization_id": org["id"]},
+    )
+    await create_resource(
+        client,
+        alice,
+        "/tasks/",
+        {"title": "Okapi follow-up", "contact_id": contact["id"], "deal_id": deal["id"]},
+    )
+
+    statements: list[str] = []
+
+    def record(conn: Any, cursor: Any, statement: str, *args: Any) -> None:
+        statements.append(statement)
+
+    event.listen(Engine, "before_cursor_execute", record)
+    try:
+        tasks = await _search(client, alice, "okapi", type="tasks")
+        deals = await _search(client, alice, "okapi", type="deals")
+    finally:
+        event.remove(Engine, "before_cursor_execute", record)
+
+    # A task's line names neither its contact nor its deal, so the models'
+    # own eager loading — task → deal → contact → organization — stays off.
+    assert _titles(tasks, "tasks") == ["Okapi follow-up"]
+    # A deal's line names its organization, which comes along in the same
+    # statement rather than in one of its own.
+    assert _group(deals, "deals")["items"][0]["subtitle"] == "Lead · Okapi Labs"
+    reads = [s for s in statements if s.lstrip().upper().startswith("SELECT")]
+    assert not [s for s in reads if "FROM contacts" in s or "FROM organizations" in s], reads
+
+
 async def test_captures_are_found_by_raw_text_whatever_their_status(
     client: AsyncClient, alice: Account
 ) -> None:
@@ -173,6 +254,20 @@ async def test_like_wildcards_are_taken_literally(client: AsyncClient, alice: Ac
     assert _titles(await _search(client, alice, "first_name"), "tasks") == ["rename first_name"]
 
 
+async def test_the_per_panel_boxes_take_wildcards_literally_too(
+    client: AsyncClient, alice: Account
+) -> None:
+    await create_resource(client, alice, "/contacts/", {"name": "Ten% Club"})
+    await create_resource(client, alice, "/contacts/", {"name": "Tennis Club"})
+    await create_resource(client, alice, "/contacts/", {"name": "first_name"})
+    await create_resource(client, alice, "/contacts/", {"name": "firstXname"})
+
+    for search, found in [("ten%", ["Ten% Club"]), ("first_name", ["first_name"])]:
+        response = await client.get("/contacts/", params={"search": search}, headers=alice.headers)
+        assert response.status_code == 200, response.text
+        assert [c["name"] for c in response.json()["items"]] == found
+
+
 async def test_one_type_pages_through_all_of_its_hits(client: AsyncClient, alice: Account) -> None:
     for index in range(7):
         await create_resource(client, alice, "/organizations/", {"name": f"Company {index}"})
@@ -188,7 +283,7 @@ async def test_one_type_pages_through_all_of_its_hits(client: AsyncClient, alice
 
 
 async def test_paging_needs_a_type(client: AsyncClient, alice: Account) -> None:
-    response = await client.get("/search/", params={"q": "x", "skip": 5}, headers=alice.headers)
+    response = await client.get("/search/", params={"q": "xx", "skip": 5}, headers=alice.headers)
     assert response.status_code == 422
 
 
@@ -198,8 +293,25 @@ async def test_a_blank_query_is_refused(client: AsyncClient, alice: Account) -> 
         assert response.status_code == 422
 
 
+async def test_a_single_character_is_refused(client: AsyncClient, alice: Account) -> None:
+    # Padding does not make it two.
+    for q in ["a", " a ", "a  "]:
+        response = await client.get("/search/", params={"q": q}, headers=alice.headers)
+        assert response.status_code == 422, q
+    assert (await _search(client, alice, "ab"))["q"] == "ab"
+
+
+async def test_a_nul_character_is_refused_not_sent_to_the_database(
+    client: AsyncClient, alice: Account
+) -> None:
+    # Postgres text cannot hold one; unchecked, the driver's refusal was a 500.
+    for q in ["\x00\x00", "anna\x00", "an\x00na acme"]:
+        response = await client.get("/search/", params={"q": q}, headers=alice.headers)
+        assert response.status_code == 422, repr(q)
+
+
 async def test_search_needs_a_login(client: AsyncClient) -> None:
-    response = await client.get("/search/", params={"q": "x"})
+    response = await client.get("/search/", params={"q": "xx"})
     assert response.status_code == 401
 
 

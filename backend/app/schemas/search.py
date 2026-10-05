@@ -1,3 +1,4 @@
+from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
@@ -30,13 +31,28 @@ class SearchMatch(BaseModel):
     excerpt: str
 
 
+class SearchDate(BaseModel):
+    """A date that belongs in a hit's subtitle: "Due …", "Since …".
+
+    Sent as a value, not as text, because only the client knows the reader's
+    timezone and locale. Exactly one of `at` and `day` is set.
+    """
+
+    label: str | None = None
+    # A moment; the day shown is the one it falls on where the reader is.
+    at: datetime | None = None
+    # A calendar day, the same day everywhere.
+    day: date | None = None
+
+
 class SearchHit(BaseModel):
     id: UUID
     type: SearchType
     title: str
-    # One short line of context: the company, the stage, the date — whatever
-    # tells two hits with the same title apart.
+    # One short line of context: the company, the stage — whatever tells two
+    # hits with the same title apart. `date` continues it.
     subtitle: str | None = None
+    date: SearchDate | None = None
     match: SearchMatch | None = None
 
 

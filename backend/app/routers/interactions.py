@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import current_active_user
 from app.auth.users import User
-from app.db import count_rows, get_session
+from app.db import contains, count_rows, get_session
 from app.links import filter_by_link, load_scoped
 from app.models.contact import Contact
 from app.models.deal import Deal
@@ -82,7 +82,7 @@ async def list_interactions(
     """
     query = select(Interaction).where(Interaction.user_id == user.id)
     if search:
-        query = query.where(Interaction.subject.ilike(f"%{search}%"))
+        query = query.where(contains(Interaction.subject, search))
     if kind:
         query = query.where(Interaction.kind == kind)
     for target_id, (_field, _attr, _model, table, column) in zip(

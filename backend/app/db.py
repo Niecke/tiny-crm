@@ -1,7 +1,7 @@
 from collections.abc import AsyncGenerator
 from typing import Any
 
-from sqlalchemy import Select, func, select
+from sqlalchemy import ColumnElement, Select, SQLColumnExpression, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -34,3 +34,18 @@ async def count_rows(session: AsyncSession, query: Select[tuple[Any]]) -> int:
     """
     total = await session.scalar(select(func.count()).select_from(query.subquery()))
     return total or 0
+
+
+def escape_like(text: str) -> str:
+    """`text` with its own `%`, `_` and `\\` taken literally in a LIKE.
+
+    Without this, searching for "100%" or "first_name" would match far more
+    than was typed. The LIKE itself has to name the escape character,
+    `escape="\\"` — `contains` does both.
+    """
+    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def contains(column: SQLColumnExpression[Any], text: str) -> ColumnElement[bool]:
+    """`column` holds `text` somewhere, whatever its case — the search boxes' match."""
+    return column.ilike(f"%{escape_like(text)}%", escape="\\")

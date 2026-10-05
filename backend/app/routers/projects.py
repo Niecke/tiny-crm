@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import current_active_user
 from app.auth.users import User
-from app.db import count_rows, get_session
+from app.db import contains, count_rows, get_session
 from app.links import load_scoped
 from app.models.contact import Contact
 from app.models.document import Document
@@ -48,7 +48,7 @@ async def list_projects(
 ) -> Page[ProjectRead]:
     query = select(Project).where(Project.user_id == user.id)
     if search:
-        query = query.where(Project.name.ilike(f"%{search}%"))
+        query = query.where(contains(Project.name, search))
     total = await count_rows(session, query)
     result = await session.execute(
         query.order_by(Project.start_date.desc(), Project.id.asc()).offset(skip).limit(limit)

@@ -13,15 +13,26 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Select, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload, raiseload
 
 from app.auth import current_active_user
 from app.auth.users import User
-from app.db import count_rows, get_session
+from app.db import contains, count_rows, escape_like, get_session
 from app.models.search import SEARCHABLES, Searchable
-from app.schemas.search import SearchGroup, SearchHit, SearchMatch, SearchResults, SearchType
+from app.schemas.search import (
+    SearchDate,
+    SearchGroup,
+    SearchHit,
+    SearchMatch,
+    SearchResults,
+    SearchType,
+)
 
 router = APIRouter(prefix="/search", tags=["search"])
 
+# One character matches most of every table and has no trigram for the index
+# to look up, so it is a full scan of all nine for a list nobody can use.
+MIN_QUERY_LENGTH = 2
 # More terms than this is a pasted paragraph, not a search; each one is another
 # ILIKE on every table.
 MAX_TERMS = 8
@@ -31,15 +42,6 @@ EXCERPT_CONTEXT = 30
 
 def _terms(q: str) -> list[str]:
     return q.split()[:MAX_TERMS]
-
-
-def _escape(term: str) -> str:
-    """The term with its own `%`, `_` and `\\` taken literally in a LIKE.
-
-    Without this, searching for "100%" or "first_name" would match far more
-    than was typed.
-    """
-    return term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 def _digits(value: str) -> str:
@@ -82,38 +84,6 @@ def _match(searchable: Searchable, row: Any, title: str, terms: list[str]) -> Se
     return None
 
 
-def _join(*parts: Any) -> str | None:
-    text = " · ".join(str(p) for p in parts if p)
-    return text or None
-
-
-def _subtitle(type_: str, row: Any) -> str | None:
-    """One line telling two hits with the same title apart."""
-    match type_:
-        case "contacts":
-            return _join(row.job_title, row.organization_name) or cast(str | None, row.email)
-        case "organizations":
-            return _join(row.domain, row.industry)
-        case "deals":
-            return _join(row.stage.capitalize(), row.organization_name or row.contact_name)
-        case "tasks":
-            if row.done:
-                return "Done"
-            return f"Due {row.due_date.date().isoformat()}" if row.due_date else None
-        case "interactions":
-            return _join(row.kind.capitalize(), row.occurred_at.date().isoformat())
-        case "projects":
-            return f"Since {row.start_date.isoformat()}"
-        case "documents":
-            return str(row.format).upper()
-        case "watches":
-            return _join(row.kind.replace("_", " ").capitalize(), row.organization_name)
-        case "captures":
-            # The inbox's own word for a capture still waiting for a decision.
-            return "Waiting" if row.status == "new" else str(row.status).capitalize()
-    return None
-
-
 async def _search_one(
     session: AsyncSession,
     searchable: Searchable,
@@ -125,13 +95,13 @@ async def _search_one(
     document = searchable.document()
     q: Select[tuple[Any]] = select(searchable.model).where(
         searchable.user_id == user_id,
-        *(document.ilike(f"%{_escape(term)}%", escape="\\") for term in terms),
+        *(contains(document, term) for term in terms),
     )
     phrase = " ".join(terms)
     # Titles that start with what was typed first, then by how close the title
     # is to it, then alphabetically — so "Anna" ranks Anna Berger above
     # Johanna, and both above a contact whose notes merely mention an Anna.
-    starts = case((searchable.title.ilike(f"{_escape(terms[0])}%", escape="\\"), 0), else_=1)
+    starts = case((searchable.title.ilike(f"{escape_like(terms[0])}%", escape="\\"), 0), else_=1)
     ranked = q.order_by(
         starts,
         func.word_similarity(phrase, searchable.title).desc(),
@@ -139,17 +109,22 @@ async def _search_one(
         searchable.id,
     )
     total = await count_rows(session, q)
-    rows = (await session.execute(ranked.offset(skip).limit(limit))).scalars().all()
+    # Only what a hit's subtitle reads is loaded along with it; reaching for
+    # anything else raises instead of quietly costing a query per row.
+    loaded = ranked.options(*(joinedload(r) for r in searchable.loads), raiseload("*"))
+    rows = (await session.execute(loaded.offset(skip).limit(limit))).scalars().all()
 
     items = []
     for row in rows:
         title = searchable.title_of(row)
+        date = searchable.date_of(row) if searchable.date_of else None
         items.append(
             SearchHit(
                 id=row.id,
                 type=cast(SearchType, searchable.key),
                 title=title,
-                subtitle=_subtitle(searchable.key, row),
+                subtitle=searchable.subtitle_of(row),
+                date=SearchDate(label=date.label, at=date.at, day=date.day) if date else None,
                 match=_match(searchable, row, title, terms),
             )
         )
@@ -158,7 +133,7 @@ async def _search_one(
 
 @router.get("/", response_model=SearchResults)
 async def search(
-    q: str = Query(min_length=1, max_length=200),
+    q: str = Query(min_length=MIN_QUERY_LENGTH, max_length=200),
     # One type only, for paging through it on the results page. Without it,
     # every type answers with its first `limit` hits.
     type: SearchType | None = Query(default=None),
@@ -167,9 +142,15 @@ async def search(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> SearchResults:
+    if "\x00" in q:
+        # Postgres text cannot hold a NUL, and the driver refuses to send one.
+        raise HTTPException(status_code=422, detail="The search holds a character no record can")
     terms = _terms(q)
-    if not terms:
-        raise HTTPException(status_code=422, detail="Type something to search for")
+    # Counted without the padding: "  a  " is as long as the parameter asks for.
+    if len(" ".join(terms)) < MIN_QUERY_LENGTH:
+        raise HTTPException(
+            status_code=422, detail=f"Type at least {MIN_QUERY_LENGTH} characters to search for"
+        )
     if skip and type is None:
         # Paging all nine groups at once would page each one by the same
         # offset, which is no list anybody reads.

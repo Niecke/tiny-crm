@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import current_active_user
 from app.auth.users import User
-from app.db import count_rows, get_session
+from app.db import contains, count_rows, get_session
 from app.models.contact import Contact
 from app.models.deal import Deal
 from app.models.interaction import Interaction
@@ -148,7 +148,7 @@ async def list_tasks(
     if not include_done:
         query = query.where(Task.done.is_(False))
     if search:
-        query = query.where(Task.title.ilike(f"%{search}%"))
+        query = query.where(contains(Task.title, search))
     if contact_id is not None:
         query = query.where(Task.contact_id == contact_id)
     if deal_id is not None:

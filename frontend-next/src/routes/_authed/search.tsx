@@ -5,7 +5,16 @@ import { z } from 'zod'
 import type { SearchGroup, SearchType } from '../../api/types'
 import { Pagination } from '../../components/ui/Pagination'
 import { SearchField } from '../../components/ui/SearchField'
-import { hitLink, hitMeta, OVERVIEW_LIMIT, PAGE_SIZE, searchQuery, typeLabels } from '../../search'
+import {
+  hitLink,
+  hitMeta,
+  isSearchable,
+  MIN_QUERY_LENGTH,
+  OVERVIEW_LIMIT,
+  PAGE_SIZE,
+  searchQuery,
+  typeLabels,
+} from '../../search'
 import { useDebounced } from '../../useDebounced'
 
 const types = Object.keys(typeLabels) as [SearchType, ...SearchType[]]
@@ -71,6 +80,8 @@ function SearchPage() {
 
       {!q ? (
         <p className="muted">Type a name, an email address, part of a phone number or a word from a note.</p>
+      ) : !isSearchable(q) ? (
+        <p className="muted">Type at least {MIN_QUERY_LENGTH} characters.</p>
       ) : isPending ? (
         <p className="muted">Searching…</p>
       ) : error ? (

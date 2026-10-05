@@ -2355,6 +2355,10 @@ textarea.input {
   color: var(--color-accent);
 }
 
+.global-search-error {
+  color: var(--color-danger);
+}
+
 .search-group-header {
   display: flex;
   align-items: baseline;

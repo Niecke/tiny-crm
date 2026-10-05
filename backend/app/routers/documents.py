@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import current_active_user
 from app.auth.users import User
-from app.db import count_rows, get_session
+from app.db import contains, count_rows, get_session
 from app.links import filter_by_link, load_scoped
 from app.models.contact import Contact
 from app.models.deal import Deal
@@ -135,7 +135,7 @@ async def list_documents(
 ) -> Page[DocumentRead]:
     q = select(Document).where(Document.user_id == user.id)
     if search:
-        q = q.where(Document.title.ilike(f"%{search}%"))
+        q = q.where(contains(Document.title, search))
     for target_id, (_field, _attr, _model, table, column) in zip(
         (contact_id, organization_id, deal_id, project_id), LINKS, strict=True
     ):

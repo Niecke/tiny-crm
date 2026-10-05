@@ -2053,6 +2053,21 @@ export interface components {
             /** Refresh Token */
             refresh_token: string;
         };
+        /**
+         * SearchDate
+         * @description A date that belongs in a hit's subtitle: "Due …", "Since …".
+         *
+         *     Sent as a value, not as text, because only the client knows the reader's
+         *     timezone and locale. Exactly one of `at` and `day` is set.
+         */
+        SearchDate: {
+            /** Label */
+            label?: string | null;
+            /** At */
+            at?: string | null;
+            /** Day */
+            day?: string | null;
+        };
         /** SearchGroup */
         SearchGroup: {
             /**
@@ -2081,6 +2096,7 @@ export interface components {
             title: string;
             /** Subtitle */
             subtitle?: string | null;
+            date?: components["schemas"]["SearchDate"] | null;
             match?: components["schemas"]["SearchMatch"] | null;
         };
         /**

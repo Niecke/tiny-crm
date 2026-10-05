@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import current_active_user
 from app.auth.users import User
-from app.db import count_rows, get_session
+from app.db import contains, count_rows, get_session
 from app.models.contact import Contact
 from app.models.deal import (
     ACTIVE_STAGES,
@@ -204,7 +204,7 @@ async def list_deals(
 ) -> Page[DealRead]:
     q = select(Deal).where(Deal.user_id == user.id)
     if search:
-        q = q.where(Deal.title.ilike(f"%{search}%"))
+        q = q.where(contains(Deal.title, search))
     if stage is not None:
         q = q.where(Deal.stage == stage)
     if status is not None:

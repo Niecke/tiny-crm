@@ -23,6 +23,7 @@ bound parameter would not match the index expression.
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import date, datetime
 from functools import reduce
 from typing import Any
 
@@ -81,6 +82,26 @@ def _digits(column: Any) -> ColumnElement[str]:
 
 
 @dataclass(frozen=True)
+class HitDate:
+    """A date in a hit's subtitle, kept as a value rather than written out.
+
+    The browser formats it: only it knows where the reader is, and a task due
+    at 23:59 in Vienna is already tomorrow in UTC.
+    """
+
+    label: str | None = None
+    # A moment, shown as the day it falls on for the reader…
+    at: datetime | None = None
+    # …or a calendar day, which is the same day everywhere.
+    day: date | None = None
+
+
+def _join(*parts: Any) -> str | None:
+    text = " · ".join(str(p) for p in parts if p)
+    return text or None
+
+
+@dataclass(frozen=True)
 class Searchable:
     """One table as the search box sees it.
 
@@ -96,6 +117,15 @@ class Searchable:
     # (for the response). Two, because a capture's falls back from name to raw.
     title: ColumnElement[str] | InstrumentedAttribute[str]
     title_of: Callable[[Any], str]
+    # One line telling two hits with the same title apart. Required, so a new
+    # table cannot join the list without saying what its line is.
+    subtitle_of: Callable[[Any], str | None]
+    # The date that belongs on that line, where there is one.
+    date_of: Callable[[Any], HitDate | None] | None = None
+    # The relationships `subtitle_of` reads. /search loads these and nothing
+    # else: the models' own `lazy="selectin"` would pull in half the tenant
+    # for a line of text.
+    loads: tuple[InstrumentedAttribute[Any], ...] = ()
     fields: tuple[tuple[str, str], ...] = ()
     tags: bool = False
     phones: tuple[str, ...] = ()
@@ -132,6 +162,8 @@ SEARCHABLES: tuple[Searchable, ...] = (
         model=Contact,
         title=Contact.name,
         title_of=lambda c: c.name,
+        subtitle_of=lambda c: _join(c.job_title, c.organization_name) or c.email,
+        loads=(Contact.organization,),
         fields=(
             ("email", "Email"),
             ("email_secondary", "Email"),
@@ -152,6 +184,7 @@ SEARCHABLES: tuple[Searchable, ...] = (
         model=Organization,
         title=Organization.name,
         title_of=lambda o: o.name,
+        subtitle_of=lambda o: _join(o.domain, o.industry),
         fields=(
             ("domain", "Domain"),
             ("email", "Email"),
@@ -167,6 +200,8 @@ SEARCHABLES: tuple[Searchable, ...] = (
         model=Deal,
         title=Deal.title,
         title_of=lambda d: d.title,
+        subtitle_of=lambda d: _join(d.stage.capitalize(), d.organization_name or d.contact_name),
+        loads=(Deal.organization, Deal.contact),
         fields=(("notes", "Notes"), ("lost_reason", "Lost reason")),
     ),
     Searchable(
@@ -174,6 +209,10 @@ SEARCHABLES: tuple[Searchable, ...] = (
         model=Task,
         title=Task.title,
         title_of=lambda t: t.title,
+        subtitle_of=lambda t: "Done" if t.done else None,
+        date_of=lambda t: (
+            HitDate(label="Due", at=t.due_date) if t.due_date and not t.done else None
+        ),
         fields=(("description", "Description"),),
         tags=True,
     ),
@@ -182,6 +221,8 @@ SEARCHABLES: tuple[Searchable, ...] = (
         model=Interaction,
         title=Interaction.subject,
         title_of=lambda i: i.subject,
+        subtitle_of=lambda i: i.kind.capitalize(),
+        date_of=lambda i: HitDate(at=i.occurred_at),
         fields=(("notes", "Notes"),),
         tags=True,
     ),
@@ -190,6 +231,8 @@ SEARCHABLES: tuple[Searchable, ...] = (
         model=Project,
         title=Project.name,
         title_of=lambda p: p.name,
+        subtitle_of=lambda p: None,
+        date_of=lambda p: HitDate(label="Since", day=p.start_date),
         fields=(("description", "Description"),),
     ),
     Searchable(
@@ -197,6 +240,7 @@ SEARCHABLES: tuple[Searchable, ...] = (
         model=Document,
         title=Document.title,
         title_of=lambda d: d.title,
+        subtitle_of=lambda d: str(d.format).upper(),
         fields=(("description", "Description"),),
         tags=True,
     ),
@@ -205,6 +249,8 @@ SEARCHABLES: tuple[Searchable, ...] = (
         model=Watch,
         title=Watch.name,
         title_of=lambda w: w.name,
+        subtitle_of=lambda w: _join(w.kind.replace("_", " ").capitalize(), w.organization_name),
+        loads=(Watch.organization,),
         fields=(("url", "URL"), ("query_note", "Search"), ("notes", "Notes")),
     ),
     Searchable(
@@ -215,6 +261,8 @@ SEARCHABLES: tuple[Searchable, ...] = (
         # the document either way.
         title=func.coalesce(Capture.name, Capture.raw),
         title_of=lambda c: c.display_name,
+        # The inbox's own word for a capture still waiting for a decision.
+        subtitle_of=lambda c: "Waiting" if c.status == "new" else str(c.status).capitalize(),
         fields=(("name", "Name"), ("raw", "Captured"), ("url", "URL"), ("note", "Note")),
         title_in_document=False,
     ),

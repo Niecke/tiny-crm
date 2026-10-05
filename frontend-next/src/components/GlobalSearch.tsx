@@ -12,7 +12,7 @@ import {
   Popover,
 } from 'react-aria-components'
 import type { SearchHit } from '../api/types'
-import { hitLink, hitMeta, searchQuery, typeLabels } from '../search'
+import { hitLink, hitMeta, isSearchable, MIN_QUERY_LENGTH, searchQuery, typeLabels } from '../search'
 import { useDebounced } from '../useDebounced'
 
 const SEE_ALL = 'see-all'
@@ -32,9 +32,11 @@ export function GlobalSearch() {
   const [input, setInput] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const q = useDebounced(input.trim())
-  const { data, isFetching } = useQuery(searchQuery(api, q))
+  const { data, error, isFetching } = useQuery(searchQuery(api, q))
 
-  const groups = q ? (data?.groups ?? []).filter((g) => g.items.length > 0) : []
+  // Not `data` alone: for a query too short to send, it is still the hits of
+  // the longer one typed before it.
+  const groups = isSearchable(q) ? (data?.groups ?? []).filter((g) => g.items.length > 0) : []
   const hits = new Map(groups.flatMap((g) => g.items.map((hit) => [keyOf(hit), hit] as const)))
 
   function openAll() {
@@ -59,6 +61,21 @@ export function GlobalSearch() {
   // Enter while no row is highlighted: the ComboBox would only close its
   // list. A highlighted row is the input's aria-activedescendant, and then
   // the ComboBox's own Enter picks it.
+  // What the list says while it has no rows. A failed search says so: "Nothing
+  // found." would be an answer the server never gave.
+  function emptyState() {
+    if (!isSearchable(input))
+      return <div className="listbox-empty">Type at least {MIN_QUERY_LENGTH} characters.</div>
+    if (isFetching || q !== input.trim()) return <div className="listbox-empty">Searching…</div>
+    if (error)
+      return (
+        <div className="listbox-empty global-search-error" role="alert">
+          Search failed: {error.message}
+        </div>
+      )
+    return <div className="listbox-empty">Nothing found.</div>
+  }
+
   function onKeyDownCapture(e: KeyboardEvent<HTMLDivElement>) {
     if (e.key !== 'Enter' || !(e.target instanceof HTMLInputElement)) return
     if (e.target.getAttribute('aria-activedescendant')) return
@@ -90,12 +107,7 @@ export function GlobalSearch() {
           )}
         </div>
         <Popover className="popover global-search-popover" offset={4} placement="bottom start">
-          <ListBox
-            className="listbox"
-            renderEmptyState={() => (
-              <div className="listbox-empty">{isFetching || q !== input.trim() ? 'Searching…' : 'Nothing found.'}</div>
-            )}
-          >
+          <ListBox className="listbox" renderEmptyState={emptyState}>
             {groups.map((group) => (
               <ListBoxSection key={group.type} id={group.type} className="global-search-section">
                 <Header className="global-search-header">
