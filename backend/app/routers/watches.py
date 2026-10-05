@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import current_active_user
 from app.auth.users import User
-from app.db import count_rows, get_session
+from app.db import contains, count_rows, get_session
 from app.links import load_scoped
 from app.models.deal import Deal
 from app.models.organization import Organization
@@ -114,7 +114,7 @@ async def list_watches(
 ) -> Page[WatchRead]:
     q = select(Watch).where(Watch.user_id == user.id)
     if search:
-        q = q.where(Watch.name.ilike(f"%{search}%"))
+        q = q.where(contains(Watch.name, search))
     if kind is not None:
         q = q.where(Watch.kind == kind)
     if organization_id is not None:

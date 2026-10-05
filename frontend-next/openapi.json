@@ -3428,6 +3428,105 @@
         }
       }
     },
+    "/search/": {
+      "get": {
+        "tags": [
+          "search"
+        ],
+        "summary": "Search",
+        "operationId": "search_search__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 200,
+              "title": "Q"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "contacts",
+                    "organizations",
+                    "deals",
+                    "tasks",
+                    "interactions",
+                    "projects",
+                    "documents",
+                    "watches",
+                    "captures"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type"
+            }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Skip"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 5,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResults"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/briefing/": {
       "get": {
         "tags": [
@@ -8251,6 +8350,191 @@
           "refresh_token"
         ],
         "title": "RefreshTokenBody"
+      },
+      "SearchDate": {
+        "properties": {
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "day": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Day"
+          }
+        },
+        "type": "object",
+        "title": "SearchDate",
+        "description": "A date that belongs in a hit's subtitle: \"Due …\", \"Since …\".\n\nSent as a value, not as text, because only the client knows the reader's\ntimezone and locale. Exactly one of `at` and `day` is set."
+      },
+      "SearchGroup": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "contacts",
+              "organizations",
+              "deals",
+              "tasks",
+              "interactions",
+              "projects",
+              "documents",
+              "watches",
+              "captures"
+            ],
+            "title": "Type"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SearchHit"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "total",
+          "items"
+        ],
+        "title": "SearchGroup"
+      },
+      "SearchHit": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "contacts",
+              "organizations",
+              "deals",
+              "tasks",
+              "interactions",
+              "projects",
+              "documents",
+              "watches",
+              "captures"
+            ],
+            "title": "Type"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subtitle"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SearchDate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "match": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SearchMatch"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "title"
+        ],
+        "title": "SearchHit"
+      },
+      "SearchMatch": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "title": "Field"
+          },
+          "excerpt": {
+            "type": "string",
+            "title": "Excerpt"
+          }
+        },
+        "type": "object",
+        "required": [
+          "field",
+          "excerpt"
+        ],
+        "title": "SearchMatch",
+        "description": "Where a hit matched, when it was not in its title.\n\nA contact found by its phone number shows a name that does not contain\nwhat was typed; this is the line that says why it is in the list."
+      },
+      "SearchResults": {
+        "properties": {
+          "q": {
+            "type": "string",
+            "title": "Q"
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/SearchGroup"
+            },
+            "type": "array",
+            "title": "Groups"
+          }
+        },
+        "type": "object",
+        "required": [
+          "q",
+          "groups"
+        ],
+        "title": "SearchResults"
       },
       "TaskCompletionRead": {
         "properties": {

@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import current_active_user
 from app.auth.users import User
-from app.db import count_rows, get_session
+from app.db import contains, count_rows, get_session
 from app.models.contact import Contact
 from app.models.organization import Organization
 from app.schemas.organization import OrganizationCreate, OrganizationRead, OrganizationUpdate
@@ -75,8 +75,8 @@ async def list_organizations(
         # often all the operator has to go on.
         q = q.where(
             or_(
-                Organization.name.ilike(f"%{search}%"),
-                Organization.domain.ilike(f"%{search}%"),
+                contains(Organization.name, search),
+                contains(Organization.domain, search),
             )
         )
     total = await count_rows(session, q)

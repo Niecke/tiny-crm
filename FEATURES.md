@@ -316,6 +316,33 @@ Ordering is most-overdue-first, paused sources last.
 
 ---
 
+## Search — one box over everything
+
+`GET /search/?q=` looks through contacts, organizations, deals, tasks,
+interactions, projects, documents, watches and captures at once (#126), and
+answers with one group per type: the best few hits and how many there are.
+`?type=` with `skip`/`limit` pages through one type. A query needs at least
+two characters: one matches most of every table and no index helps it look.
+
+- **Every column, not just the name.** Each table has a search document, its
+  text columns joined (`app/models/search.py`): a contact by email, phone,
+  job title, address, notes or tag; a capture by its raw line, link or note,
+  whatever its status. Phone numbers are also held digits-only, so "664123"
+  finds "+43 664 123 45 67".
+- **Substring, every term.** Each word typed must appear somewhere in the
+  row (`ILIKE '%term%'`, wildcards escaped), so "anna acme" narrows rather
+  than widens. Titles starting with the query rank first, then by
+  `pg_trgm` word similarity.
+- **Trigram GIN indexes**, one per table over the same expression the query
+  uses, so the match stays an index scan as the tables grow.
+- **Why it matched.** A hit whose title does not show the query says where it
+  did — `Phone: +43 664 …`, `Notes: …met at the Vienna…`.
+
+In the app, the box sits above every page. Typing lists the top hits per type;
+picking one opens it, and Enter (or "See all results") opens `/search?q=`.
+
+---
+
 ## Cross-cutting rules
 
 **Tenant scoping.** Every list, read, write and link is filtered by
@@ -354,6 +381,7 @@ so the 401 handler can see one. Every delete goes through the same
 | Route | What it does |
 |---|---|
 | `/` | Dashboard: Contacts / Tasks / Upcoming panels, responsive to tabs under 700px. Contact panel filters by status, type and freelancer answer. |
+| `/search` | Every type's hits for `?q=`, ten each, with "Show all" paging through one type. |
 | `/inbox` | The inbox: captures oldest-first beside a triage panel. **Open link** opens the profile in a new tab; one form files the person, opens a deal at stage Lead and logs that you wrote to them, then advances to the next capture. Nav badge counts what is waiting. |
 | `/capture` | Where Android's share sheet lands. Saves what was shared, then offers "Add another" or the inbox. Outside the app shell — arrived at from outside, not navigated to. |
 | `/watches` | Sources: "Due now" / "All active" / "Everything", filter by kind. **Open & sweep** opens the source in a new tab, then offers the check dialog. Nav badge counts what is due. |

@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import current_active_user
 from app.auth.users import User
 from app.captures import parse_capture
-from app.db import count_rows, get_session
+from app.db import contains, count_rows, get_session
 from app.models.capture import Capture
 from app.models.contact import Contact
 from app.models.deal import Deal
@@ -79,7 +79,7 @@ async def list_captures(
     if search:
         # Both columns, because half the rows have no name yet and the raw
         # text is the only thing those can be found by.
-        q = q.where(or_(Capture.raw.ilike(f"%{search}%"), Capture.name.ilike(f"%{search}%")))
+        q = q.where(or_(contains(Capture.raw, search), contains(Capture.name, search)))
 
     total = await count_rows(session, q)
     # Oldest first, and this is the whole point of the screen: an inbox is a
