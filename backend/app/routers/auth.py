@@ -6,10 +6,10 @@ from fastapi_users.router.common import ErrorCode, ErrorModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.sessions import close_session, close_sessions, open_session, rotate_session
-from app.auth.throttle import clear_login, login_retry_after, record_login_failure
+from app.auth.throttle import claim_login_attempt, clear_login
 from app.auth.users import UserManager, get_user_manager
 from app.db import get_session
-from app.ratelimit import enforce_login_rate_limit
+from app.ratelimit import enforce_login_rate_limit, record_locked_login
 from app.schemas.auth import RefreshTokenBody, TokenPair
 
 # Sign-in, token renewal and sign-out (app/auth/sessions.py has the design).
@@ -36,9 +36,12 @@ async def login(
     db: AsyncSession = Depends(get_session),
 ) -> TokenPair:
     # Refused before the password is looked at: while locked, even the right
-    # one gets no answer about itself.
-    retry_after = await login_retry_after(db, credentials.username)
+    # one gets no answer about itself. Otherwise the attempt is counted as a
+    # failure here, up front, so requests arriving together cannot all slip
+    # past the lock; a successful login takes it back below.
+    retry_after = await claim_login_attempt(db, credentials.username)
     if retry_after is not None:
+        record_locked_login(request)
         logger.warning("Login refused for a locked account, retry in %ds", retry_after)
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -50,9 +53,6 @@ async def login(
     # One answer for a wrong password and a deactivated account, as in
     # fastapi-users: the difference would tell a guesser the password was right.
     if user is None or not user.is_active:
-        locked_for = await record_login_failure(db, credentials.username)
-        if locked_for:
-            logger.warning("Failed login locked the account for %ds", locked_for)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=ErrorCode.LOGIN_BAD_CREDENTIALS
         )

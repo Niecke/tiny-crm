@@ -36,6 +36,9 @@ def upgrade() -> None:
         sa.Column("last_event_at", sa.DateTime(timezone=True), nullable=False),
         sa.PrimaryKeyConstraint("key"),
     )
+    op.create_index(
+        op.f("ix_auth_throttle_last_event_at"), "auth_throttle", ["last_event_at"], unique=False
+    )
 
 
 def downgrade() -> None:
@@ -43,4 +46,5 @@ def downgrade() -> None:
 
     Every lock and cooldown ends; the per-address throttle stays in place.
     """
+    op.drop_index(op.f("ix_auth_throttle_last_event_at"), table_name="auth_throttle")
     op.drop_table("auth_throttle")

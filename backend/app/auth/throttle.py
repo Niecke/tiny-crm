@@ -15,7 +15,10 @@ nor the password someone typed into the address field by mistake.
 nothing. Each one after that locks the account for 2, 4, 8, … seconds, capped
 at LOGIN_BACKOFF_MAX_SECONDS. Attempts while locked are refused before the
 password is looked at and do not count, so the lock never grows past one step
-per expiry. It is deliberately not a hard lock: that would hand an attacker a
+per expiry. An attempt is counted, and its lock set, *before* its password is
+checked (claim_login_attempt), under a row lock: of any number of requests
+arriving together, only as many reach the password check as arriving one
+after another would. It is deliberately not a hard lock: that would hand an attacker a
 way to keep the operator out for good. Signed-in devices are unaffected —
 /auth/jwt/refresh never consults this. A failure more than
 LOGIN_BACKOFF_DECAY_SECONDS after the previous one starts counting afresh; a
@@ -28,11 +31,9 @@ failed delivery costs one too — a broken mail setup is not retried in a loop.
 The caller still answers 202 either way. Only existing accounts reach the
 claim, so unknown addresses add no rows.
 
-**Limits.** Requests that arrive together all pass the check before the first
-failure is recorded; the per-address throttle bounds that burst. Failed logins
-for invented addresses each add a row, swept once they are a decay window old.
+**Limits.** Logins for invented addresses each add a row, swept once they are
+a decay window old.
 
-Every write is a single upsert, so concurrent requests cannot lose a count.
 The table is a key, a counter and an expiry by design: moving it to Redis
 (#245) replaces this module and drops the table, nothing else.
 """
@@ -45,7 +46,7 @@ import logging
 import math
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import DateTime, String, case, delete, func, or_, select, update
+from sqlalchemy import DateTime, String, delete, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
@@ -66,7 +67,8 @@ class AuthThrottle(Base):
     # Failed logins in the current run; unused for the reset-mail cooldown.
     count: Mapped[int] = mapped_column(default=0, server_default="0")
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    last_event_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    # Indexed for the sweep in claim_login_attempt(), which runs per attempt.
+    last_event_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
 
 
 def _key(kind: str, email: str) -> str:
@@ -89,28 +91,59 @@ def lock_seconds(failures: int) -> int:
     return min(1 << min(over, cap.bit_length()), cap)
 
 
-async def login_retry_after(db: AsyncSession, email: str) -> int | None:
-    """Seconds until `email` may try to log in again, or None if it may now."""
-    locked_until = await db.scalar(
-        select(AuthThrottle.locked_until).where(AuthThrottle.key == _key(_LOGIN, email))
-    )
-    if locked_until is None:
-        return None
-    remaining = (locked_until - datetime.now(UTC)).total_seconds()
-    return math.ceil(remaining) if remaining > 0 else None
+async def claim_login_attempt(db: AsyncSession, email: str) -> int | None:
+    """Count a login attempt for `email` before its password is checked.
 
-
-async def record_login_failure(db: AsyncSession, email: str) -> int:
-    """Count a failed login; returns the lock it earned in seconds (0: none)."""
+    None: the attempt may go ahead, and has been counted as a failure — a
+    successful login takes that back through clear_login(). Otherwise the
+    account is locked, nothing was counted, and the result is how many seconds
+    remain.
+    """
     now = datetime.now(UTC)
     decay_cutoff = now - timedelta(seconds=settings.login_backoff_decay_seconds)
+    key = _key(_LOGIN, email)
 
-    # Nothing else deletes rows that ran out, so failures sweep them, the way a
-    # login sweeps expired sessions. SKIP LOCKED: a row another request holds
-    # is left for the next sweep rather than waited on.
+    # Create the row or lock the stored one, and read it, in one statement.
+    # The no-op update is what takes the row lock: concurrent attempts on one
+    # account queue here, and each sees what the one before it committed.
+    statement = insert(AuthThrottle).values(key=key, count=0, last_event_at=now)
+    statement = statement.on_conflict_do_update(
+        index_elements=[AuthThrottle.key], set_={"key": AuthThrottle.key}
+    )
+    count: int
+    locked_until: datetime | None
+    last_event_at: datetime
+    count, locked_until, last_event_at = (
+        await db.execute(
+            statement.returning(
+                AuthThrottle.count, AuthThrottle.locked_until, AuthThrottle.last_event_at
+            )
+        )
+    ).one()
+
+    if locked_until is not None and locked_until > now:
+        await db.commit()
+        return math.ceil((locked_until - now).total_seconds())
+
+    failures = 1 if last_event_at <= decay_cutoff else count + 1
+    seconds = lock_seconds(failures)
+    await db.execute(
+        update(AuthThrottle)
+        .where(AuthThrottle.key == key)
+        .values(
+            count=failures,
+            last_event_at=now,
+            locked_until=now + timedelta(seconds=seconds) if seconds else None,
+        )
+    )
+
+    # Nothing else deletes rows that ran out, so counted attempts sweep them,
+    # the way a login sweeps expired sessions. SKIP LOCKED: a row another
+    # request holds is left for the next sweep rather than waited on.
     stale = (
         select(AuthThrottle.key)
         .where(
+            AuthThrottle.key != key,
             AuthThrottle.last_event_at <= decay_cutoff,
             or_(AuthThrottle.locked_until.is_(None), AuthThrottle.locked_until <= now),
         )
@@ -118,36 +151,10 @@ async def record_login_failure(db: AsyncSession, email: str) -> int:
     )
     await db.execute(delete(AuthThrottle).where(AuthThrottle.key.in_(stale.scalar_subquery())))
 
-    key = _key(_LOGIN, email)
-    statement = insert(AuthThrottle).values(key=key, count=1, last_event_at=now)
-    statement = statement.on_conflict_do_update(
-        index_elements=[AuthThrottle.key],
-        set_={
-            # On the right-hand side, AuthThrottle.* is the row already stored.
-            "count": case(
-                (AuthThrottle.last_event_at <= decay_cutoff, 1),
-                else_=AuthThrottle.count + 1,
-            ),
-            "last_event_at": now,
-        },
-    )
-    failures = await db.scalar(statement.returning(AuthThrottle.count))
-    assert failures is not None  # an upsert always returns its row
-
-    seconds = lock_seconds(failures)
-    if seconds:
-        until = now + timedelta(seconds=seconds)
-        # GREATEST: of two concurrent failures, the smaller count must not
-        # shorten the lock the larger one set.
-        await db.execute(
-            update(AuthThrottle)
-            .where(AuthThrottle.key == key)
-            .values(
-                locked_until=func.greatest(func.coalesce(AuthThrottle.locked_until, until), until)
-            )
-        )
+    # Committed before the caller hashes a password, so the row lock is never
+    # held across that.
     await db.commit()
-    return seconds
+    return None
 
 
 async def clear_login(db: AsyncSession, email: str) -> bool:

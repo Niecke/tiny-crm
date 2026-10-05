@@ -13,7 +13,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app import cli
-from app.auth.throttle import AuthThrottle, lock_seconds, record_login_failure
+from app.auth.throttle import AuthThrottle, claim_login_attempt, lock_seconds
 from app.config import settings
 from tests.conftest import Account, Outbox
 from tests.test_password_reset import token_from
@@ -137,6 +137,19 @@ async def test_attempts_while_locked_do_not_count(
     assert row.count == FREE + 1
 
 
+async def test_attempts_while_locked_spend_the_address_budget(
+    client: AsyncClient, alice: Account
+) -> None:
+    """A locked account is no free target: each refusal counts per address."""
+    await _fail_until_locked(client, alice.email)
+    for _ in range(settings.login_max_failures - (FREE + 1)):
+        assert (await _login(client, alice.email, "wrong password")).status_code == 429
+
+    # The address is now over its own budget, whichever account it names.
+    response = await _login(client, "nobody@example.com", "anything")
+    assert response.status_code == 429
+
+
 async def test_a_successful_login_clears_the_count(
     client: AsyncClient, alice: Account, session_factory: async_sessionmaker[AsyncSession]
 ) -> None:
@@ -191,17 +204,20 @@ async def test_the_address_is_not_stored(
     assert "alice" not in row.key
 
 
-async def test_concurrent_failures_are_all_counted(
+async def test_a_burst_gets_no_more_attempts_than_a_queue(
     alice: Account, session_factory: async_sessionmaker[AsyncSession]
 ) -> None:
-    async def fail() -> None:
+    """Arriving together must not let every request reach the password check."""
+
+    async def claim() -> int | None:
         async with session_factory() as session:
-            await record_login_failure(session, alice.email)
+            return await claim_login_attempt(session, alice.email)
 
-    await asyncio.gather(*(fail() for _ in range(5)))
+    results = await asyncio.gather(*(claim() for _ in range(FREE + 10)))
 
+    assert results.count(None) == FREE + 1
     [row] = await _rows(session_factory)
-    assert row.count == 5
+    assert row.count == FREE + 1
 
 
 async def test_a_password_reset_ends_the_lock(

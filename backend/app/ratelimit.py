@@ -43,6 +43,8 @@ _last_sweep = 0.0
 
 # fastapi-users answers bad credentials with 400; its 422 is a malformed body,
 # which is a client bug rather than a guess, and 429 is our own rejection.
+# The per-account lock answers 429 too; the login handler charges that one
+# itself through record_locked_login().
 _BAD_CREDENTIALS_STATUS = 400
 
 
@@ -90,6 +92,18 @@ def record_failed_login(ip: str) -> None:
     timestamps = _failures.setdefault(ip, deque())
     _prune(timestamps, now - settings.login_failure_window_seconds)
     timestamps.append(now)
+
+
+def record_locked_login(request: Request) -> None:
+    """Charge a login refused by the per-account lock to its source address.
+
+    The middleware below only sees the status, and a 429 is also what this
+    module answers once an address is over budget. Counting those would let a
+    blocked address extend its own block by retrying, so the handler reports
+    the account lock (app/auth/throttle.py) here instead: hammering a locked
+    account spends the same budget as guessing at an open one.
+    """
+    record_failed_login(_client_ip(request))
 
 
 def retry_after_seconds(ip: str) -> int | None:
