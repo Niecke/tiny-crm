@@ -22,6 +22,7 @@ from app.routers import (
     deals,
     documents,
     interactions,
+    metrics,
     organizations,
     projects,
     search,
@@ -128,6 +129,7 @@ app.include_router(interactions.router)
 app.include_router(watches.router)
 app.include_router(search.router)
 app.include_router(briefing.router)
+app.include_router(metrics.router)
 # /auth/jwt/login, /refresh and /logout. The throttle covers logout as well as
 # login. That is deliberate: both are the credential surface, and the budget is
 # generous enough that no real session hits it.

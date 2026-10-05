@@ -1229,6 +1229,16 @@
             }
           },
           {
+            "name": "overdue",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Overdue"
+            }
+          },
+          {
             "name": "sort",
             "in": "query",
             "required": false,
@@ -3554,6 +3564,61 @@
         ]
       }
     },
+    "/metrics/dashboard": {
+      "get": {
+        "tags": [
+          "metrics"
+        ],
+        "summary": "Get Dashboard Metrics",
+        "description": "The dashboard's numbers for the calendar `period` containing today.\n\nPipeline, the per-stage ages and the attention counts are as of now; the\nrest covers the period, which is echoed back resolved. Today is a calendar\nday in BRIEFING_TIMEZONE, as in the morning briefing.",
+        "operationId": "get_dashboard_metrics_metrics_dashboard_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "week",
+                "month",
+                "quarter",
+                "year"
+              ],
+              "type": "string",
+              "default": "quarter",
+              "title": "Period"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardMetrics"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/auth/jwt/login": {
       "post": {
         "tags": [
@@ -4036,6 +4101,100 @@
   },
   "components": {
     "schemas": {
+      "ActivityMetrics": {
+        "properties": {
+          "interactions_by_kind": {
+            "items": {
+              "$ref": "#/components/schemas/InteractionKindCount"
+            },
+            "type": "array",
+            "title": "Interactions By Kind"
+          },
+          "deals_opened": {
+            "type": "integer",
+            "title": "Deals Opened"
+          },
+          "captures_converted": {
+            "type": "integer",
+            "title": "Captures Converted"
+          },
+          "captures_dismissed": {
+            "type": "integer",
+            "title": "Captures Dismissed"
+          },
+          "tasks_created": {
+            "type": "integer",
+            "title": "Tasks Created"
+          }
+        },
+        "type": "object",
+        "required": [
+          "interactions_by_kind",
+          "deals_opened",
+          "captures_converted",
+          "captures_dismissed",
+          "tasks_created"
+        ],
+        "title": "ActivityMetrics",
+        "description": "In the period. Outbound vs inbound waits for #135. Tasks completed\nwaits for a completion timestamp — `done` says whether, not when."
+      },
+      "AttentionMetrics": {
+        "properties": {
+          "stalled_deals": {
+            "$ref": "#/components/schemas/AttentionRow"
+          },
+          "overdue_deals": {
+            "$ref": "#/components/schemas/AttentionRow"
+          },
+          "overdue_tasks": {
+            "$ref": "#/components/schemas/AttentionRow"
+          },
+          "unconfirmed_interactions": {
+            "$ref": "#/components/schemas/AttentionRow"
+          },
+          "captures_waiting": {
+            "$ref": "#/components/schemas/AttentionRow"
+          }
+        },
+        "type": "object",
+        "required": [
+          "stalled_deals",
+          "overdue_deals",
+          "overdue_tasks",
+          "unconfirmed_interactions",
+          "captures_waiting"
+        ],
+        "title": "AttentionMetrics",
+        "description": "Now. Rows that need later work are not fields yet: lost deals due for\na revisit (#118) and contacts awaiting a reply (#135)."
+      },
+      "AttentionRow": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "list": {
+            "$ref": "#/components/schemas/ListQuery"
+          },
+          "oldest_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldest Days"
+          }
+        },
+        "type": "object",
+        "required": [
+          "count",
+          "list"
+        ],
+        "title": "AttentionRow"
+      },
       "Body_login_auth_jwt_login_post": {
         "properties": {
           "grant_type": {
@@ -6118,6 +6277,34 @@
         "type": "object",
         "title": "ContactUpdate"
       },
+      "DashboardMetrics": {
+        "properties": {
+          "period": {
+            "$ref": "#/components/schemas/PeriodRead"
+          },
+          "pipeline": {
+            "$ref": "#/components/schemas/PipelineMetrics"
+          },
+          "velocity": {
+            "$ref": "#/components/schemas/VelocityMetrics"
+          },
+          "attention": {
+            "$ref": "#/components/schemas/AttentionMetrics"
+          },
+          "activity": {
+            "$ref": "#/components/schemas/ActivityMetrics"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period",
+          "pipeline",
+          "velocity",
+          "attention",
+          "activity"
+        ],
+        "title": "DashboardMetrics"
+      },
       "DealCreate": {
         "properties": {
           "value_type": {
@@ -7210,6 +7397,32 @@
         ],
         "title": "InteractionCreate"
       },
+      "InteractionKindCount": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "call",
+              "meeting",
+              "event",
+              "email",
+              "note",
+              "other"
+            ],
+            "title": "Kind"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "count"
+        ],
+        "title": "InteractionKindCount"
+      },
       "InteractionRead": {
         "properties": {
           "contact_ids": {
@@ -7487,6 +7700,98 @@
         },
         "type": "object",
         "title": "InteractionUpdate"
+      },
+      "ListQuery": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "params": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Params",
+            "default": {}
+          },
+          "field": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path"
+        ],
+        "title": "ListQuery",
+        "description": "The request that lists what a count counted, so a client links to it\nwithout re-deriving the filter.\n\n`field` names the list inside the response when the endpoint returns\nseveral, as /briefing/ does."
+      },
+      "MoneyByCurrency": {
+        "properties": {
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "value": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Value"
+          },
+          "open_ended": {
+            "type": "integer",
+            "title": "Open Ended"
+          }
+        },
+        "type": "object",
+        "required": [
+          "currency",
+          "count",
+          "value",
+          "open_ended"
+        ],
+        "title": "MoneyByCurrency"
+      },
+      "OldestDeal": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "stage_changed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Stage Changed At"
+          },
+          "days_in_stage": {
+            "type": "integer",
+            "title": "Days In Stage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "stage_changed_at",
+          "days_in_stage"
+        ],
+        "title": "OldestDeal"
       },
       "OrganizationCreate": {
         "properties": {
@@ -8082,6 +8387,68 @@
         ],
         "title": "PasswordChange"
       },
+      "PeriodRead": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "start": {
+            "type": "string",
+            "format": "date",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date",
+            "title": "End"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          },
+          "today": {
+            "type": "string",
+            "format": "date",
+            "title": "Today"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "start",
+          "end",
+          "timezone",
+          "today"
+        ],
+        "title": "PeriodRead",
+        "description": "The window the period figures cover, resolved: the client asked for\n\"quarter\", this says which one and in which timezone."
+      },
+      "PipelineMetrics": {
+        "properties": {
+          "by_stage": {
+            "items": {
+              "$ref": "#/components/schemas/StageMoney"
+            },
+            "type": "array",
+            "title": "By Stage"
+          },
+          "committed": {
+            "items": {
+              "$ref": "#/components/schemas/MoneyByCurrency"
+            },
+            "type": "array",
+            "title": "Committed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "by_stage",
+          "committed"
+        ],
+        "title": "PipelineMetrics",
+        "description": "Now. Weighted pipeline is left out until stage-default probabilities\nexist (#120); today it would be a sum over an arbitrary subset."
+      },
       "ProjectCreate": {
         "properties": {
           "name": {
@@ -8351,6 +8718,32 @@
         ],
         "title": "RefreshTokenBody"
       },
+      "SalesCycle": {
+        "properties": {
+          "deals": {
+            "type": "integer",
+            "title": "Deals"
+          },
+          "median_days": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median Days"
+          }
+        },
+        "type": "object",
+        "required": [
+          "deals",
+          "median_days"
+        ],
+        "title": "SalesCycle",
+        "description": "Deals first won in the period, and the median calendar days from\nopening each to winning it. Null median when none were won."
+      },
       "SearchDate": {
         "properties": {
           "label": {
@@ -8535,6 +8928,158 @@
           "groups"
         ],
         "title": "SearchResults"
+      },
+      "StageConversion": {
+        "properties": {
+          "stage": {
+            "type": "string",
+            "enum": [
+              "lead",
+              "qualified",
+              "proposal",
+              "negotiation",
+              "won",
+              "running",
+              "completed",
+              "lost"
+            ],
+            "title": "Stage"
+          },
+          "entered": {
+            "type": "integer",
+            "title": "Entered"
+          },
+          "advanced": {
+            "type": "integer",
+            "title": "Advanced"
+          }
+        },
+        "type": "object",
+        "required": [
+          "stage",
+          "entered",
+          "advanced"
+        ],
+        "title": "StageConversion",
+        "description": "All-time: of the deals that ever entered `stage`, how many later\nentered a stage further along the pipeline (lost does not count)."
+      },
+      "StageEntered": {
+        "properties": {
+          "stage": {
+            "type": "string",
+            "enum": [
+              "lead",
+              "qualified",
+              "proposal",
+              "negotiation",
+              "won",
+              "running",
+              "completed",
+              "lost"
+            ],
+            "title": "Stage"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "stage",
+          "count"
+        ],
+        "title": "StageEntered",
+        "description": "In the period: distinct deals that entered `stage`."
+      },
+      "StageMoney": {
+        "properties": {
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "value": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Value"
+          },
+          "open_ended": {
+            "type": "integer",
+            "title": "Open Ended"
+          },
+          "stage": {
+            "type": "string",
+            "enum": [
+              "lead",
+              "qualified",
+              "proposal",
+              "negotiation",
+              "won",
+              "running",
+              "completed",
+              "lost"
+            ],
+            "title": "Stage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "currency",
+          "count",
+          "value",
+          "open_ended",
+          "stage"
+        ],
+        "title": "StageMoney"
+      },
+      "StageVelocity": {
+        "properties": {
+          "stage": {
+            "type": "string",
+            "enum": [
+              "lead",
+              "qualified",
+              "proposal",
+              "negotiation",
+              "won",
+              "running",
+              "completed",
+              "lost"
+            ],
+            "title": "Stage"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "median_days_in_stage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median Days In Stage"
+          },
+          "oldest": {
+            "$ref": "#/components/schemas/OldestDeal"
+          }
+        },
+        "type": "object",
+        "required": [
+          "stage",
+          "count",
+          "median_days_in_stage",
+          "oldest"
+        ],
+        "title": "StageVelocity",
+        "description": "Now, one open stage."
       },
       "TaskCompletionRead": {
         "properties": {
@@ -9332,6 +9877,42 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "VelocityMetrics": {
+        "properties": {
+          "by_stage": {
+            "items": {
+              "$ref": "#/components/schemas/StageVelocity"
+            },
+            "type": "array",
+            "title": "By Stage"
+          },
+          "entered": {
+            "items": {
+              "$ref": "#/components/schemas/StageEntered"
+            },
+            "type": "array",
+            "title": "Entered"
+          },
+          "conversion": {
+            "items": {
+              "$ref": "#/components/schemas/StageConversion"
+            },
+            "type": "array",
+            "title": "Conversion"
+          },
+          "sales_cycle": {
+            "$ref": "#/components/schemas/SalesCycle"
+          }
+        },
+        "type": "object",
+        "required": [
+          "by_stage",
+          "entered",
+          "conversion",
+          "sales_cycle"
+        ],
+        "title": "VelocityMetrics"
       },
       "WatchCheckCreate": {
         "properties": {

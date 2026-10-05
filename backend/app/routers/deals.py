@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import not_, nulls_last, select
@@ -9,6 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import current_active_user
 from app.auth.users import User
+from app.briefing import DayWindow
+from app.config import settings
 from app.db import contains, count_rows, get_session
 from app.models.contact import Contact
 from app.models.deal import (
@@ -19,8 +22,10 @@ from app.models.deal import (
     WON_STAGES,
     Deal,
     DealStageEvent,
+    overdue_on,
 )
 from app.models.organization import Organization
+from app.routers.briefing import current_time
 from app.schemas.deal import (
     DealCreate,
     DealRead,
@@ -198,7 +203,13 @@ async def list_deals(
     # would ever bring up again. Implies the stage-age order unless `sort` says
     # otherwise — the one that has sat longest is the one to rescue first.
     stalled: bool = Query(default=False),
+    # Open, with an expected close date before today: a forecast that has
+    # expired (#117). Today is the briefing's — a calendar day in
+    # BRIEFING_TIMEZONE — so this and the dashboard agree on what day it is.
+    # The default order already puts the furthest past first.
+    overdue: bool = Query(default=False),
     sort: DealSort | None = Query(default=None),
+    now: datetime = Depends(current_time),
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> Page[DealRead]:
@@ -215,6 +226,9 @@ async def list_deals(
         q = q.where(Deal.organization_id == organization_id)
     if stalled:
         q = q.where(Deal.stage.in_(OPEN_STAGES), not_(Deal.has_next_step))
+    if overdue:
+        today = DayWindow.containing(now, ZoneInfo(settings.briefing_timezone)).today
+        q = q.where(overdue_on(today))
 
     total = await count_rows(session, q)
     if sort is None:

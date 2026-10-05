@@ -126,7 +126,9 @@ their `stage_changed_at` — a floor, not the real move — and have no events.
 is not urgent. `?sort=stage_changed_at` puts the longest-waiting deal first.
 
 **Filters.** `?search` (title) · `?stage` · `?status` · `?contact_id` ·
-`?organization_id`.
+`?organization_id` · `?stalled=true` (open, no next step) · `?overdue=true`
+(open, `expected_close_date` before today — today in `BRIEFING_TIMEZONE`, as
+the briefing has it).
 
 ---
 
@@ -456,6 +458,30 @@ sections), and each item carries the day count the briefing computed in
 `BRIEFING_TIMEZONE`, so the page and the 07:00 message cannot disagree about
 what is late. `app/routers/briefing.py`; the clock is a dependency
 (`current_time`) so tests pin it.
+
+---
+
+## Dashboard numbers
+
+`GET /metrics/dashboard?period=quarter` — `week` · `month` · `quarter` ·
+`year`, the calendar one containing today in `BRIEFING_TIMEZONE`, echoed back
+resolved. One response, one model per group from [DASHBOARD.md](DASHBOARD.md)
+(#138); `app/metrics.py` holds the queries, each one grouped aggregate.
+
+| Group | Now / period | What |
+|---|---|---|
+| `pipeline` (A) | now | open deals per stage and currency: count, value, open-ended count; won + running per currency |
+| `velocity` (B) | both | per open stage the median calendar days in stage and the oldest deal; deals entering each stage in the period; all-time conversion to a later stage; median days from opening to first win for deals won in the period |
+| `attention` (D) | now | stalled deals, overdue deals, overdue tasks, unconfirmed interactions, waiting captures (with the oldest's age), each with the list request behind it |
+| `activity` (E) | period | interactions that happened, by kind; deals opened; captures converted and dismissed; tasks created |
+
+**Money is a pair and never crosses currencies:** every amount is a `Decimal`
+string beside the count of deals with no derivable amount, grouped by
+currency. **A group that cannot be computed yet is absent, not zero** —
+`outcomes` (C) and `delivery` (F), and within the groups the weighted pipeline
+(#120), revisits (#118), reply direction (#135) and tasks completed (no
+completion timestamp). The attention counts run the briefing's own queries
+(`briefing_queries`), so the two cannot disagree about what is late.
 
 ---
 
