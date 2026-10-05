@@ -1,12 +1,15 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi_users.router.common import ErrorCode, ErrorModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.sessions import close_session, close_sessions, open_session, rotate_session
+from app.auth.throttle import claim_login_attempt, clear_login
 from app.auth.users import UserManager, get_user_manager
 from app.db import get_session
-from app.ratelimit import enforce_login_rate_limit
+from app.ratelimit import enforce_login_rate_limit, record_locked_login
 from app.schemas.auth import RefreshTokenBody, TokenPair
 
 # Sign-in, token renewal and sign-out (app/auth/sessions.py has the design).
@@ -14,6 +17,8 @@ from app.schemas.auth import RefreshTokenBody, TokenPair
 # logout cannot revoke anything. Same paths, same login form and errors, so the
 # login throttle and the OAuth2 flow in /docs keep working.
 router = APIRouter(prefix="/auth/jwt", tags=["auth"])
+
+logger = logging.getLogger(__name__)
 
 _REFRESH_REJECTED = "REFRESH_TOKEN_INVALID"
 
@@ -30,6 +35,20 @@ async def login(
     user_manager: UserManager = Depends(get_user_manager),
     db: AsyncSession = Depends(get_session),
 ) -> TokenPair:
+    # Refused before the password is looked at: while locked, even the right
+    # one gets no answer about itself. Otherwise the attempt is counted as a
+    # failure here, up front, so requests arriving together cannot all slip
+    # past the lock; a successful login takes it back below.
+    retry_after = await claim_login_attempt(db, credentials.username)
+    if retry_after is not None:
+        record_locked_login(request)
+        logger.warning("Login refused for a locked account, retry in %ds", retry_after)
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many failed login attempts. Try again later.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
     user = await user_manager.authenticate(credentials)
     # One answer for a wrong password and a deactivated account, as in
     # fastapi-users: the difference would tell a guesser the password was right.
@@ -37,6 +56,7 @@ async def login(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=ErrorCode.LOGIN_BAD_CREDENTIALS
         )
+    await clear_login(db, credentials.username)
     tokens = await open_session(db, user.id)
     await user_manager.on_after_login(user, request)
     return tokens

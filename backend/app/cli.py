@@ -4,6 +4,7 @@
     python -m app.cli create-user you@example.com --set-password   # no mail
     printf '%s\n' "$PW" | python -m app.cli create-user you@example.com --set-password
     python -m app.cli invite you@example.com                       # send again
+    python -m app.cli unlock you@example.com                       # end a login lock
 
 Run from the backend directory (/app in the image), so `app` is importable.
 Reads the same environment as the API: DATABASE_URL, and for mail
@@ -30,6 +31,7 @@ from pydantic import ValidationError
 # The whole model registry, not just User: SQLAlchemy configures mappers against
 # all of it on first query, and a relationship naming an unimported model fails.
 import app.models  # noqa: F401
+from app.auth.throttle import clear_login, clear_reset_mail
 from app.auth.users import User, UserManager
 from app.config import settings
 from app.db import _session_factory
@@ -103,6 +105,16 @@ async def _invite(email: str) -> None:
         typer.echo(f"Invite sent to {user.email}.")
 
 
+async def _unlock(email: str) -> None:
+    async with _session_factory() as session:
+        login = await clear_login(session, email)
+        reset_mail = await clear_reset_mail(session, email)
+    if login or reset_mail:
+        typer.echo(f"Cleared the login backoff and reset-mail cooldown of {email}.")
+    else:
+        typer.echo(f"Nothing to clear for {email}.")
+
+
 @cli.command("create-user")
 def create_user(
     email: str,
@@ -139,6 +151,16 @@ def invite(email: str) -> None:
     until they expire or one of them is used.
     """
     asyncio.run(_invite(email))
+
+
+@cli.command()
+def unlock(email: str) -> None:
+    """End the failed-login backoff and the reset-mail cooldown of an address.
+
+    For an operator locked out of their own account by someone guessing at it.
+    The address need not have an account: failures are counted per address.
+    """
+    asyncio.run(_unlock(email))
 
 
 if __name__ == "__main__":
