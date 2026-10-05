@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.auth.sessions import close_sessions, read_access_token, session_is_open
+from app.auth.throttle import claim_reset_mail, clear_login
 from app.config import settings
 from app.db import Base, get_session
 from app.mail import (
@@ -117,7 +118,15 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, UUID]):
         reaching this hook. An error escaping here would turn that into a 500
         for known ones only — telling an outsider which accounts exist. So a
         failed delivery is the operator's problem, reported in the log.
+
+        At most one mail per PASSWORD_RESET_COOLDOWN_SECONDS (#134), claimed
+        before sending so a failed delivery costs one too. Inside the cooldown
+        the request is dropped and still answered 202: the mail already sent is
+        the one to use.
         """
+        if not await claim_reset_mail(self.db, user.email):
+            logger.info("Password reset for user %s skipped: mail cooldown running", user.id)
+            return
         if self.mail_sender is None:
             logger.warning(
                 "Password reset requested for user %s, but mail is not configured (%s)",
@@ -141,6 +150,9 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, UUID]):
         # Whoever reset the password may not be whoever is signed in: every
         # session ends, including any the old password opened.
         await close_sessions(self.db, user.id)
+        # Whoever could redeem the link controls the mailbox; any backoff the
+        # forgotten password ran up is theirs to drop.
+        await clear_login(self.db, user.email)
         logger.info("Password reset completed for user %s", user.id)
 
     async def on_after_request_verify(

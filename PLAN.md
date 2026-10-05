@@ -132,10 +132,10 @@ Priorities: **P0** not a CRM without it · **P1** daily friction · **P2** expec
       `jwt_lifetime_seconds` is 270 days with no refresh token and no denylist. A leaked token stays valid until it expires; changing the password does not invalidate it; logout only clears client storage.
       *Done when:* short access token + refresh token, revoked on password change and on explicit sign-out.
 
-- [ ] **T34 · P1 · Rate-limit login (layer 2: durable per-account backoff)**
-      The shipped throttle counts per source address, which an attacker rotating IPs walks straight through, and its window resets on every redeploy. Add `failed_login_count` and `locked_until` to the user table (Postgres, no new infrastructure) so the budget follows the *account* and survives restarts.
-      *Use exponential backoff* (`locked_until = now + 2^n` seconds, capped around 15 min), not a hard lock — a hard lock hands an attacker a way to lock the operator out of their own CRM on purpose.
-      *Needs:* an Alembic migration on `user`.
+- [ ] **T34 · P1 · Rate-limit login (layer 2: durable per-account backoff and reset-mail cooldown)**
+      The shipped throttle counts per source address, which an attacker rotating IPs walks straight through, and its window resets on every redeploy. `forgot-password` had no limit at all: every call for a real account sent a mail. A separate `auth_throttle` table (Postgres, no new infrastructure, `user` untouched) keyed by an HMAC of the typed address makes the budget follow the *account* and survive restarts — and unknown addresses are throttled like real ones, so a 429 reveals nothing.
+      *Use exponential backoff* (2, 4, 8 … seconds after 3 free failures, capped at 15 min), not a hard lock — a hard lock hands an attacker a way to lock the operator out of their own CRM on purpose. Refresh is never throttled; `python -m app.cli unlock` ends a lock. One reset mail per account per 5 min.
+      *Later:* the table moves to Redis with #245.
 
 - [ ] **T25 · P2 · User administration in the app**
       Teams stay out of scope, but every row is already `user_id`-scoped, so a second account is a UI problem, not a data-model one. At minimum: create and deactivate users without a shell.
