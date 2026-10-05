@@ -463,7 +463,7 @@ jobs:
       pull-requests: write
     env:
       # renovate: datasource=github-releases depName=aquasecurity/trivy
-      TRIVY_VERSION: v0.74.0
+      TRIVY_VERSION: v0.75.0
       # Renovate moves TRIVY_VERSION; the "newer version available" notice is
       # noise that ends up as the last log line of a failing scan.
       TRIVY_SKIP_VERSION_CHECK: "true"
