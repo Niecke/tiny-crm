@@ -16,7 +16,7 @@ RUN echo "{\"version\":\"$GIT_COMMIT\"}" > public/version.json && \
     VITE_BUILD_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ") npm run build
 
 # Static files only: Node exists in the build stage and nowhere after it.
-FROM caddy:alpine@sha256:881bbc60f9986d5ab8e7cfd6cf7e4ef3c9c0439fef2429d035d065577882f028
+FROM caddy:alpine@sha256:d44355d3c2149dc580ce2cac735955d1c08d3d00882c30489c241aa51a5c10d9
 COPY --from=builder /app/dist /srv
 COPY Caddyfile /etc/caddy/Caddyfile
 
