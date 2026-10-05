@@ -42,6 +42,14 @@ class Settings(BaseSettings):
     # Only failed logins count, so a legitimate mistype costs almost nothing.
     login_max_failures: int = 10
     login_failure_window_seconds: int = 300
+    # Per-account backoff on top of it, kept in Postgres (app/auth/throttle.py).
+    # After the free failures, each further one locks the account for 2, 4, 8, …
+    # seconds up to the cap; a quiet decay window starts the count afresh.
+    login_backoff_free_failures: int = 3
+    login_backoff_max_seconds: int = 60 * 15
+    login_backoff_decay_seconds: int = 60 * 60 * 24
+    # At most one password-reset mail per account in this long.
+    password_reset_cooldown_seconds: int = 60 * 5
 
     # Git commit of the running build, injected at image build time via the
     # GIT_COMMIT build arg (git isn't available inside the build container).

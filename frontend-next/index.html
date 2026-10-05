@@ -10,7 +10,14 @@
          otherwise fetched without the browser's saved credentials. -->
     <link rel="manifest" href="/manifest.json" crossorigin="use-credentials" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <!-- react-aria's usePress injects this one rule as an inline <style>,
+         which the Content-Security-Policy refuses (#155). It skips the
+         injection when an element with this id exists, so the same rule
+         ships as a file of our own instead. -->
+    <link rel="stylesheet" id="react-aria-pressable-style" href="/react-aria-pressable.css" />
     <title>tinyCRM</title>
+    <!-- Before the app's modules: see the file. -->
+    <script src="/zod-jitless.js"></script>
   </head>
   <body>
     <div id="root"></div>

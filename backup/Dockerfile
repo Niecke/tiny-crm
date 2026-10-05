@@ -3,7 +3,7 @@
 # Based on the CloudNativePG postgres image rather than a plain Debian, because
 # pg_dump refuses to dump a server newer than itself — the major version here
 # has to track the one the Cluster runs.
-FROM ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie@sha256:99bc64e413d59b017d169ce2ff25746f1d68c5d7210a19f12c0464a109216ee1
+FROM ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie@sha256:3e89ea90485ffda67094fd6950d9d61dec9ec314aabc8d63c048c67759918621
 
 # rclone from the official image, the same way the backend Dockerfile takes uv
 # from the astral image. Pinned by digest. The binary is statically linked, so

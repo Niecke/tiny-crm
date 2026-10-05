@@ -494,6 +494,18 @@ what is late. `app/routers/briefing.py`; the clock is a dependency
   **Requires `FORWARDED_ALLOW_IPS`** wherever Caddy fronts the API, or every
   user shares one bucket — which in turn requires the backend port not to be
   publicly reachable.
+- **Per-account login backoff** (`app/auth/throttle.py`, table `auth_throttle`):
+  after `LOGIN_BACKOFF_FREE_FAILURES` (3) failed logins for one address, each
+  further failure locks it for 2, 4, 8, … seconds up to
+  `LOGIN_BACKOFF_MAX_SECONDS` (900). Locked → 429 with `Retry-After`, before
+  the password is checked. Keyed by an HMAC of the typed address, so unknown
+  addresses are throttled exactly like real ones and no address is stored.
+  `LOGIN_BACKOFF_DECAY_SECONDS` (86400) of quiet, a successful login or a
+  completed password reset clear it; so does `python -m app.cli unlock <email>`.
+  `/auth/jwt/refresh` is never throttled, so signed-in devices keep working.
+- **Reset-mail cooldown:** at most one password-reset mail per account per
+  `PASSWORD_RESET_COOLDOWN_SECONDS` (300), failed deliveries included. Inside
+  the cooldown the request still answers 202 and sends nothing.
 - **Insecure-default guard.** `check_secure_defaults()` runs in the lifespan
   hook. Development warns per problem; **production logs each at ERROR and
   aborts startup with exit code 3**. Covers the placeholder JWT secret,

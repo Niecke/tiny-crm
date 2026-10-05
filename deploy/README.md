@@ -64,8 +64,11 @@ the production decision:
    it and pushes it to `oci://ghcr.io/niecke/tiny-crm/charts` (failing if
    `Chart.yaml` is not at `X.Y.Z`), signs every digest with cosign (keyless,
    GitHub OIDC) and attaches a signed syft SPDX SBOM to each image, commits
-   `Deploy X.Y.Z to production`, and appends the image and chart digests, the
-   SBOM files and the `cosign verify` commands to the GitHub Release.
+   `Deploy X.Y.Z to production`, and appends the image and chart digests and
+   the `cosign verify` commands to the GitHub Release notes. The SBOMs are not
+   uploaded as Release assets — immutable releases refuse uploads once a Release
+   is published — so they are read back from GHCR with
+   `cosign verify-attestation`.
 
 Every image also carries SLSA provenance (`mode=max`) from its build on the
 pull request; the retags copy it along with the digest. It records the build
