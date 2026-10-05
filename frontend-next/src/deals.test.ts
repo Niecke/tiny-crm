@@ -30,6 +30,11 @@ describe('scopeOf', () => {
     expect(scopeOf('plate').columns).toEqual(['lead', 'qualified', 'proposal', 'negotiation', 'won', 'running'])
   })
 
+  test('the attention scopes are open deals with a flag', () => {
+    expect(scopeOf('stalled')).toMatchObject({ stalled: true, columns: ['lead', 'qualified', 'proposal', 'negotiation'] })
+    expect(scopeOf('overdue')).toMatchObject({ overdue: true })
+  })
+
   test('a single stage scope asks for that stage only', () => {
     expect(scopeOf('stage-lost')).toMatchObject({ stage: 'lost', columns: ['lost'] })
   })

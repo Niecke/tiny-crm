@@ -208,6 +208,10 @@ needs a decision or a column first: contacts untouched for 90 days (which
 contacts are worth touching) and tasks completed per period (`Task` records
 *whether* it is done, not *when*).
 
+The React client renders it at `/numbers`. Every metric above that is not in
+the response yet shows there as a skeleton linking the issue it waits on, so
+the page states what is missing rather than implying zero.
+
 Phase 0 before the section-E tasks, deliberately: it is independent, it is small,
 and having the endpoint already in place means each velocity task ships its
 numbers with it rather than accumulating a second backlog of "add this to the

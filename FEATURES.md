@@ -383,11 +383,12 @@ so the 401 handler can see one. Every delete goes through the same
 | Route | What it does |
 |---|---|
 | `/` | Dashboard: Contacts / Tasks / Upcoming panels, responsive to tabs under 700px. Contact panel filters by status, type and freelancer answer. |
+| `/numbers` | The dashboard's aggregates from `GET /metrics/dashboard`, with a Week / Month / Quarter / Year switch (`?period=`). One panel per question in DASHBOARD.md, each marked "Now" or the period. Attention counts link to the list behind them (`/deals` scoped "No next step" or "Past expected close", the inbox, today's briefing). Anything not measurable yet is a dashed skeleton naming the issue it waits on, never a zero. |
 | `/search` | Every type's hits for `?q=`, ten each, with "Show all" paging through one type. |
 | `/inbox` | The inbox: captures oldest-first beside a triage panel. **Open link** opens the profile in a new tab; one form files the person, opens a deal at stage Lead and logs that you wrote to them, then advances to the next capture. Nav badge counts what is waiting. |
 | `/capture` | Where Android's share sheet lands. Saves what was shared, then offers "Add another" or the inbox. Outside the app shell — arrived at from outside, not navigated to. |
 | `/watches` | Sources: "Due now" / "All active" / "Everything", filter by kind. **Open & sweep** opens the source in a new tab, then offers the check dialog. Nav badge counts what is due. |
-| `/deals` | List beside detail, scoped "On my plate" / "Still competing" / "Won" / "Finished" / one stage. Detail moves the deal with stage chips. |
+| `/deals` | List beside detail, scoped "On my plate" / "Still competing" / "No next step" / "Past expected close" / "Won" / "Finished" / one stage. Detail moves the deal with stage chips. |
 | `/organizations` | List beside detail: contacts at the company, add-someone-here, attached documents and interactions. |
 | `/projects` | Project list and detail with its contacts, tasks, documents and interactions. |
 | `/documents` | Upload, pdfrx viewer, markdown render, replace content, attach anywhere. |

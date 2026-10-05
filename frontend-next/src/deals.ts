@@ -33,11 +33,25 @@ export const stageTone = (stage: string): 'success' | 'danger' | 'accent' | unde
 // What the list is asked for, as the Flutter app's scope menu offers it: four
 // status questions and one per stage. "On my plate" is the default — it keeps
 // won and running work in view, which is what the running stage exists for.
-export const scopeOptions: { value: string; label: string; status?: Status; stage?: Stage; columns: Stage[] }[] = [
+type Scope = {
+  value: string
+  label: string
+  status?: Status
+  stage?: Stage
+  // The open deals that need looking at: no next step, or past their
+  // expected close date. What the Numbers page's counts link to.
+  stalled?: true
+  overdue?: true
+  columns: Stage[]
+}
+
+export const scopeOptions: Scope[] = [
   { value: 'plate', label: 'On my plate', status: 'active', columns: [...OPEN, 'won', 'running'] },
   { value: 'competing', label: 'Still competing', status: 'open', columns: OPEN },
   { value: 'won', label: 'Won (any state)', status: 'won', columns: WON },
   { value: 'finished', label: 'Finished', status: 'finished', columns: ['completed', 'lost'] },
+  { value: 'stalled', label: 'No next step', stalled: true, columns: OPEN },
+  { value: 'overdue', label: 'Past expected close', overdue: true, columns: OPEN },
   { value: 'all', label: 'All deals', columns: stageOptions.map((o) => o.value) },
   ...stageOptions.map((o) => ({ value: `stage-${o.value}`, label: `· ${o.label}`, stage: o.value, columns: [o.value] })),
 ]
@@ -92,7 +106,7 @@ export type DealFilters = { q?: string; scope?: string; page?: number }
 
 const scopeQuery = (scope: string | undefined) => {
   const s = scopeOf(scope)
-  return { status: s.status, stage: s.stage }
+  return { status: s.status, stage: s.stage, stalled: s.stalled, overdue: s.overdue }
 }
 
 // Soonest expected close first — the API's order.

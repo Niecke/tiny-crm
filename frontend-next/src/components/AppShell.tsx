@@ -13,6 +13,7 @@ import { Button } from './ui/Button'
 // the Flutter app reached them only from other screens.
 const nav: { label: string; to: LinkProps['to'] }[] = [
   { label: 'Dashboard', to: '/' },
+  { label: 'Numbers', to: '/numbers' },
   { label: 'Inbox', to: '/inbox' },
   { label: 'Organizations', to: '/organizations' },
   { label: 'Contacts', to: '/contacts' },
