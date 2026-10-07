@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.archive import archived_is, require_archived, require_live, set_archived
 from app.auth import current_active_user
 from app.auth.users import User
 from app.db import contains, count_rows, get_session
@@ -48,6 +49,13 @@ LINKS = (
 )
 
 
+async def _get_owned(session: AsyncSession, interaction_id: UUID, user: User) -> Interaction:
+    interaction = await session.get(Interaction, interaction_id)
+    if interaction is None or interaction.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Interaction not found")
+    return interaction
+
+
 async def _apply_links(
     session: AsyncSession, interaction: Interaction, values: dict[str, object], user_id: UUID
 ) -> None:
@@ -72,6 +80,7 @@ async def list_interactions(
     project_id: UUID | None = None,
     kind: InteractionKind | None = None,
     upcoming: bool | None = None,
+    archived: bool = False,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> Page[InteractionRead]:
@@ -80,7 +89,9 @@ async def list_interactions(
     `upcoming=true` returns only planned (future) entries, oldest first so the
     next appointment comes up top; `upcoming=false` returns only the past log.
     """
-    query = select(Interaction).where(Interaction.user_id == user.id)
+    query = select(Interaction).where(
+        Interaction.user_id == user.id, archived_is(Interaction, archived)
+    )
     if search:
         query = query.where(contains(Interaction.subject, search))
     if kind:
@@ -121,10 +132,7 @@ async def get_interaction(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> InteractionRead:
-    interaction = await session.get(Interaction, interaction_id)
-    if interaction is None or interaction.user_id != user.id:
-        raise HTTPException(status_code=404, detail="Interaction not found")
-    return InteractionRead.model_validate(interaction)
+    return InteractionRead.model_validate(await _get_owned(session, interaction_id, user))
 
 
 @router.post("/", response_model=InteractionRead, status_code=201)
@@ -149,9 +157,8 @@ async def update_interaction(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> InteractionRead:
-    interaction = await session.get(Interaction, interaction_id)
-    if interaction is None or interaction.user_id != user.id:
-        raise HTTPException(status_code=404, detail="Interaction not found")
+    interaction = await _get_owned(session, interaction_id, user)
+    require_live(interaction, "Interaction")
     updates = body.model_dump(exclude_unset=True)
     await _apply_links(session, interaction, updates, user.id)
     for field, value in updates.items():
@@ -163,14 +170,38 @@ async def update_interaction(
     return InteractionRead.model_validate(interaction)
 
 
+@router.post("/{interaction_id}/archive", response_model=InteractionRead)
+async def archive_interaction(
+    interaction_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_active_user),
+) -> InteractionRead:
+    """Put the entry away: off every timeline, and out of the briefing if planned."""
+    interaction = await _get_owned(session, interaction_id, user)
+    await set_archived(session, interaction, True)
+    return InteractionRead.model_validate(interaction)
+
+
+@router.post("/{interaction_id}/restore", response_model=InteractionRead)
+async def restore_interaction(
+    interaction_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_active_user),
+) -> InteractionRead:
+    """Bring an archived entry back onto the timelines it was on."""
+    interaction = await _get_owned(session, interaction_id, user)
+    await set_archived(session, interaction, False)
+    return InteractionRead.model_validate(interaction)
+
+
 @router.delete("/{interaction_id}", status_code=204)
 async def delete_interaction(
     interaction_id: UUID,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> None:
-    interaction = await session.get(Interaction, interaction_id)
-    if interaction is None or interaction.user_id != user.id:
-        raise HTTPException(status_code=404, detail="Interaction not found")
+    """Erase the entry for good. Only once it has been archived."""
+    interaction = await _get_owned(session, interaction_id, user)
+    require_archived(interaction, "Interaction")
     await session.delete(interaction)
     await session.commit()

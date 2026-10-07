@@ -3,14 +3,16 @@ import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import { z } from 'zod'
 import { ApiError } from '../../../../api/client'
+import { ArchiveButton, ArchivedNotice } from '../../../../components/Archive'
+import { useArchive } from '../../../../useArchive'
 import { CheckDialog } from '../../../../components/CheckDialog'
 import { Fact, Facts } from '../../../../components/RecordPage'
 import { Button } from '../../../../components/ui/Button'
-import { ConfirmDialog } from '../../../../components/ui/ConfirmDialog'
 import { Pagination } from '../../../../components/ui/Pagination'
 import { PAGE_SIZE } from '../../../../contacts'
 import { formatDateTime } from '../../../../format'
 import {
+  archiveWatch,
   cadenceLabel,
   checksQuery,
   deleteWatch,
@@ -18,6 +20,7 @@ import {
   invalidateWatches,
   isDue,
   kindLabel,
+  restoreWatch,
   safeUrl,
   updateWatch,
   watchQuery,
@@ -43,25 +46,22 @@ function WatchDetail() {
   const checks = useQuery(checksQuery(api, watchId, checksPage))
   const [now] = useState(() => Date.now())
   const [sweeping, setSweeping] = useState(false)
-  const [confirmDelete, setConfirmDelete] = useState(false)
 
   const pause = useMutation({
     mutationFn: (active: boolean) => updateWatch(api, watchId, { active }),
     onSuccess: async (saved) => {
       queryClient.setQueryData(watchQuery(api, watchId).queryKey, saved)
-      setConfirmDelete(false)
       await invalidateWatches(queryClient)
     },
   })
 
-  const remove = useMutation({
-    mutationFn: () => deleteWatch(api, watchId),
-    onSuccess: async () => {
-      await navigate({ to: '/watches', search: filters, replace: true })
-      queryClient.removeQueries({ queryKey: ['watches', 'detail', watchId] })
-      queryClient.removeQueries({ queryKey: ['watches', 'checks', watchId] })
-      await invalidateWatches(queryClient)
-    },
+  const archiving = useArchive({
+    queryKey: watchQuery(api, watchId).queryKey,
+    archive: () => archiveWatch(api, watchId),
+    restore: () => restoreWatch(api, watchId),
+    remove: () => deleteWatch(api, watchId),
+    leave: () => navigate({ to: '/watches', search: filters, replace: true }),
+    alsoRemove: [['watches', 'checks', watchId]],
   })
 
   const back = (
@@ -95,6 +95,10 @@ function WatchDetail() {
     <div className="page">
       {back}
 
+      <ArchivedNotice record={w} noun="source" name={w.name} archiving={archiving}>
+        Its {w.check_count} logged {w.check_count === 1 ? 'sweep goes' : 'sweeps go'} with it.
+      </ArchivedNotice>
+
       <header className="page-header page-header-row">
         <div className="page-header">
           <h1>{w.name}</h1>
@@ -110,15 +114,21 @@ function WatchDetail() {
             )}
           </p>
         </div>
-        <div className="header-actions">
-          <Button variant="quiet" onPress={() => setConfirmDelete(true)}>
-            Delete
-          </Button>
-          <Link to="/watches/$watchId/edit" params={{ watchId }} search={filters} className="button button-quiet">
-            Edit
-          </Link>
-        </div>
+        {!w.archived_at && (
+          <div className="header-actions">
+            <ArchiveButton archiving={archiving} />
+            <Link to="/watches/$watchId/edit" params={{ watchId }} search={filters} className="button button-quiet">
+              Edit
+            </Link>
+          </div>
+        )}
       </header>
+
+      {pause.error && (
+        <p className="form-error" role="alert">
+          {pause.error.message}
+        </p>
+      )}
 
       <section className="panel sweep-bar" data-due={due || undefined}>
         <div className="row-main">
@@ -129,21 +139,24 @@ function WatchDetail() {
               ` · ${w.found_count} ${w.found_count === 1 ? 'find' : 'finds'} in ${w.check_count} ${w.check_count === 1 ? 'sweep' : 'sweeps'}`}
           </span>
         </div>
-        <div className="header-actions">
-          {/* Opens the source in a new tab and the log dialog here, so coming
-              back to this tab after looking is one step. */}
-          <Button
-            onPress={() => {
-              window.open(url, '_blank', 'noopener,noreferrer')
-              setSweeping(true)
-            }}
-          >
-            Open &amp; sweep
-          </Button>
-          <Button variant="quiet" onPress={() => setSweeping(true)}>
-            Log a sweep
-          </Button>
-        </div>
+        {/* An archived source cannot be swept; its history stays below. */}
+        {!w.archived_at && (
+          <div className="header-actions">
+            {/* Opens the source in a new tab and the log dialog here, so coming
+                back to this tab after looking is one step. */}
+            <Button
+              onPress={() => {
+                window.open(url, '_blank', 'noopener,noreferrer')
+                setSweeping(true)
+              }}
+            >
+              Open &amp; sweep
+            </Button>
+            <Button variant="quiet" onPress={() => setSweeping(true)}>
+              Log a sweep
+            </Button>
+          </div>
+        )}
       </section>
 
       <div className="profile">
@@ -157,6 +170,8 @@ function WatchDetail() {
           <Fact label="Status">
             {w.active ? (
               'Active'
+            ) : w.archived_at ? (
+              'Paused'
             ) : (
               <>
                 Paused{' '}
@@ -224,33 +239,6 @@ function WatchDetail() {
       </div>
 
       <CheckDialog watch={w} isOpen={sweeping} onOpenChange={setSweeping} />
-
-      {/* A source with history is usually better paused than deleted; the
-          dialog offers both. */}
-      <ConfirmDialog
-        title="Delete this source?"
-        isOpen={confirmDelete}
-        onOpenChange={setConfirmDelete}
-        onConfirm={() => remove.mutate()}
-        confirmLabel="Delete"
-        pendingLabel="Deleting…"
-        pending={remove.isPending}
-        error={remove.error ?? pause.error}
-      >
-        <p>
-          <strong>{w.name}</strong> and its {w.check_count} logged {w.check_count === 1 ? 'sweep' : 'sweeps'} will be
-          permanently deleted.
-        </p>
-        {w.active && w.check_count > 0 && (
-          <p className="muted small">
-            To stop sweeping it but keep the history,{' '}
-            <Button variant="quiet" className="link-button" onPress={() => pause.mutate(false)}>
-              pause it instead
-            </Button>
-            .
-          </p>
-        )}
-      </ConfirmDialog>
     </div>
   )
 }

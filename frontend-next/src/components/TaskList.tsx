@@ -41,7 +41,7 @@ export function TaskList({
             <Checkbox
               className="checkbox task-check"
               isSelected={t.done}
-              isDisabled={pendingId === t.id}
+              isDisabled={pendingId === t.id || Boolean(t.archived_at)}
               onChange={() => onToggle(t)}
               aria-label={t.done ? `Mark “${t.title}” as not done` : `Mark “${t.title}” as done`}
             >

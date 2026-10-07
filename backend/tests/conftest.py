@@ -21,7 +21,7 @@ from typing import Any
 
 import pytest
 from fastapi_users.password import PasswordHelper
-from httpx2 import ASGITransport, AsyncClient
+from httpx2 import ASGITransport, AsyncClient, Response
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app import ratelimit
@@ -198,3 +198,15 @@ async def create_resource(
     assert response.status_code == 201, response.text
     created: dict[str, Any] = response.json()
     return created
+
+
+async def erase(client: AsyncClient, account: Account, path: str) -> Response:
+    """Archive the record at `path`, then DELETE it, and return the DELETE.
+
+    The only order a delete is allowed in (#140): erasing something that was
+    never archived is refused. tests/test_archive.py covers that refusal; every
+    other test that needs a row gone comes through here.
+    """
+    archived = await client.post(f"{path}/archive", headers=account.headers)
+    assert archived.status_code == 200, archived.text
+    return await client.delete(path, headers=account.headers)

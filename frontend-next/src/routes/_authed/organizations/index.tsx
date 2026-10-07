@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { Cell, Column, Row, Table, TableBody, TableHeader } from 'react-aria-components'
+import { ArchivedToggle } from '../../../components/Archive'
 import { SearchField } from '../../../components/ui/SearchField'
 import { organizationsQuery } from '../../../organizations'
 import { useDebounced } from '../../../useDebounced'
@@ -12,7 +13,7 @@ export const Route = createFileRoute('/_authed/organizations/')({
 
 function OrganizationsList() {
   const { api } = Route.useRouteContext()
-  const { q = '' } = Route.useSearch()
+  const { q = '', archived = false } = Route.useSearch()
   const navigate = Route.useNavigate()
 
   const [input, setInput] = useState(q)
@@ -22,8 +23,8 @@ function OrganizationsList() {
     if (search !== q) void navigate({ search: (prev) => ({ ...prev, q: search || undefined }), replace: true })
   }, [search, q, navigate])
 
-  const { data, error, isPending, isPlaceholderData } = useQuery(organizationsQuery(api, search))
-  const keep = { q: search || undefined }
+  const { data, error, isPending, isPlaceholderData } = useQuery(organizationsQuery(api, search, archived))
+  const keep = { q: search || undefined, archived: archived || undefined }
 
   return (
     <div className="page">
@@ -34,19 +35,27 @@ function OrganizationsList() {
         </Link>
       </header>
 
-      <SearchField
-        label="Search organizations"
-        placeholder="Search name or domain"
-        value={input}
-        onChange={setInput}
-      />
+      <div className="toolbar filters">
+        <SearchField
+          label="Search organizations"
+          placeholder="Search name or domain"
+          value={input}
+          onChange={setInput}
+        />
+        <ArchivedToggle
+          isSelected={archived}
+          onChange={(v) => void navigate({ search: (prev) => ({ ...prev, archived: v || undefined }), replace: true })}
+        />
+      </div>
 
       {isPending ? (
         <p className="muted">Loading…</p>
       ) : error ? (
         <p className="form-error">{error.message}</p>
       ) : data.items.length === 0 ? (
-        <p className="muted">{search ? `No organization matches “${search}”.` : 'No organizations yet.'}</p>
+        <p className="muted">
+          {search ? `No organization matches “${search}”.` : archived ? 'Nothing archived.' : 'No organizations yet.'}
+        </p>
       ) : (
         <>
           {/* React Aria's Table: a real <table> with row navigation — arrow keys

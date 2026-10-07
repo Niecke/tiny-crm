@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Label, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.archive import archived_is, require_archived, require_live, set_archived
 from app.auth import current_active_user
 from app.auth.users import User
 from app.db import contains, count_rows, get_session
@@ -72,6 +73,7 @@ def _to_read(watch: Watch, found_count: int, check_count: int) -> WatchRead:
         last_checked_at=watch.last_checked_at,
         next_due_at=watch.next_due_at,
         active=watch.active,
+        archived_at=watch.archived_at,
         found_count=found_count,
         check_count=check_count,
         created_at=watch.created_at,
@@ -109,10 +111,13 @@ async def list_watches(
     due: bool | None = Query(default=None),
     # None returns paused sources as well as running ones.
     active: bool | None = Query(default=None),
+    # Not the same as paused. A paused source is still on the list, waiting to
+    # be switched back on; an archived one is off it.
+    archived: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> Page[WatchRead]:
-    q = select(Watch).where(Watch.user_id == user.id)
+    q = select(Watch).where(Watch.user_id == user.id, archived_is(Watch, archived))
     if search:
         q = q.where(contains(Watch.name, search))
     if kind is not None:
@@ -181,6 +186,7 @@ async def update_watch(
     user: User = Depends(current_active_user),
 ) -> WatchRead:
     watch = await _get_owned(session, watch_id, user)
+    require_live(watch, "Watch")
 
     updates = body.model_dump(exclude_unset=True)
     if "organization_id" in updates:
@@ -246,6 +252,7 @@ async def log_check(
     it. Everything here commits or nothing does.
     """
     watch = await _get_owned(session, watch_id, user)
+    require_live(watch, "Watch")
 
     if body.outcome != "found" and (body.create_deal or body.create_task):
         raise HTTPException(
@@ -335,17 +342,46 @@ async def list_checks(
     )
 
 
+@router.post("/{watch_id}/archive", response_model=WatchRead)
+async def archive_watch(
+    watch_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_active_user),
+) -> WatchRead:
+    """Put the source away, keeping its check history.
+
+    Off the sweep list and out of the briefing, like a paused one — and off the
+    watch list as well, which pausing with `active=false` does not do.
+    """
+    watch = await _get_owned(session, watch_id, user)
+    await set_archived(session, watch, True)
+    return _to_read(watch, *await _counts(session, watch.id))
+
+
+@router.post("/{watch_id}/restore", response_model=WatchRead)
+async def restore_watch(
+    watch_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_active_user),
+) -> WatchRead:
+    """Bring an archived source back, due when it was due before."""
+    watch = await _get_owned(session, watch_id, user)
+    await set_archived(session, watch, False)
+    return _to_read(watch, *await _counts(session, watch.id))
+
+
 @router.delete("/{watch_id}", status_code=204)
 async def delete_watch(
     watch_id: UUID,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> None:
-    """Deleting a watch takes its check history with it (CASCADE).
+    """Erase a watch for good, and its check history with it (CASCADE).
 
-    Pausing with `active=false` is the non-destructive option, and what the UI
-    offers first.
+    Only once it has been archived. Pausing with `active=false` and archiving
+    are the non-destructive options, and what the UI offers first.
     """
     watch = await _get_owned(session, watch_id, user)
+    require_archived(watch, "Watch")
     await session.delete(watch)
     await session.commit()

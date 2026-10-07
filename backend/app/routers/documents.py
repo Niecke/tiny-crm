@@ -11,6 +11,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.archive import archived_is, require_archived, require_live, set_archived
 from app.auth import current_active_user
 from app.auth.users import User
 from app.db import contains, count_rows, get_session
@@ -42,6 +43,13 @@ LINKS = (
     ("deal_ids", "deals", Deal, document_deals, "deal_id"),
     ("project_ids", "projects", Project, project_documents, "project_id"),
 )
+
+
+async def _get_owned(session: AsyncSession, document_id: UUID, user: User) -> Document:
+    doc = await session.get(Document, document_id)
+    if doc is None or doc.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return doc
 
 
 async def _apply_links(
@@ -130,10 +138,11 @@ async def list_documents(
     organization_id: UUID | None = Query(default=None),
     deal_id: UUID | None = Query(default=None),
     project_id: UUID | None = Query(default=None),
+    archived: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> Page[DocumentRead]:
-    q = select(Document).where(Document.user_id == user.id)
+    q = select(Document).where(Document.user_id == user.id, archived_is(Document, archived))
     if search:
         q = q.where(contains(Document.title, search))
     for target_id, (_field, _attr, _model, table, column) in zip(
@@ -232,13 +241,7 @@ async def get_document(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> Document:
-    result = await session.execute(
-        select(Document).where(Document.id == document_id, Document.user_id == user.id)
-    )
-    doc = result.scalar_one_or_none()
-    if doc is None:
-        raise HTTPException(status_code=404, detail="Document not found")
-    return doc
+    return await _get_owned(session, document_id, user)
 
 
 @router.get("/{document_id}/content")
@@ -247,12 +250,8 @@ async def get_document_content(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> StreamingResponse:
-    result = await session.execute(
-        select(Document).where(Document.id == document_id, Document.user_id == user.id)
-    )
-    doc = result.scalar_one_or_none()
-    if doc is None:
-        raise HTTPException(status_code=404, detail="Document not found")
+    # Archived or not: putting a contract away must not make it unreadable.
+    doc = await _get_owned(session, document_id, user)
 
     safe_title = doc.title.replace('"', "").replace("\\", "")
     ext = {"pdf": "pdf", "markdown": "md", "txt": "txt"}[doc.format]
@@ -269,12 +268,7 @@ async def get_document_preview(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> StreamingResponse:
-    result = await session.execute(
-        select(Document).where(Document.id == document_id, Document.user_id == user.id)
-    )
-    doc = result.scalar_one_or_none()
-    if doc is None:
-        raise HTTPException(status_code=404, detail="Document not found")
+    doc = await _get_owned(session, document_id, user)
     if not doc.preview_key:
         raise HTTPException(status_code=404, detail="No preview available")
     return StreamingResponse(get_object_stream(doc.preview_key), media_type="image/jpeg")
@@ -287,12 +281,8 @@ async def replace_document_content(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> Document:
-    result = await session.execute(
-        select(Document).where(Document.id == document_id, Document.user_id == user.id)
-    )
-    doc = result.scalar_one_or_none()
-    if doc is None:
-        raise HTTPException(status_code=404, detail="Document not found")
+    doc = await _get_owned(session, document_id, user)
+    require_live(doc, "Document")
 
     size = _checked_size(file)
 
@@ -326,12 +316,8 @@ async def update_document(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> Document:
-    result = await session.execute(
-        select(Document).where(Document.id == document_id, Document.user_id == user.id)
-    )
-    doc = result.scalar_one_or_none()
-    if doc is None:
-        raise HTTPException(status_code=404, detail="Document not found")
+    doc = await _get_owned(session, document_id, user)
+    require_live(doc, "Document")
     updates = body.model_dump(exclude_unset=True)
     await _apply_links(session, doc, updates, user.id)
     for field, value in updates.items():
@@ -343,18 +329,47 @@ async def update_document(
     return doc
 
 
+@router.post("/{document_id}/archive", response_model=DocumentRead)
+async def archive_document(
+    document_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_active_user),
+) -> Document:
+    """Put the document away. The file stays in the bucket and stays readable.
+
+    Only the row is marked: nothing is moved or removed in storage, so
+    restoring is the same file under the same key.
+    """
+    doc = await _get_owned(session, document_id, user)
+    await set_archived(session, doc, True)
+    return doc
+
+
+@router.post("/{document_id}/restore", response_model=DocumentRead)
+async def restore_document(
+    document_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_active_user),
+) -> Document:
+    """Bring an archived document back, still filed where it was."""
+    doc = await _get_owned(session, document_id, user)
+    await set_archived(session, doc, False)
+    return doc
+
+
 @router.delete("/{document_id}", status_code=204)
 async def delete_document(
     document_id: UUID,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> None:
-    result = await session.execute(
-        select(Document).where(Document.id == document_id, Document.user_id == user.id)
-    )
-    doc = result.scalar_one_or_none()
-    if doc is None:
-        raise HTTPException(status_code=404, detail="Document not found")
+    """Erase the document and its file for good. Only once it has been archived.
+
+    On a versioned bucket the delete below leaves earlier versions behind, so
+    this is not yet a complete erasure of the file — see #143.
+    """
+    doc = await _get_owned(session, document_id, user)
+    require_archived(doc, "Document")
     await delete_object(doc.storage_key)
     if doc.preview_key:
         await delete_object(doc.preview_key)

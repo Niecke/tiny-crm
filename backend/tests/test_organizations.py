@@ -9,7 +9,7 @@ company, and how many that is.
 
 from httpx2 import AsyncClient
 
-from tests.conftest import Account, create_resource
+from tests.conftest import Account, create_resource, erase
 
 
 async def test_an_organization_survives_a_full_round_trip(
@@ -48,7 +48,7 @@ async def test_an_organization_survives_a_full_round_trip(
     assert patched.json()["email"] == "info@acme.example"
     assert patched.json()["name"] == "ACME Corporation"
 
-    deleted = await client.delete(f"/organizations/{created['id']}", headers=alice.headers)
+    deleted = await erase(client, alice, f"/organizations/{created['id']}")
     assert deleted.status_code == 204
     assert (
         await client.get(f"/organizations/{created['id']}", headers=alice.headers)
@@ -184,7 +184,7 @@ async def test_the_contact_count_follows_the_links(client: AsyncClient, alice: A
     listed = await client.get("/organizations/", headers=alice.headers)
     assert listed.json()["items"][0]["contact_count"] == 2
 
-    await client.delete(f"/contacts/{contact['id']}", headers=alice.headers)
+    await erase(client, alice, f"/contacts/{contact['id']}")
 
     after = await client.get(f"/organizations/{organization['id']}", headers=alice.headers)
     assert after.json()["contact_count"] == 1
@@ -198,9 +198,7 @@ async def test_deleting_an_organization_keeps_its_contacts(
         client, alice, "/contacts/", {"name": "Ada", "organization_id": organization["id"]}
     )
 
-    assert (
-        await client.delete(f"/organizations/{organization['id']}", headers=alice.headers)
-    ).status_code == 204
+    assert (await erase(client, alice, f"/organizations/{organization['id']}")).status_code == 204
 
     # The company is gone; the person we know there is not.
     survivor = await client.get(f"/contacts/{contact['id']}", headers=alice.headers)

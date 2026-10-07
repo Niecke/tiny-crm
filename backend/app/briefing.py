@@ -36,6 +36,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.archive import live
 from app.auth.users import User
 
 # The package, not the three modules this file names: a mapper is configured
@@ -173,8 +174,12 @@ class BriefingQueries:
 
 def briefing_queries(user_id: UUID, window: DayWindow) -> BriefingQueries:
     """Everything that wants `user_id`'s attention on `window`'s day, as queries."""
-    open_tasks = select(Task).where(Task.user_id == user_id, Task.done.is_(False))
-    planned = select(Interaction).where(Interaction.user_id == user_id, Interaction.done.is_(False))
+    # Nothing archived is ever in the briefing: it was put away so that it
+    # would stop asking for attention.
+    open_tasks = select(Task).where(Task.user_id == user_id, Task.done.is_(False), live(Task))
+    planned = select(Interaction).where(
+        Interaction.user_id == user_id, Interaction.done.is_(False), live(Interaction)
+    )
     return BriefingQueries(
         overdue_tasks=open_tasks.where(Task.due_date < window.start).order_by(
             Task.due_date.asc(), Task.priority.desc(), Task.id.asc()
@@ -189,10 +194,15 @@ def briefing_queries(user_id: UUID, window: DayWindow) -> BriefingQueries:
             Interaction.occurred_at.asc(), Interaction.id.asc()
         ),
         watches_due=select(Watch)
-        .where(Watch.user_id == user_id, Watch.active.is_(True), Watch.next_due_at < window.end)
+        .where(
+            Watch.user_id == user_id,
+            Watch.active.is_(True),
+            Watch.next_due_at < window.end,
+            live(Watch),
+        )
         .order_by(Watch.next_due_at.asc(), Watch.id.asc()),
         captures_waiting=select(Capture)
-        .where(Capture.user_id == user_id, Capture.status == "new")
+        .where(Capture.user_id == user_id, Capture.status == "new", live(Capture))
         .order_by(Capture.created_at.asc(), Capture.id.asc()),
         # Planned from the start of today, not from this instant: a meeting
         # earlier today that is still unconfirmed is in the calendar section
@@ -204,6 +214,7 @@ def briefing_queries(user_id: UUID, window: DayWindow) -> BriefingQueries:
             Deal.user_id == user_id,
             Deal.stage.in_(OPEN_STAGES),
             ~next_step_exists(window.start),
+            live(Deal),
         )
         .order_by(Deal.stage_changed_at.asc(), Deal.id.asc()),
     )

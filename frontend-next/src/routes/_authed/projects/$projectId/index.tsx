@@ -6,6 +6,8 @@ import { z } from 'zod'
 import { ApiError } from '../../../../api/client'
 import type { ProjectRead, ProjectUpdate, TaskRead } from '../../../../api/types'
 import { AddLinkPicker } from '../../../../components/AddLinkPicker'
+import { ArchiveButton, ArchivedNotice } from '../../../../components/Archive'
+import { useArchive } from '../../../../useArchive'
 import { DocumentRows } from '../../../../components/DocumentRows'
 import { InteractionList } from '../../../../components/InteractionList'
 import { Markdown } from '../../../../components/Markdown'
@@ -13,7 +15,6 @@ import { Fact, Facts } from '../../../../components/RecordPage'
 import { TaskList } from '../../../../components/TaskList'
 import { Button } from '../../../../components/ui/Button'
 import { Checkbox } from '../../../../components/ui/Checkbox'
-import { ConfirmDialog } from '../../../../components/ui/ConfirmDialog'
 import { DatePicker } from '../../../../components/ui/DatePicker'
 import { Modal } from '../../../../components/ui/Modal'
 import { TextField } from '../../../../components/ui/TextField'
@@ -21,7 +22,16 @@ import { contactQuery } from '../../../../contacts'
 import { linkedDocumentsQuery } from '../../../../documents'
 import { endOfLocalDay, formatDay, localDay } from '../../../../format'
 import { linkedInteractionsQuery, useToggleHappened } from '../../../../interactions'
-import { deleteProject, invalidateProjects, projectQuery, statusLabels, statusOf, updateProject } from '../../../../projects'
+import {
+  archiveProject,
+  deleteProject,
+  invalidateProjects,
+  projectQuery,
+  restoreProject,
+  statusLabels,
+  statusOf,
+  updateProject,
+} from '../../../../projects'
 import { createTask, invalidateTasks, taskQuery, useToggleDone } from '../../../../tasks'
 import { useSelectedTabInView } from '../../../../useSelectedTabInView'
 
@@ -70,14 +80,12 @@ function ProjectDetail() {
     },
   })
 
-  const [confirmDelete, setConfirmDelete] = useState(false)
-  const remove = useMutation({
-    mutationFn: () => deleteProject(api, projectId),
-    onSuccess: async () => {
-      await navigate({ to: '/projects', search: filters, replace: true })
-      queryClient.removeQueries({ queryKey: projectQuery(api, projectId).queryKey })
-      await invalidateProjects(queryClient)
-    },
+  const archiving = useArchive({
+    queryKey: projectQuery(api, projectId).queryKey,
+    archive: () => archiveProject(api, projectId),
+    restore: () => restoreProject(api, projectId),
+    remove: () => deleteProject(api, projectId),
+    leave: () => navigate({ to: '/projects', search: filters, replace: true }),
   })
 
   const back = (
@@ -103,7 +111,10 @@ function ProjectDetail() {
     )
   }
 
-  const tasks = taskResults.flatMap((r) => (r.data ? [r.data] : []))
+  // A project's tasks are looked up by id, so an archived one still comes
+  // back; like every other task list, this one leaves it out. The link is
+  // kept (p.task_ids), so restoring the task puts it back here.
+  const tasks = taskResults.flatMap((r) => (r.data && !r.data.archived_at ? [r.data] : []))
   const tasksLoading = taskResults.some((r) => r.isPending)
   const openTasks = tasks.filter((t) => !t.done)
   const shownTasks = (showDone ? tasks : openTasks).sort(byDue)
@@ -120,6 +131,10 @@ function ProjectDetail() {
     <div className="page">
       {back}
 
+      <ArchivedNotice record={p} noun="project" name={p.name} archiving={archiving}>
+        Its tasks, contacts and documents are kept.
+      </ArchivedNotice>
+
       <header className="page-header page-header-row">
         <div className="page-header">
           <h1>{p.name}</h1>
@@ -130,14 +145,14 @@ function ProjectDetail() {
             {p.end_date ? `${formatDay(p.start_date)} – ${formatDay(p.end_date)}` : `From ${formatDay(p.start_date)}`}
           </p>
         </div>
-        <div className="header-actions">
-          <Button variant="quiet" onPress={() => setConfirmDelete(true)}>
-            Delete
-          </Button>
-          <Link to="/projects/$projectId/edit" params={{ projectId }} search={filters} className="button button-quiet">
-            Edit
-          </Link>
-        </div>
+        {!p.archived_at && (
+          <div className="header-actions">
+            <ArchiveButton archiving={archiving} />
+            <Link to="/projects/$projectId/edit" params={{ projectId }} search={filters} className="button button-quiet">
+              Edit
+            </Link>
+          </div>
+        )}
       </header>
 
       {link.error && (
@@ -233,15 +248,19 @@ function ProjectDetail() {
                     <span className="row-main">
                       <Link to="/contacts/$contactId" params={{ contactId: c.id }} className="row-link">
                         {c.name}
+                        {/* Still on the project: archiving keeps the link. */}
+                        {c.archived_at && ' (archived)'}
                       </Link>
                       {(c.job_title || c.organization_name) && (
                         <span className="row-meta">{[c.job_title, c.organization_name].filter(Boolean).join(' · ')}</span>
                       )}
                     </span>
                     <span className="row-actions">
-                      <Link to="/contacts/$contactId/edit" params={{ contactId: c.id }} className="button button-quiet">
-                        Edit
-                      </Link>
+                      {!c.archived_at && (
+                        <Link to="/contacts/$contactId/edit" params={{ contactId: c.id }} className="button button-quiet">
+                          Edit
+                        </Link>
+                      )}
                       <Button
                         variant="quiet"
                         isDisabled={link.isPending}
@@ -314,21 +333,6 @@ function ProjectDetail() {
           </TabPanel>
         </Tabs>
       </div>
-
-      <ConfirmDialog
-        title="Delete this project?"
-        isOpen={confirmDelete}
-        onOpenChange={setConfirmDelete}
-        onConfirm={() => remove.mutate()}
-        confirmLabel="Delete"
-        pendingLabel="Deleting…"
-        pending={remove.isPending}
-        error={remove.error}
-      >
-        <p>
-          <strong>{p.name}</strong> will be permanently deleted. Its tasks, contacts and documents are kept.
-        </p>
-      </ConfirmDialog>
     </div>
   )
 }

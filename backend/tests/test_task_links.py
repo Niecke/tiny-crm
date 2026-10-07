@@ -17,7 +17,7 @@ from typing import Any
 import pytest
 from httpx2 import AsyncClient
 
-from tests.conftest import Account, create_resource
+from tests.conftest import Account, create_resource, erase
 
 OCCURRED_AT = (datetime.now(UTC) - timedelta(days=1)).isoformat()
 
@@ -272,7 +272,7 @@ async def test_deleting_the_linked_record_keeps_the_task(
         client, alice, "/tasks/", {"title": "Work I promised", field: target["id"]}
     )
 
-    assert (await client.delete(f"{path}{target['id']}", headers=alice.headers)).status_code == 204
+    assert (await erase(client, alice, f"{path}{target['id']}")).status_code == 204
 
     # Work the operator committed to does not vanish because the record it
     # pointed at did — the task survives, unattached.

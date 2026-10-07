@@ -97,7 +97,7 @@ export function InteractionList({
               {/* Only offered while it is still open; undoing it is rare
                   enough to live in the form's Happened box. */}
               {!i.done && (
-                <Button variant="quiet" onPress={() => onToggle(i)} isDisabled={pendingId === i.id}>
+                <Button variant="quiet" onPress={() => onToggle(i)} isDisabled={pendingId === i.id || Boolean(i.archived_at)}>
                   Mark happened
                 </Button>
               )}

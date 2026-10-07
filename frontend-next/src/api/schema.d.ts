@@ -33,12 +33,62 @@ export interface paths {
         get: operations["get_contact_contacts__contact_id__get"];
         put?: never;
         post?: never;
-        /** Delete Contact */
+        /**
+         * Delete Contact
+         * @description Erase the contact for good. Only once it has been archived.
+         *
+         *     This is the erasure, not the tidy-up (#143): the row goes, and every task,
+         *     deal and interaction that named this person stops naming anyone.
+         */
         delete: operations["delete_contact_contacts__contact_id__delete"];
         options?: never;
         head?: never;
         /** Update Contact */
         patch: operations["update_contact_contacts__contact_id__patch"];
+        trace?: never;
+    };
+    "/contacts/{contact_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive Contact
+         * @description Put the contact away, keeping everything that points at them.
+         *
+         *     The interactions, deals and tasks that name this contact go on naming them.
+         *     That is the difference from DELETE, which leaves each of those pointing at
+         *     nobody.
+         */
+        post: operations["archive_contact_contacts__contact_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/contacts/{contact_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore Contact
+         * @description Bring an archived contact back, exactly as it was put away.
+         */
+        post: operations["restore_contact_contacts__contact_id__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/captures/": {
@@ -105,6 +155,11 @@ export interface paths {
          *
          *     Distinct from /dismiss, which keeps the row as a decision that was made.
          *     A typo is not a decision.
+         *
+         *     The one delete that does not ask for archiving first, and only while the
+         *     capture is still `new`: nothing has been made of it and nothing points at
+         *     it, so there is no trail to lose, and Undo that took two steps would not be
+         *     one. Once worked, a capture is erased like everything else.
          */
         delete: operations["delete_capture_captures__capture_id__delete"];
         options?: never;
@@ -171,6 +226,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/captures/{capture_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive Capture
+         * @description Put the capture away, whatever was decided about it.
+         *
+         *     Different from /dismiss, which is itself a decision and stays in the inbox's
+         *     history. This takes the row out of the inbox and its history alike, and
+         *     leaves its status as it was.
+         */
+        post: operations["archive_capture_captures__capture_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/captures/{capture_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore Capture
+         * @description Bring an archived capture back, with the status it was put away in.
+         */
+        post: operations["restore_capture_captures__capture_id__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/organizations/": {
         parameters: {
             query?: never;
@@ -202,13 +301,58 @@ export interface paths {
         post?: never;
         /**
          * Delete Organization
-         * @description Deleting a company keeps its people: their organization_id becomes NULL.
+         * @description Erase the company for good. Only once it has been archived.
+         *
+         *     Deleting a company keeps its people: their organization_id becomes NULL.
          */
         delete: operations["delete_organization_organizations__organization_id__delete"];
         options?: never;
         head?: never;
         /** Update Organization */
         patch: operations["update_organization_organizations__organization_id__patch"];
+        trace?: never;
+    };
+    "/organizations/{organization_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive Organization
+         * @description Put the company away. Its people stay where they are, still filed under it.
+         *
+         *     Nothing cascades: whether the contacts go too is a separate decision, and
+         *     making it silently is the opposite of recoverable.
+         */
+        post: operations["archive_organization_organizations__organization_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organizations/{organization_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore Organization
+         * @description Bring an archived company back, exactly as it was put away.
+         */
+        post: operations["restore_organization_organizations__organization_id__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/deals/": {
@@ -240,7 +384,10 @@ export interface paths {
         get: operations["get_deal_deals__deal_id__get"];
         put?: never;
         post?: never;
-        /** Delete Deal */
+        /**
+         * Delete Deal
+         * @description Erase the deal for good. Only once it has been archived.
+         */
         delete: operations["delete_deal_deals__deal_id__delete"];
         options?: never;
         head?: never;
@@ -266,6 +413,50 @@ export interface paths {
          *     takes the lost reason — and because it is what a kanban drag calls.
          */
         post: operations["change_stage_deals__deal_id__stage_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/deals/{deal_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive Deal
+         * @description Put the deal away: off the board, out of the pipeline and its numbers.
+         *
+         *     Not the same as losing it. A lost deal is an outcome and stays in the
+         *     conversion figures; an archived one is a record that should not have been
+         *     counted at all, and comes back with its stage and its history untouched.
+         */
+        post: operations["archive_deal_deals__deal_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/deals/{deal_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore Deal
+         * @description Bring an archived deal back, in the stage it was put away in.
+         */
+        post: operations["restore_deal_deals__deal_id__restore_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -301,12 +492,59 @@ export interface paths {
         get: operations["get_task_tasks__task_id__get"];
         put?: never;
         post?: never;
-        /** Delete Task */
+        /**
+         * Delete Task
+         * @description Erase the task for good. Only once it has been archived.
+         */
         delete: operations["delete_task_tasks__task_id__delete"];
         options?: never;
         head?: never;
         /** Update Task */
         patch: operations["update_task_tasks__task_id__patch"];
+        trace?: never;
+    };
+    "/tasks/{task_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive Task
+         * @description Put the task away without calling it done.
+         *
+         *     Done is a claim that the work happened, and completing a repeating task
+         *     schedules the next one. Archiving says neither: the task leaves the list
+         *     and the briefing, and a series stops where it is.
+         */
+        post: operations["archive_task_tasks__task_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{task_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore Task
+         * @description Bring an archived task back, as open or as done as it was.
+         */
+        post: operations["restore_task_tasks__task_id__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/documents/": {
@@ -338,7 +576,13 @@ export interface paths {
         get: operations["get_document_documents__document_id__get"];
         put?: never;
         post?: never;
-        /** Delete Document */
+        /**
+         * Delete Document
+         * @description Erase the document and its file for good. Only once it has been archived.
+         *
+         *     On a versioned bucket the delete below leaves earlier versions behind, so
+         *     this is not yet a complete erasure of the file — see #143.
+         */
         delete: operations["delete_document_documents__document_id__delete"];
         options?: never;
         head?: never;
@@ -381,6 +625,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/documents/{document_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive Document
+         * @description Put the document away. The file stays in the bucket and stays readable.
+         *
+         *     Only the row is marked: nothing is moved or removed in storage, so
+         *     restoring is the same file under the same key.
+         */
+        post: operations["archive_document_documents__document_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/documents/{document_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore Document
+         * @description Bring an archived document back, still filed where it was.
+         */
+        post: operations["restore_document_documents__document_id__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/": {
         parameters: {
             query?: never;
@@ -410,12 +697,55 @@ export interface paths {
         get: operations["get_project_projects__project_id__get"];
         put?: never;
         post?: never;
-        /** Delete Project */
+        /**
+         * Delete Project
+         * @description Erase the project for good. Only once it has been archived.
+         */
         delete: operations["delete_project_projects__project_id__delete"];
         options?: never;
         head?: never;
         /** Update Project */
         patch: operations["update_project_projects__project_id__patch"];
+        trace?: never;
+    };
+    "/projects/{project_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive Project
+         * @description Put the project away. Its contacts, tasks and documents stay filed under it.
+         */
+        post: operations["archive_project_projects__project_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore Project
+         * @description Bring an archived project back, with everything still filed under it.
+         */
+        post: operations["restore_project_projects__project_id__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/interactions/": {
@@ -453,12 +783,55 @@ export interface paths {
         get: operations["get_interaction_interactions__interaction_id__get"];
         put?: never;
         post?: never;
-        /** Delete Interaction */
+        /**
+         * Delete Interaction
+         * @description Erase the entry for good. Only once it has been archived.
+         */
         delete: operations["delete_interaction_interactions__interaction_id__delete"];
         options?: never;
         head?: never;
         /** Update Interaction */
         patch: operations["update_interaction_interactions__interaction_id__patch"];
+        trace?: never;
+    };
+    "/interactions/{interaction_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive Interaction
+         * @description Put the entry away: off every timeline, and out of the briefing if planned.
+         */
+        post: operations["archive_interaction_interactions__interaction_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/interactions/{interaction_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore Interaction
+         * @description Bring an archived entry back onto the timelines it was on.
+         */
+        post: operations["restore_interaction_interactions__interaction_id__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/watches/": {
@@ -492,10 +865,10 @@ export interface paths {
         post?: never;
         /**
          * Delete Watch
-         * @description Deleting a watch takes its check history with it (CASCADE).
+         * @description Erase a watch for good, and its check history with it (CASCADE).
          *
-         *     Pausing with `active=false` is the non-destructive option, and what the UI
-         *     offers first.
+         *     Only once it has been archived. Pausing with `active=false` and archiving
+         *     are the non-destructive options, and what the UI offers first.
          */
         delete: operations["delete_watch_watches__watch_id__delete"];
         options?: never;
@@ -543,6 +916,49 @@ export interface paths {
         get: operations["list_checks_watches__watch_id__checks_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/watches/{watch_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive Watch
+         * @description Put the source away, keeping its check history.
+         *
+         *     Off the sweep list and out of the briefing, like a paused one — and off the
+         *     watch list as well, which pausing with `active=false` does not do.
+         */
+        post: operations["archive_watch_watches__watch_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/watches/{watch_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore Watch
+         * @description Bring an archived source back, due when it was due before.
+         */
+        post: operations["restore_watch_watches__watch_id__restore_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1277,6 +1693,8 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** Archived At */
+            archived_at?: string | null;
         };
         /**
          * CaptureUpdate
@@ -1414,6 +1832,8 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** Archived At */
+            archived_at?: string | null;
         };
         /** ContactUpdate */
         ContactUpdate: {
@@ -1590,6 +2010,8 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** Archived At */
+            archived_at?: string | null;
         };
         /**
          * DealStageChange
@@ -1686,6 +2108,8 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** Archived At */
+            archived_at?: string | null;
             /** Has Preview */
             readonly has_preview: boolean;
         };
@@ -1835,6 +2259,8 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** Archived At */
+            archived_at?: string | null;
         };
         /** InteractionUpdate */
         InteractionUpdate: {
@@ -1960,6 +2386,8 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** Archived At */
+            archived_at?: string | null;
         };
         /** OrganizationUpdate */
         OrganizationUpdate: {
@@ -2195,6 +2623,8 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** Archived At */
+            archived_at?: string | null;
         };
         /** ProjectUpdate */
         ProjectUpdate: {
@@ -2424,6 +2854,8 @@ export interface components {
              * Format: date-time
              */
             updated: string;
+            /** Archived At */
+            archived_at?: string | null;
             next_occurrence?: components["schemas"]["TaskRead"] | null;
         };
         /** TaskCreate */
@@ -2526,6 +2958,8 @@ export interface components {
              * Format: date-time
              */
             updated: string;
+            /** Archived At */
+            archived_at?: string | null;
         };
         /** TaskUpdate */
         TaskUpdate: {
@@ -2805,6 +3239,8 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** Archived At */
+            archived_at?: string | null;
         };
         /** WatchUpdate */
         WatchUpdate: {
@@ -2850,6 +3286,7 @@ export interface operations {
                 source?: ("referral" | "inbound" | "outbound" | "event" | "job_board" | "tender_portal" | "other") | null;
                 country?: string | null;
                 works_with_freelancers?: ("yes" | "no" | "unknown") | null;
+                archived?: boolean;
             };
             header?: never;
             path?: never;
@@ -3005,6 +3442,68 @@ export interface operations {
             };
         };
     };
+    archive_contact_contacts__contact_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_contact_contacts__contact_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_captures_captures__get: {
         parameters: {
             query?: {
@@ -3012,6 +3511,7 @@ export interface operations {
                 limit?: number;
                 status?: ("new" | "converted" | "dismissed") | "all";
                 search?: string | null;
+                archived?: boolean;
             };
             header?: never;
             path?: never;
@@ -3253,12 +3753,75 @@ export interface operations {
             };
         };
     };
+    archive_capture_captures__capture_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                capture_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaptureRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_capture_captures__capture_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                capture_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaptureRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_organizations_organizations__get: {
         parameters: {
             query?: {
                 skip?: number;
                 limit?: number;
                 search?: string | null;
+                archived?: boolean;
             };
             header?: never;
             path?: never;
@@ -3414,6 +3977,68 @@ export interface operations {
             };
         };
     };
+    archive_organization_organizations__organization_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_organization_organizations__organization_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_deals_deals__get: {
         parameters: {
             query?: {
@@ -3427,6 +4052,7 @@ export interface operations {
                 stalled?: boolean;
                 overdue?: boolean;
                 sort?: ("expected_close_date" | "stage_changed_at") | null;
+                archived?: boolean;
             };
             header?: never;
             path?: never;
@@ -3617,6 +4243,68 @@ export interface operations {
             };
         };
     };
+    archive_deal_deals__deal_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DealRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_deal_deals__deal_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DealRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_tasks_tasks__get: {
         parameters: {
             query?: {
@@ -3627,6 +4315,7 @@ export interface operations {
                 contact_id?: string | null;
                 deal_id?: string | null;
                 interaction_id?: string | null;
+                archived?: boolean;
             };
             header?: never;
             path?: never;
@@ -3782,6 +4471,68 @@ export interface operations {
             };
         };
     };
+    archive_task_tasks__task_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_task_tasks__task_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_documents_documents__get: {
         parameters: {
             query?: {
@@ -3792,6 +4543,7 @@ export interface operations {
                 organization_id?: string | null;
                 deal_id?: string | null;
                 project_id?: string | null;
+                archived?: boolean;
             };
             header?: never;
             path?: never;
@@ -4044,12 +4796,75 @@ export interface operations {
             };
         };
     };
+    archive_document_documents__document_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_document_documents__document_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_projects_projects__get: {
         parameters: {
             query?: {
                 skip?: number;
                 limit?: number;
                 search?: string | null;
+                archived?: boolean;
             };
             header?: never;
             path?: never;
@@ -4205,6 +5020,68 @@ export interface operations {
             };
         };
     };
+    archive_project_projects__project_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_project_projects__project_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_interactions_interactions__get: {
         parameters: {
             query?: {
@@ -4217,6 +5094,7 @@ export interface operations {
                 project_id?: string | null;
                 kind?: ("call" | "meeting" | "event" | "email" | "note" | "other") | null;
                 upcoming?: boolean | null;
+                archived?: boolean;
             };
             header?: never;
             path?: never;
@@ -4372,6 +5250,68 @@ export interface operations {
             };
         };
     };
+    archive_interaction_interactions__interaction_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                interaction_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InteractionRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_interaction_interactions__interaction_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                interaction_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InteractionRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_watches_watches__get: {
         parameters: {
             query?: {
@@ -4382,6 +5322,7 @@ export interface operations {
                 organization_id?: string | null;
                 due?: boolean | null;
                 active?: boolean | null;
+                archived?: boolean;
             };
             header?: never;
             path?: never;
@@ -4593,6 +5534,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_WatchCheckRead_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_watch_watches__watch_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                watch_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_watch_watches__watch_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                watch_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchRead"];
                 };
             };
             /** @description Validation Error */

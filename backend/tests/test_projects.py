@@ -2,7 +2,7 @@
 
 from httpx2 import AsyncClient
 
-from tests.conftest import Account, create_resource
+from tests.conftest import Account, create_resource, erase
 
 
 async def test_a_project_survives_a_full_round_trip(client: AsyncClient, alice: Account) -> None:
@@ -35,9 +35,7 @@ async def test_a_project_survives_a_full_round_trip(client: AsyncClient, alice: 
     # Unlinking a task must not delete it.
     assert (await client.get(f"/tasks/{task['id']}", headers=alice.headers)).status_code == 200
 
-    assert (
-        await client.delete(f"/projects/{created['id']}", headers=alice.headers)
-    ).status_code == 204
+    assert (await erase(client, alice, f"/projects/{created['id']}")).status_code == 204
     assert (
         await client.get(f"/contacts/{contact['id']}", headers=alice.headers)
     ).status_code == 200
