@@ -462,7 +462,12 @@ async def trend_metrics(
     week_of = cast(func.date_trunc("week", func.timezone(tz.key, Deal.created_at)), Date)
     rows = await session.execute(
         select(week_of, func.count())
-        .where(Deal.user_id == user_id, Deal.created_at >= since, Deal.created_at < this_week.end)
+        .where(
+            Deal.user_id == user_id,
+            live(Deal),
+            Deal.created_at >= since,
+            Deal.created_at < this_week.end,
+        )
         .group_by(week_of)
     )
     counts: dict[date, int] = {start: n for start, n in rows}

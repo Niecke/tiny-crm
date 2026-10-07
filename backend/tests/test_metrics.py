@@ -524,6 +524,8 @@ async def test_deals_opened_per_week_cover_ten_local_weeks_with_zeros(
         # The oldest week in the window, and the one before it (left out).
         _deal(alice, "Oldest", since=berlin("2026-06-29T09:00")),
         _deal(alice, "Too old", since=berlin("2026-06-28T09:00")),
+        # Archived: put away, so not counted in any week.
+        _deal(alice, "Archived", since=berlin("2026-09-01T09:00"), archived_at=NOW),
     )
 
     # The period does not matter: the series is always the last ten weeks.
