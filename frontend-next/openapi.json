@@ -2091,6 +2091,9 @@
                 }
               ],
               "title": "Due Before"
+            }
+          },
+          {
             "name": "archived",
             "in": "query",
             "required": false,
