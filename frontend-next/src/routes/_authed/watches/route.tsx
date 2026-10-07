@@ -10,6 +10,8 @@ const searchSchema = z.object({
     .enum(kindOptions.map((o) => o.value) as ['job_board', 'careers_page', 'tender_portal', 'other'])
     .optional()
     .catch(undefined),
+  // The archive instead of the list (#140).
+  archived: z.boolean().optional().catch(undefined),
   page: z.number().int().min(2).optional().catch(undefined),
 })
 

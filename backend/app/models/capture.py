@@ -4,6 +4,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import DateTime, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.archive import Archivable
 from app.db import Base
 from app.models.contact import Contact
 from app.models.deal import Deal
@@ -20,7 +21,7 @@ CAPTURE_STATUSES = ("new", "converted", "dismissed")
 OPEN_STATUSES = ("new",)
 
 
-class Capture(Base):
+class Capture(Archivable, Base):
     """A name or a link, parked in seconds, to be dealt with later.
 
     The hole this fills: `Contact` needs a name and rewards a dozen more

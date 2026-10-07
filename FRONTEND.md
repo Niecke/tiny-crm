@@ -353,6 +353,13 @@ auth is the part only a phone can prove.
   left, linked records in tabs on the right, the tab in `?tab=`.
 - **Lists** show how many rows they are not showing rather than stopping
   silently at the page limit.
+- **Archive, then delete** (#140). A record page offers Archive, with no
+  confirmation — it is undone by Restore. Once archived, the page shows
+  `ArchivedNotice` in place of its edit controls, and that notice is the only
+  place Delete permanently appears, behind a confirmation. The three mutations
+  come from `useArchive`, which refetches everything on screen: an archived
+  record leaves the search, the briefing and the tabs of whatever it is linked
+  to, not only its own list. Each list has an Archived switch in `?archived=`.
 - **Not built yet** is visible, not hidden: actions that are not implemented
   are disabled buttons with a note saying so. (The nav showed unported screens
   disabled until the last of them landed; every entry is live now.)

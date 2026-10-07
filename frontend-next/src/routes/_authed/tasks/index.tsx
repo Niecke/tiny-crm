@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
+import { ArchivedToggle } from '../../../components/Archive'
 import { TaskList } from '../../../components/TaskList'
 import { Checkbox } from '../../../components/ui/Checkbox'
 import { Pagination } from '../../../components/ui/Pagination'
@@ -17,7 +18,7 @@ export const Route = createFileRoute('/_authed/tasks/')({
 function TasksList() {
   const { api } = Route.useRouteContext()
   const filters = Route.useSearch()
-  const { q = '', done = false, page = 1 } = filters
+  const { q = '', done = false, archived = false, page = 1 } = filters
   const navigate = Route.useNavigate()
 
   const [input, setInput] = useState(q)
@@ -28,7 +29,7 @@ function TasksList() {
       void navigate({ search: (prev) => ({ ...prev, q: search || undefined, page: undefined }), replace: true })
   }, [search, q, navigate])
 
-  const { data, error, isPending, isPlaceholderData } = useQuery(tasksQuery(api, { q: search, done, page }))
+  const { data, error, isPending, isPlaceholderData } = useQuery(tasksQuery(api, { q: search, done, archived, page }))
   const { toggle, pendingId, error: toggleError, repeated } = useToggleDone(api)
   const [now] = useState(() => Date.now())
 
@@ -54,6 +55,12 @@ function TasksList() {
         >
           Show done
         </Checkbox>
+        <ArchivedToggle
+          isSelected={archived}
+          onChange={(v) =>
+            void navigate({ search: (prev) => ({ ...prev, archived: v || undefined, page: undefined }), replace: true })
+          }
+        />
       </div>
 
       {repeated && (
@@ -72,7 +79,15 @@ function TasksList() {
       ) : error ? (
         <p className="form-error">{error.message}</p>
       ) : data.items.length === 0 && page === 1 ? (
-        <p className="muted">{search ? `No task matches “${search}”.` : done ? 'No tasks yet.' : 'Nothing outstanding.'}</p>
+        <p className="muted">
+          {search
+            ? `No task matches “${search}”.`
+            : archived
+              ? 'Nothing archived.'
+              : done
+                ? 'No tasks yet.'
+                : 'Nothing outstanding.'}
+        </p>
       ) : (
         <>
           <div className="panel panel-body" data-stale={isPlaceholderData || undefined}>

@@ -6,6 +6,7 @@ from sqlalchemy import Boolean, Date, ForeignKey, Numeric, String, func
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.archive import Archivable
 from app.db import Base
 from app.models.organization import Organization
 
@@ -16,7 +17,7 @@ from app.models.organization import Organization
 # shaping, and one definition of each set beats two that can drift.
 
 
-class Contact(Base):
+class Contact(Archivable, Base):
     __tablename__ = "contacts"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)

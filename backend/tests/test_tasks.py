@@ -2,7 +2,7 @@
 
 from httpx2 import AsyncClient
 
-from tests.conftest import Account, create_resource
+from tests.conftest import Account, create_resource, erase
 
 
 async def test_a_task_survives_a_full_round_trip(client: AsyncClient, alice: Account) -> None:
@@ -29,9 +29,7 @@ async def test_a_task_survives_a_full_round_trip(client: AsyncClient, alice: Acc
     assert patched.status_code == 200
     assert patched.json()["done"] is True
 
-    assert (
-        await client.delete(f"/tasks/{created['id']}", headers=alice.headers)
-    ).status_code == 204
+    assert (await erase(client, alice, f"/tasks/{created['id']}")).status_code == 204
     assert (await client.get(f"/tasks/{created['id']}", headers=alice.headers)).status_code == 404
 
 

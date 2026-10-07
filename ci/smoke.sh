@@ -113,6 +113,13 @@ token=$(curl -fsS -X POST "$API/auth/jwt/login" \
 [ -n "$token" ] || fail "login did not return a token"
 auth=(-H "Authorization: Bearer $token")
 
+# A delete is only allowed on what was archived first (#140), so every delete
+# below is the pair. `erase contacts/<id>`.
+erase() {
+  curl -fsS -o /dev/null -X POST "$API/$1/archive" "${auth[@]}"
+  curl -fsS -X DELETE "$API/$1" "${auth[@]}"
+}
+
 step "unauthenticated requests are rejected"
 [ "$(curl -s -o /dev/null -w '%{http_code}' "$API/contacts/")" = "401" ] \
   || fail "GET /contacts/ without a token should be 401"
@@ -226,9 +233,22 @@ task=$(curl -fsS "$API/tasks/$task_id" "${auth[@]}")
 owed=$(curl -fsS "$API/tasks/?contact_id=$contact_id" "${auth[@]}" | json "['total']")
 [ "$owed" = "1" ] || fail "expected 1 task for the contact, got $owed"
 
+step "archiving the contact keeps it on the task, and hides it from the list"
+code=$(curl -s -o /dev/null -w '%{http_code}' -X DELETE "$API/contacts/$contact_id" "${auth[@]}")
+[ "$code" = "409" ] || fail "deleting a contact that was never archived should be 409, got $code"
+curl -fsS -o /dev/null -X POST "$API/contacts/$contact_id/archive" "${auth[@]}"
+listed=$(curl -fsS "$API/contacts/?search=CI%20Smoke" "${auth[@]}" | json "['total']")
+[ "$listed" = "0" ] || fail "the archived contact should have left the list, got $listed"
+kept=$(curl -fsS "$API/tasks/$task_id" "${auth[@]}")
+[ "$(echo "$kept" | json "['contact_id']")" = "$contact_id" ] \
+  || fail "the task should still name the archived contact"
+curl -fsS -o /dev/null -X POST "$API/contacts/$contact_id/restore" "${auth[@]}"
+listed=$(curl -fsS "$API/contacts/?search=CI%20Smoke" "${auth[@]}" | json "['total']")
+[ "$listed" = "1" ] || fail "the restored contact should be back in the list, got $listed"
+
 step "deleting the contact keeps the task, unattached"
 # SET NULL: work the operator committed to must not vanish with the record.
-curl -fsS -X DELETE "$API/contacts/$contact_id" "${auth[@]}"
+erase "contacts/$contact_id"
 orphan=$(curl -fsS "$API/tasks/$task_id" "${auth[@]}")
 [ "$(echo "$orphan" | json "['contact_id']")" = "None" ] \
   || fail "the task should have been detached from the deleted contact"
@@ -269,7 +289,7 @@ code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$API/interactions/" "${au
 [ "$code" = "404" ] || fail "an unknown deal link should be 404, got $code"
 
 step "deleting the deal drops the links, not the document"
-curl -fsS -X DELETE "$API/deals/$deal_id" "${auth[@]}"
+erase "deals/$deal_id"
 after=$(curl -fsS "$API/documents/$document_id" "${auth[@]}")
 [ "$(echo "$after" | json "['deal_ids']")" = "[]" ] \
   || fail "the document should have been detached from the deleted deal"
@@ -298,7 +318,7 @@ still_due=$(curl -fsS "$API/watches/?due=true" "${auth[@]}" | json "['total']")
 [ "$still_due" = "0" ] || fail "expected the swept source to leave the due list, got $still_due"
 
 step "deleting the deal keeps the record of finding it"
-curl -fsS -X DELETE "$API/deals/$found_deal_id" "${auth[@]}"
+erase "deals/$found_deal_id"
 history=$(curl -fsS "$API/watches/$watch_id/checks" "${auth[@]}")
 [ "$(echo "$history" | json "['total']")" = "1" ] || fail "the sweep log should have survived"
 [ "$(echo "$history" | json "['items'][0]['created_deal_id']")" = "None" ] \
@@ -355,17 +375,17 @@ echo "$briefing" | grep -q 'Call CI Smoke back' \
 echo "$briefing" | grep -q "$EMAIL" || fail "the briefing does not name its recipient"
 
 step "cleanup"
-curl -fsS -X DELETE "$API/captures/$capture_id" "${auth[@]}"
-curl -fsS -X DELETE "$API/deals/$capture_deal_id" "${auth[@]}"
-curl -fsS -X DELETE "$API/contacts/$capture_contact_id" "${auth[@]}"
-curl -fsS -X DELETE "$API/documents/$document_id" "${auth[@]}"
-curl -fsS -X DELETE "$API/interactions/$interaction_id" "${auth[@]}"
+erase "captures/$capture_id"
+erase "deals/$capture_deal_id"
+erase "contacts/$capture_contact_id"
+erase "documents/$document_id"
+erase "interactions/$interaction_id"
 # Takes its sweep log with it (CASCADE).
-curl -fsS -X DELETE "$API/watches/$watch_id" "${auth[@]}"
-curl -fsS -X DELETE "$API/tasks/$task_id" "${auth[@]}"
+erase "watches/$watch_id"
+erase "tasks/$task_id"
 # The linked deal is already gone — deleted to prove the document survives it.
-curl -fsS -X DELETE "$API/deals/$open_ended_id" "${auth[@]}"
+erase "deals/$open_ended_id"
 # The contact is already gone — it was deleted to prove the task survives it.
-curl -fsS -X DELETE "$API/organizations/$org_id" "${auth[@]}"
+erase "organizations/$org_id"
 
 printf '\nAll integration checks passed for %s (commit %s)\n' "$IMAGE_TAG" "$backend_version"

@@ -3,19 +3,22 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useLeave } from '../../../useLeave'
 import { useState } from 'react'
 import { ApiError } from '../../../api/client'
+import { ArchiveButton, ArchivedNotice, ReadOnlyWhenArchived } from '../../../components/Archive'
+import { useArchive } from '../../../useArchive'
 import { DocumentForm, type DocumentFields, FilePicker } from '../../../components/DocumentForm'
 import { DocumentThumb } from '../../../components/DocumentThumb'
 import { DocumentViewer } from '../../../components/DocumentViewer'
 import { Button } from '../../../components/ui/Button'
-import { ConfirmDialog } from '../../../components/ui/ConfirmDialog'
 import { Modal } from '../../../components/ui/Modal'
 import {
+  archiveDocument,
   contentQuery,
   deleteDocument,
   documentQuery,
   filenameFor,
   invalidateDocuments,
   replaceContent,
+  restoreDocument,
   saveBlob,
   updateDocument,
 } from '../../../documents'
@@ -36,7 +39,6 @@ function DocumentPage() {
   const [replacing, setReplacing] = useState(false)
   const [newFile, setNewFile] = useState<File | null>(null)
   const [fileError, setFileError] = useState<string | null>(null)
-  const [confirmDelete, setConfirmDelete] = useState(false)
   const leave = useLeave({ to: '/documents', search: filters })
 
   const save = useMutation({
@@ -58,15 +60,16 @@ function DocumentPage() {
     },
   })
 
-  const remove = useMutation({
-    mutationFn: () => deleteDocument(api, documentId),
-    onSuccess: async () => {
-      await leave()
-      queryClient.removeQueries({ queryKey: documentQuery(api, documentId).queryKey })
-      queryClient.removeQueries({ queryKey: ['documents', 'content', documentId] })
-      queryClient.removeQueries({ queryKey: ['documents', 'preview', documentId] })
-      await invalidateDocuments(queryClient)
-    },
+  const archiving = useArchive({
+    queryKey: documentQuery(api, documentId).queryKey,
+    archive: () => archiveDocument(api, documentId),
+    restore: () => restoreDocument(api, documentId),
+    remove: () => deleteDocument(api, documentId),
+    leave,
+    alsoRemove: [
+      ['documents', 'content', documentId],
+      ['documents', 'preview', documentId],
+    ],
   })
 
   const download = useMutation({
@@ -97,6 +100,9 @@ function DocumentPage() {
         </p>
       ) : (
         <>
+          <ArchivedNotice record={d} noun="document" name={d.title} archiving={archiving}>
+            The file goes with it, from every record it is filed under.
+          </ArchivedNotice>
           <section className="panel doc-file">
             <button type="button" className="doc-open" onClick={() => setViewing(true)} aria-label={`View ${d.title}`}>
               <DocumentThumb doc={d} />
@@ -111,32 +117,33 @@ function DocumentPage() {
                 <Button variant="quiet" onPress={() => download.mutate()} isDisabled={download.isPending}>
                   {download.isPending ? 'Downloading…' : 'Download'}
                 </Button>
-                <Button variant="quiet" onPress={() => setReplacing(true)}>
-                  Replace file
-                </Button>
+                {/* Still viewed and downloaded once archived; not replaced. */}
+                {!d.archived_at && (
+                  <Button variant="quiet" onPress={() => setReplacing(true)}>
+                    Replace file
+                  </Button>
+                )}
               </span>
               {download.error && <p className="form-error">{download.error.message}</p>}
             </div>
           </section>
 
-          <DocumentForm
-            key={d.updated_at}
-            initial={d}
-            onSubmit={(fields) => save.mutate(fields)}
-            submitLabel="Save changes"
-            pending={save.isPending}
-            error={save.error}
-            cancel={
-              <Button variant="quiet" onPress={() => void leave()}>
-                Cancel
-              </Button>
-            }
-            extraActions={
-              <Button variant="quiet" onPress={() => setConfirmDelete(true)}>
-                Delete
-              </Button>
-            }
-          />
+          <ReadOnlyWhenArchived record={d}>
+            <DocumentForm
+              key={d.updated_at}
+              initial={d}
+              onSubmit={(fields) => save.mutate(fields)}
+              submitLabel="Save changes"
+              pending={save.isPending}
+              error={save.error}
+              cancel={
+                <Button variant="quiet" onPress={() => void leave()}>
+                  Cancel
+                </Button>
+              }
+              extraActions={!d.archived_at && <ArchiveButton archiving={archiving} />}
+            />
+          </ReadOnlyWhenArchived>
         </>
       )}
 
@@ -169,21 +176,6 @@ function DocumentPage() {
           </Button>
         </div>
       </Modal>
-
-      <ConfirmDialog
-        title="Delete this document?"
-        isOpen={confirmDelete}
-        onOpenChange={setConfirmDelete}
-        onConfirm={() => remove.mutate()}
-        confirmLabel="Delete"
-        pendingLabel="Deleting…"
-        pending={remove.isPending}
-        error={remove.error}
-      >
-        <p>
-          <strong>{d?.title}</strong> will be permanently deleted, from every record it is filed under.
-        </p>
-      </ConfirmDialog>
     </div>
   )
 }

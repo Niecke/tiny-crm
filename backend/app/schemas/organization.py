@@ -34,5 +34,8 @@ class OrganizationRead(OrganizationCreate):
     contact_count: int
     created_at: datetime
     updated_at: datetime
+    # Set once the record has been archived: out of every list, read-only, and
+    # still reachable by its id. NULL for everything in use.
+    archived_at: datetime | None = None
 
     model_config = {"from_attributes": True}

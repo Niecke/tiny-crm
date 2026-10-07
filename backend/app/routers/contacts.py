@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.archive import archived_is, require_archived, require_live, set_archived
 from app.auth import current_active_user
 from app.auth.users import User
 from app.db import contains, count_rows, get_session
@@ -23,6 +24,13 @@ from app.schemas.contact import (
 from app.schemas.page import Page
 
 router = APIRouter(prefix="/contacts", tags=["contacts"])
+
+
+async def _get_owned(session: AsyncSession, contact_id: UUID, user: User) -> Contact:
+    contact = await session.get(Contact, contact_id)
+    if contact is None or contact.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Contact not found")
+    return contact
 
 
 async def _check_organization(
@@ -96,10 +104,12 @@ async def list_contacts(
     # Tri-state, because a bool could not ask for the never-asked ones — and
     # those are the list that produces the next approach.
     works_with_freelancers: FreelancerAnswer | None = Query(default=None),
+    # The archive instead of the list, never the two mixed: see app/archive.py.
+    archived: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> Page[ContactRead]:
-    q = select(Contact).where(Contact.user_id == user.id)
+    q = select(Contact).where(Contact.user_id == user.id, archived_is(Contact, archived))
     if search:
         q = q.where(contains(Contact.name, search))
     # "Everyone at ACME" — the question free-text company could never answer.
@@ -141,10 +151,10 @@ async def get_contact(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> Contact:
-    contact = await session.get(Contact, contact_id)
-    if contact is None or contact.user_id != user.id:
-        raise HTTPException(status_code=404, detail="Contact not found")
-    return contact
+    # Archived or not: the interactions and deals that name an archived contact
+    # still link here, and a link that answered 404 would be the anonymised
+    # history archiving exists to prevent.
+    return await _get_owned(session, contact_id, user)
 
 
 @router.post("/", response_model=ContactRead, status_code=201)
@@ -169,9 +179,8 @@ async def update_contact(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> Contact:
-    contact = await session.get(Contact, contact_id)
-    if contact is None or contact.user_id != user.id:
-        raise HTTPException(status_code=404, detail="Contact not found")
+    contact = await _get_owned(session, contact_id, user)
+    require_live(contact, "Contact")
     updates = body.model_dump(exclude_unset=True)
     if "organization_id" in updates:
         await _check_organization(session, updates["organization_id"], user)
@@ -185,14 +194,47 @@ async def update_contact(
     return contact
 
 
+@router.post("/{contact_id}/archive", response_model=ContactRead)
+async def archive_contact(
+    contact_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_active_user),
+) -> Contact:
+    """Put the contact away, keeping everything that points at them.
+
+    The interactions, deals and tasks that name this contact go on naming them.
+    That is the difference from DELETE, which leaves each of those pointing at
+    nobody.
+    """
+    contact = await _get_owned(session, contact_id, user)
+    await set_archived(session, contact, True)
+    return contact
+
+
+@router.post("/{contact_id}/restore", response_model=ContactRead)
+async def restore_contact(
+    contact_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_active_user),
+) -> Contact:
+    """Bring an archived contact back, exactly as it was put away."""
+    contact = await _get_owned(session, contact_id, user)
+    await set_archived(session, contact, False)
+    return contact
+
+
 @router.delete("/{contact_id}", status_code=204)
 async def delete_contact(
     contact_id: UUID,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> None:
-    contact = await session.get(Contact, contact_id)
-    if contact is None or contact.user_id != user.id:
-        raise HTTPException(status_code=404, detail="Contact not found")
+    """Erase the contact for good. Only once it has been archived.
+
+    This is the erasure, not the tidy-up (#143): the row goes, and every task,
+    deal and interaction that named this person stops naming anyone.
+    """
+    contact = await _get_owned(session, contact_id, user)
+    require_archived(contact, "Contact")
     await session.delete(contact)
     await session.commit()

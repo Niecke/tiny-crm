@@ -103,7 +103,7 @@ export function TaskForm({
   pending: boolean
   error: Error | null
   cancel: ReactNode
-  // Left of Cancel: Delete, on an existing task.
+  // Left of Cancel: Archive, on an existing task.
   extraActions?: ReactNode
 }) {
   const { control, handleSubmit, setValue } = useForm<FormInput, unknown, FormOutput>({

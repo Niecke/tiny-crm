@@ -29,10 +29,14 @@ function useRecordName(kind: LinkKind, id: string): string | undefined {
   const organization = useQuery({ ...organizationQuery(api, id), enabled: kind === 'organization', staleTime: 300_000 })
   const deal = useQuery({ ...dealQuery(api, id), enabled: kind === 'deal', staleTime: 300_000 })
   const project = useQuery({ ...projectQuery(api, id), enabled: kind === 'project', staleTime: 300_000 })
-  if (kind === 'contact') return contact.data?.name ?? (contact.isError ? '(deleted)' : undefined)
-  if (kind === 'organization') return organization.data?.name ?? (organization.isError ? '(deleted)' : undefined)
-  if (kind === 'deal') return deal.data?.title ?? (deal.isError ? '(deleted)' : undefined)
-  return project.data?.name ?? (project.isError ? '(deleted)' : undefined)
+  // An archived record keeps its links (#140), so the name still resolves —
+  // marked, because the record itself is no longer in any list.
+  const named = (data: { archived_at?: string | null } | undefined, name: string | undefined, isError: boolean) =>
+    name === undefined ? (isError ? '(deleted)' : undefined) : data?.archived_at ? `${name} (archived)` : name
+  if (kind === 'contact') return named(contact.data, contact.data?.name, contact.isError)
+  if (kind === 'organization') return named(organization.data, organization.data?.name, organization.isError)
+  if (kind === 'deal') return named(deal.data, deal.data?.title, deal.isError)
+  return named(project.data, project.data?.name, project.isError)
 }
 
 // A linked record's name, for a row that only has its id.

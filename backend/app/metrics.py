@@ -16,6 +16,10 @@ The rules from DASHBOARD.md that shape every function:
 Plus `user_id` on every query. There is one operator, so a missing filter
 would never be noticed in use; tests/test_metrics.py proves it with a second
 user's rows.
+
+And nothing archived is counted, in any number (#140). Every figure links to
+the list behind it, and no list shows an archived row; a won deal that was
+archived leaves the conversion rate until it is restored.
 """
 
 from __future__ import annotations
@@ -42,6 +46,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.archive import live
 from app.briefing import DayWindow, briefing_queries
 from app.db import count_rows
 from app.models import Capture, Deal, DealStageEvent, Interaction, Task
@@ -180,7 +185,7 @@ async def pipeline_metrics(session: AsyncSession, user_id: UUID) -> PipelineMetr
                 func.sum(Deal.expected_value),
                 func.count().filter(Deal.expected_value.is_(None)),
             )
-            .where(Deal.user_id == user_id)
+            .where(Deal.user_id == user_id, live(Deal))
             .group_by(*group, Deal.currency)
         )
 
@@ -209,7 +214,7 @@ async def pipeline_metrics(session: AsyncSession, user_id: UUID) -> PipelineMetr
 
 async def velocity_metrics(session: AsyncSession, user_id: UUID, period: Period) -> VelocityMetrics:
     day = period.day
-    open_deals = Deal.user_id == user_id, Deal.stage.in_(OPEN_STAGES)
+    open_deals = Deal.user_id == user_id, Deal.stage.in_(OPEN_STAGES), live(Deal)
 
     in_stage = _days_since(Deal.stage_changed_at, day)
     medians = await session.execute(
@@ -248,7 +253,7 @@ async def velocity_metrics(session: AsyncSession, user_id: UUID, period: Period)
     entered = await session.execute(
         select(DealStageEvent.to_stage, func.count(distinct(DealStageEvent.deal_id)))
         .join(Deal, Deal.id == DealStageEvent.deal_id)
-        .where(Deal.user_id == user_id, period.contains(DealStageEvent.changed_at))
+        .where(Deal.user_id == user_id, live(Deal), period.contains(DealStageEvent.changed_at))
         .group_by(DealStageEvent.to_stage)
     )
     entered_rows = [StageEntered(stage=stage, count=n) for stage, n in entered]
@@ -282,7 +287,7 @@ async def _conversion(session: AsyncSession, user_id: UUID) -> list[StageConvers
             func.min(DealStageEvent.changed_at).label("at"),
         )
         .join(Deal, Deal.id == DealStageEvent.deal_id)
-        .where(Deal.user_id == user_id)
+        .where(Deal.user_id == user_id, live(Deal))
         .group_by(DealStageEvent.deal_id, DealStageEvent.to_stage)
         .subquery()
     )
@@ -329,7 +334,7 @@ async def _sales_cycle(session: AsyncSession, user_id: UUID, period: Period) -> 
     per_deal = (
         select(Deal.created_at.label("opened"), won_at.label("won"))
         .join(DealStageEvent, DealStageEvent.deal_id == Deal.id)
-        .where(Deal.user_id == user_id)
+        .where(Deal.user_id == user_id, live(Deal))
         .group_by(Deal.id, Deal.created_at)
         .subquery()
     )
@@ -358,7 +363,7 @@ async def attention_metrics(
     day = period.day
     briefing = briefing_queries(user_id, day)
 
-    overdue_deals = select(Deal).where(Deal.user_id == user_id, overdue_on(day.today))
+    overdue_deals = select(Deal).where(Deal.user_id == user_id, overdue_on(day.today), live(Deal))
     oldest_capture = await session.scalar(
         briefing.captures_waiting.with_only_columns(func.min(Capture.created_at)).order_by(None)
     )
@@ -400,21 +405,26 @@ async def activity_metrics(session: AsyncSession, user_id: UUID, period: Period)
             Interaction.user_id == user_id,
             Interaction.done.is_(True),
             period.contains(Interaction.occurred_at),
+            live(Interaction),
         )
         .group_by(Interaction.kind)
     )
     kinds: dict[str, int] = {kind: n for kind, n in kind_rows}
     deals_opened = await session.scalar(
-        select(func.count()).where(Deal.user_id == user_id, period.contains(Deal.created_at))
+        select(func.count()).where(
+            Deal.user_id == user_id, period.contains(Deal.created_at), live(Deal)
+        )
     )
     triaged_rows = await session.execute(
         select(Capture.status, func.count())
-        .where(Capture.user_id == user_id, period.contains(Capture.triaged_at))
+        .where(Capture.user_id == user_id, period.contains(Capture.triaged_at), live(Capture))
         .group_by(Capture.status)
     )
     triaged: dict[str, int] = {status: n for status, n in triaged_rows}
     tasks_created = await session.scalar(
-        select(func.count()).where(Task.user_id == user_id, period.contains(Task.created))
+        select(func.count()).where(
+            Task.user_id == user_id, period.contains(Task.created), live(Task)
+        )
     )
     return ActivityMetrics(
         # Every kind, zeros included, so the shape does not change with the data.

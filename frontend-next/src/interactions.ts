@@ -23,18 +23,25 @@ export const isPlanned = (i: Pick<InteractionRead, 'occurred_at'>, now: number) 
 export const isOverdueInteraction = (i: Pick<InteractionRead, 'occurred_at' | 'done'>, now: number) =>
   !i.done && Date.parse(i.occurred_at) <= now
 
-export type InteractionFilters = { q?: string; kind?: Kind; page?: number }
+export type InteractionFilters = { q?: string; kind?: Kind; archived?: boolean; page?: number }
 
 // The two halves of the activity screen. Planned is soonest first, the log
 // newest first — the API orders each that way when `upcoming` is set.
-export const interactionsQuery = (api: Api, upcoming: boolean, { q, kind, page = 1 }: InteractionFilters) =>
+export const interactionsQuery = (api: Api, upcoming: boolean, { q, kind, archived, page = 1 }: InteractionFilters) =>
   queryOptions({
-    queryKey: ['interactions', 'list', upcoming, { q, kind, page }],
+    queryKey: ['interactions', 'list', upcoming, { q, kind, archived, page }],
     queryFn: () =>
       unwrap(
         api.GET('/interactions/', {
           params: {
-            query: { search: q || undefined, kind, upcoming, skip: (page - 1) * PAGE_SIZE, limit: PAGE_SIZE },
+            query: {
+              search: q || undefined,
+              kind,
+              upcoming,
+              archived: archived || undefined,
+              skip: (page - 1) * PAGE_SIZE,
+              limit: PAGE_SIZE,
+            },
           },
         }),
       ),
@@ -69,6 +76,12 @@ export const updateInteraction = (api: Api, id: string, body: InteractionCreate)
 
 export const deleteInteraction = (api: Api, id: string) =>
   unwrap(api.DELETE('/interactions/{interaction_id}', { params: { path: { interaction_id: id } } }))
+
+export const archiveInteraction = (api: Api, id: string) =>
+  unwrap(api.POST('/interactions/{interaction_id}/archive', { params: { path: { interaction_id: id } } }))
+
+export const restoreInteraction = (api: Api, id: string) =>
+  unwrap(api.POST('/interactions/{interaction_id}/restore', { params: { path: { interaction_id: id } } }))
 
 // Every list and every record tab lives under ['interactions'], so one
 // invalidation reaches them all — the Flutter app refreshed only the main

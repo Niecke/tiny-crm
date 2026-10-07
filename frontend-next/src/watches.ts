@@ -49,12 +49,12 @@ export function cadenceLabel(w: Pick<WatchRead, 'recurrence_rule' | 'recurrence_
   return w.recurrence_interval === 1 ? `Every ${rule.unit}` : `Every ${w.recurrence_interval} ${rule.units}`
 }
 
-export type WatchFilters = { q?: string; scope?: WatchScope; kind?: Kind; page?: number }
+export type WatchFilters = { q?: string; scope?: WatchScope; kind?: Kind; archived?: boolean; page?: number }
 
 // Active first, then soonest due — the API's order.
-export const watchesQuery = (api: Api, { q, scope = 'due', kind, page = 1 }: WatchFilters) =>
+export const watchesQuery = (api: Api, { q, scope = 'due', kind, archived, page = 1 }: WatchFilters) =>
   queryOptions({
-    queryKey: ['watches', 'list', { q, scope, kind, page }],
+    queryKey: ['watches', 'list', { q, scope, kind, archived, page }],
     queryFn: () =>
       unwrap(
         api.GET('/watches/', {
@@ -62,7 +62,8 @@ export const watchesQuery = (api: Api, { q, scope = 'due', kind, page = 1 }: Wat
             query: {
               search: q || undefined,
               kind,
-              ...scopeQuery(scope),
+              // The archive is read whole: due and paused are questions about the sweep.
+              ...(archived ? { archived: true } : scopeQuery(scope)),
               skip: (page - 1) * PAGE_SIZE,
               limit: PAGE_SIZE,
             },
@@ -107,6 +108,12 @@ export const updateWatch = (api: Api, id: string, body: WatchUpdate) =>
 
 export const deleteWatch = (api: Api, id: string) =>
   unwrap(api.DELETE('/watches/{watch_id}', { params: { path: { watch_id: id } } }))
+
+export const archiveWatch = (api: Api, id: string) =>
+  unwrap(api.POST('/watches/{watch_id}/archive', { params: { path: { watch_id: id } } }))
+
+export const restoreWatch = (api: Api, id: string) =>
+  unwrap(api.POST('/watches/{watch_id}/restore', { params: { path: { watch_id: id } } }))
 
 // One sweep. The server moves the next due date on from it, and a find can
 // become a deal or a task in the same request.

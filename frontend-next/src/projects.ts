@@ -24,13 +24,23 @@ export function statusOf(p: Pick<ProjectRead, 'start_date' | 'end_date'>, on = t
   return 'active'
 }
 
-export const projectsQuery = (api: Api, { q, page = 1 }: { q?: string; page?: number }) =>
+export const projectsQuery = (
+  api: Api,
+  { q, archived, page = 1 }: { q?: string; archived?: boolean; page?: number },
+) =>
   queryOptions({
-    queryKey: ['projects', 'list', { q, page }],
+    queryKey: ['projects', 'list', { q, archived, page }],
     queryFn: () =>
       unwrap(
         api.GET('/projects/', {
-          params: { query: { search: q || undefined, skip: (page - 1) * PAGE_SIZE, limit: PAGE_SIZE } },
+          params: {
+            query: {
+              search: q || undefined,
+              archived: archived || undefined,
+              skip: (page - 1) * PAGE_SIZE,
+              limit: PAGE_SIZE,
+            },
+          },
         }),
       ),
     placeholderData: keepPreviousData,
@@ -59,6 +69,12 @@ export const updateProject = (api: Api, id: string, body: ProjectUpdate) =>
 
 export const deleteProject = (api: Api, id: string) =>
   unwrap(api.DELETE('/projects/{project_id}', { params: { path: { project_id: id } } }))
+
+export const archiveProject = (api: Api, id: string) =>
+  unwrap(api.POST('/projects/{project_id}/archive', { params: { path: { project_id: id } } }))
+
+export const restoreProject = (api: Api, id: string) =>
+  unwrap(api.POST('/projects/{project_id}/restore', { params: { path: { project_id: id } } }))
 
 // Documents list their projects too (project_ids), from the same link table.
 export const invalidateProjects = (queryClient: QueryClient) =>

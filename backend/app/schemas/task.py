@@ -87,6 +87,9 @@ class TaskRead(TaskCreate):
     interaction_subject: str | None = None
     created: datetime
     updated: datetime
+    # Set once the record has been archived: out of every list, read-only, and
+    # still reachable by its id. NULL for everything in use.
+    archived_at: datetime | None = None
 
     model_config = {"from_attributes": True}
 

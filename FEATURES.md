@@ -269,6 +269,9 @@ convert leaves the capture `new`, never half-worked.
 **Dismissing keeps the row.** "I looked at this and said no" is an answer, and an
 inbox that forgets its own rejections offers them again next month. `DELETE` is
 for a typo, which is not a decision — it is what Undo in the quick-add box calls.
+A capture still `new` is the one record that can be deleted without archiving it
+first (see Archive instead of delete): nothing has been made of it and nothing
+points at it. Once worked, it is erased like everything else.
 
 **Oldest first**, always: an inbox is a queue to empty, not a feed to scroll, and
 newest-first would bury exactly the captures going stale. `?status=all` widens
@@ -316,6 +319,10 @@ the deal does not erase the record of having found it.
 **Filters.** `?due` · `?active` · `?kind` · `?search` · `?organization_id`.
 Ordering is most-overdue-first, paused sources last.
 
+**Paused is not archived.** `active=false` stops a source being due and keeps it
+on the list, waiting to be switched back on. Archiving takes it off the list as
+well, and an archived source cannot be swept.
+
 ---
 
 ## Search — one box over everything
@@ -339,9 +346,54 @@ two characters: one matches most of every table and no index helps it look.
   uses, so the match stays an index scan as the tables grow.
 - **Why it matched.** A hit whose title does not show the query says where it
   did — `Phone: +43 664 …`, `Notes: …met at the Vienna…`.
+- **Nothing archived.** An archived record is not found, and there is no switch
+  to find it: each list has its own archive, and that is where to look.
 
 In the app, the box sits above every page. Typing lists the top hits per type;
 picking one opens it, and Enter (or "See all results") opens `/search?q=`.
+
+---
+
+## Archive instead of delete
+
+Every record type — contact, organization, deal, task, interaction, project,
+document, watch, capture — is put away rather than removed (#140).
+`POST /{type}/{id}/archive` stamps `archived_at`; `POST /{type}/{id}/restore`
+clears it. Both can be repeated without harm, and archiving twice keeps the
+first date.
+
+**What archived means**, the same for all nine (`app/archive.py`):
+
+- **Out of everything that lists or counts.** Every list, the search, the
+  morning briefing and every dashboard number leave it out. `?archived=true` on
+  a list returns the archive *instead* — never the two mixed, so no row has to
+  say which it is.
+- **Still there by its id.** `GET /{type}/{id}` answers as before, with
+  `archived_at` set. That is the point: an interaction with an archived contact
+  still names them, where a delete left it naming nobody.
+- **Read-only.** Any change — `PATCH`, a deal's stage, a watch's sweep, working
+  a capture, replacing a document's file — is a **409** until it is restored. A
+  document's file stays readable and downloadable.
+- **Nothing cascades.** Archiving a company leaves its people on the contact
+  list, still filed under it; archiving a contact leaves their tasks open.
+  Those are separate decisions.
+
+Two consequences worth knowing: an organization's `contact_count` counts only
+contacts that are not archived, so the number matches the list it links to; and
+an archived task or planned interaction is no longer a deal's next step, so the
+deal can show up as stalled.
+
+**Archiving is not erasing.** `DELETE` still removes the row for good, exactly
+as before — links become `SET NULL` or lose their join row — and it is the
+erase path for #143. It answers **409 unless the record was archived first**:
+two steps, because it is the one that cannot be undone. The exception is a
+capture nobody has worked yet (Captures, above). There is no automatic purge of
+the archive; a retention period is #143's to decide.
+
+In the app, a record page offers **Archive** where Delete used to be. An
+archived record shows a notice with **Restore** and **Delete permanently** in
+place of its edit controls, and each list has an **Archived** switch (a fourth
+tab in the inbox).
 
 ---
 
@@ -362,9 +414,11 @@ between pages. The UI shows "1–25 of 213" and hides the bar when everything
 fits. Pickers deliberately use `listAll()` (walking pages at `limit=200`)
 because a truncated picker is the same silent bug in a smaller box.
 
-**Deletes preserve history.** Every link between records is `SET NULL` or drops
-only the join row. Deleting a company keeps its people; deleting a contact
-keeps the tasks, documents and sweep logs, detached.
+**Deletes preserve history — detached.** Every link between records is
+`SET NULL` or drops only the join row. Deleting a company keeps its people;
+deleting a contact keeps the tasks, documents and sweep logs, with nobody on
+them. Keeping the name on them as well is what archiving is for, and a delete
+is only allowed after it (Archive instead of delete).
 
 **Money never becomes a float.** `Numeric` in Postgres, a JSON string over the
 wire, a string end to end in Dart (`core/money_text.dart`).
@@ -482,7 +536,9 @@ currency. **A group that cannot be computed yet is absent, not zero** —
 `outcomes` (C) and `delivery` (F), and within the groups the weighted pipeline
 (#120), revisits (#118), reply direction (#135) and tasks completed (no
 completion timestamp). The attention counts run the briefing's own queries
-(`briefing_queries`), so the two cannot disagree about what is late.
+(`briefing_queries`), so the two cannot disagree about what is late. **Nothing
+archived is counted**, in any group: every number links to a list, and no list
+shows an archived row.
 
 ---
 

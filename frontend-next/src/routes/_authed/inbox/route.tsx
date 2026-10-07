@@ -4,7 +4,7 @@ import { z } from 'zod'
 // Which list and what search, on the parent so the triage page can link back
 // to the same view. "new" is the default and stays out of the URL.
 const searchSchema = z.object({
-  status: z.enum(['new', 'converted', 'dismissed']).optional().catch(undefined),
+  status: z.enum(['new', 'converted', 'dismissed', 'archived']).optional().catch(undefined),
   q: z.string().optional().catch(undefined),
 })
 

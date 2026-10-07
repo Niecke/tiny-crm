@@ -1,18 +1,23 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createFileRoute, Link, useRouterState } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useState } from 'react'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 import { ApiError } from '../../../api/client'
 import type { CaptureConvert, CaptureRead } from '../../../api/types'
 import {
+  archiveCapture,
   captureQuery,
   capturesQuery,
   convertCapture,
+  deleteCapture,
   dismissCapture,
   invalidateAfterCapture,
+  restoreCapture,
 } from '../../../captures'
+import { ArchiveButton, ArchivedNotice } from '../../../components/Archive'
+import { useArchive } from '../../../useArchive'
 import { ContactPicker, OrganizationPicker } from '../../../components/RecordPickers'
 import { Button } from '../../../components/ui/Button'
 import { Checkbox } from '../../../components/ui/Checkbox'
@@ -36,6 +41,15 @@ function Triage() {
   // The waiting list, oldest first, for "n of m" and for where to go next.
   const waiting = useQuery(capturesQuery(api, 'new', ''))
   const flash = useRouterState({ select: (s) => s.location.state.flash })
+  const navigate = useNavigate()
+
+  const archiving = useArchive({
+    queryKey: captureQuery(api, captureId).queryKey,
+    archive: () => archiveCapture(api, captureId),
+    restore: () => restoreCapture(api, captureId),
+    remove: () => deleteCapture(api, captureId),
+    leave: () => navigate({ to: '/inbox', search, replace: true }),
+  })
 
   const queue = waiting.data?.items ?? []
   const position = queue.findIndex((c) => c.id === captureId)
@@ -64,6 +78,14 @@ function Triage() {
         </p>
       ) : (
         <>
+          <ArchivedNotice
+            record={capture.data}
+            noun="capture"
+            name={capture.data.name ?? capture.data.raw}
+            archiving={archiving}
+          >
+            Whatever it was converted into is kept.
+          </ArchivedNotice>
           <header className="page-header page-header-row">
             <div className="page-header">
               {position >= 0 && (
@@ -73,26 +95,32 @@ function Triage() {
               )}
               <h1>{capture.data.name ?? capture.data.raw}</h1>
             </div>
-            {capture.data.status === 'new' && next && (
-              <Link
-                to="/inbox/$captureId"
-                params={{ captureId: next.id }}
-                search={search}
-                className="button button-quiet"
-              >
-                Skip
-              </Link>
+            {!capture.data.archived_at && (
+              <div className="header-actions">
+                <ArchiveButton archiving={archiving} />
+                {capture.data.status === 'new' && next && (
+                  <Link
+                    to="/inbox/$captureId"
+                    params={{ captureId: next.id }}
+                    search={search}
+                    className="button button-quiet"
+                  >
+                    Skip
+                  </Link>
+                )}
+              </div>
             )}
           </header>
 
           <Captured capture={capture.data} />
 
-          {capture.data.status === 'new' ? (
-            // Keyed by id: moving to the next capture starts a fresh form with
-            // that capture's defaults.
-            <TriageForm key={capture.data.id} capture={capture.data} nextId={next?.id} />
-          ) : (
+          {capture.data.status !== 'new' ? (
             <Worked capture={capture.data} />
+          ) : capture.data.archived_at ? null : (
+            // Keyed by id: moving to the next capture starts a fresh form with
+            // that capture's defaults. An archived capture cannot be worked,
+            // so it gets no form; the notice above says how to bring it back.
+            <TriageForm key={capture.data.id} capture={capture.data} nextId={next?.id} />
           )}
         </>
       )}

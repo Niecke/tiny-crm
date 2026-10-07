@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { Cell, Column, Row, Table, TableBody, TableHeader } from 'react-aria-components'
+import { ArchivedToggle } from '../../../components/Archive'
 import { DealBoard } from '../../../components/DealBoard'
 import { LostReasonDialog } from '../../../components/LostReasonDialog'
 import { Pagination } from '../../../components/ui/Pagination'
@@ -31,7 +32,7 @@ export const Route = createFileRoute('/_authed/deals/')({
 function Deals() {
   const { api } = Route.useRouteContext()
   const filters = Route.useSearch()
-  const { q = '', scope, view, page = 1 } = filters
+  const { q = '', scope, view, archived = false, page = 1 } = filters
   const navigate = Route.useNavigate()
 
   const [input, setInput] = useState(q)
@@ -42,8 +43,11 @@ function Deals() {
   }, [search, q, navigate])
 
   const current = scopeOf(scope)
-  const board = useQuery({ ...boardQuery(api, { q: search, scope }), enabled: view !== 'list' })
-  const list = useQuery({ ...dealsQuery(api, { q: search, scope, page }), enabled: view === 'list' })
+  // The archive is always a list: the board is for moving deals, and an
+  // archived deal cannot be moved.
+  const asList = view === 'list' || archived
+  const board = useQuery({ ...boardQuery(api, { q: search, scope }), enabled: !asList })
+  const list = useQuery({ ...dealsQuery(api, { q: search, scope, archived, page }), enabled: asList })
   const mover = useMoveDeal(api)
 
   return (
@@ -71,7 +75,7 @@ function Deals() {
         />
         <Segmented
           label="View"
-          value={view ?? 'board'}
+          value={asList ? 'list' : 'board'}
           onChange={(v) =>
             void navigate({ search: (prev) => ({ ...prev, view: v === 'list' ? 'list' : undefined, page: undefined }), replace: true })
           }
@@ -79,6 +83,12 @@ function Deals() {
             { value: 'board', label: 'Board' },
             { value: 'list', label: 'List' },
           ]}
+        />
+        <ArchivedToggle
+          isSelected={archived}
+          onChange={(v) =>
+            void navigate({ search: (prev) => ({ ...prev, archived: v || undefined, page: undefined }), replace: true })
+          }
         />
       </div>
 
@@ -88,7 +98,7 @@ function Deals() {
         </p>
       )}
 
-      {view !== 'list' ? (
+      {!asList ? (
         board.isPending ? (
           <p className="muted">Loading…</p>
         ) : board.error ? (
@@ -113,7 +123,9 @@ function Deals() {
       ) : list.error ? (
         <p className="form-error">{list.error.message}</p>
       ) : list.data.items.length === 0 && page === 1 ? (
-        <p className="muted">{current.value === 'plate' && !search ? 'Nothing on your plate.' : 'No deals here.'}</p>
+        <p className="muted">
+          {archived ? 'Nothing archived.' : current.value === 'plate' && !search ? 'Nothing on your plate.' : 'No deals here.'}
+        </p>
       ) : (
         <>
           <div className="panel table-wrap" data-stale={list.isPlaceholderData || undefined}>

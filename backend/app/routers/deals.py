@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import not_, nulls_last, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.archive import archived_is, require_archived, require_live, set_archived
 from app.auth import current_active_user
 from app.auth.users import User
 from app.briefing import DayWindow
@@ -56,6 +57,13 @@ _STAGES_BY_STATUS: dict[str, tuple[str, ...]] = {
     "won": WON_STAGES,
     "finished": FINISHED_STAGES,
 }
+
+
+async def _get_owned(session: AsyncSession, deal_id: UUID, user: User) -> Deal:
+    deal = await session.get(Deal, deal_id)
+    if deal is None or deal.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Deal not found")
+    return deal
 
 
 async def _check_links(
@@ -209,11 +217,12 @@ async def list_deals(
     # The default order already puts the furthest past first.
     overdue: bool = Query(default=False),
     sort: DealSort | None = Query(default=None),
+    archived: bool = Query(default=False),
     now: datetime = Depends(current_time),
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> Page[DealRead]:
-    q = select(Deal).where(Deal.user_id == user.id)
+    q = select(Deal).where(Deal.user_id == user.id, archived_is(Deal, archived))
     if search:
         q = q.where(contains(Deal.title, search))
     if stage is not None:
@@ -258,10 +267,7 @@ async def get_deal(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> Deal:
-    deal = await session.get(Deal, deal_id)
-    if deal is None or deal.user_id != user.id:
-        raise HTTPException(status_code=404, detail="Deal not found")
-    return deal
+    return await _get_owned(session, deal_id, user)
 
 
 @router.post("/", response_model=DealRead, status_code=201)
@@ -302,9 +308,8 @@ async def update_deal(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> Deal:
-    deal = await session.get(Deal, deal_id)
-    if deal is None or deal.user_id != user.id:
-        raise HTTPException(status_code=404, detail="Deal not found")
+    deal = await _get_owned(session, deal_id, user)
+    require_live(deal, "Deal")
 
     # exclude_unset=True — only update fields the caller actually sent
     updates = body.model_dump(exclude_unset=True)
@@ -379,9 +384,8 @@ async def change_stage(
     edit with consequences — it stamps `closed_at`, pins the probability and
     takes the lost reason — and because it is what a kanban drag calls.
     """
-    deal = await session.get(Deal, deal_id)
-    if deal is None or deal.user_id != user.id:
-        raise HTTPException(status_code=404, detail="Deal not found")
+    deal = await _get_owned(session, deal_id, user)
+    require_live(deal, "Deal")
 
     _reject_orphan_lost_reason(body.stage, body.lost_reason)
     apply_stage(deal, body.stage, body.lost_reason)
@@ -391,14 +395,43 @@ async def change_stage(
     return deal
 
 
+@router.post("/{deal_id}/archive", response_model=DealRead)
+async def archive_deal(
+    deal_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_active_user),
+) -> Deal:
+    """Put the deal away: off the board, out of the pipeline and its numbers.
+
+    Not the same as losing it. A lost deal is an outcome and stays in the
+    conversion figures; an archived one is a record that should not have been
+    counted at all, and comes back with its stage and its history untouched.
+    """
+    deal = await _get_owned(session, deal_id, user)
+    await set_archived(session, deal, True)
+    return deal
+
+
+@router.post("/{deal_id}/restore", response_model=DealRead)
+async def restore_deal(
+    deal_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_active_user),
+) -> Deal:
+    """Bring an archived deal back, in the stage it was put away in."""
+    deal = await _get_owned(session, deal_id, user)
+    await set_archived(session, deal, False)
+    return deal
+
+
 @router.delete("/{deal_id}", status_code=204)
 async def delete_deal(
     deal_id: UUID,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> None:
-    deal = await session.get(Deal, deal_id)
-    if deal is None or deal.user_id != user.id:
-        raise HTTPException(status_code=404, detail="Deal not found")
+    """Erase the deal for good. Only once it has been archived."""
+    deal = await _get_owned(session, deal_id, user)
+    require_archived(deal, "Deal")
     await session.delete(deal)
     await session.commit()

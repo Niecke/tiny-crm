@@ -181,6 +181,16 @@
               ],
               "title": "Works With Freelancers"
             }
+          },
+          {
+            "name": "archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Archived"
+            }
           }
         ],
         "responses": {
@@ -359,6 +369,7 @@
           "contacts"
         ],
         "summary": "Delete Contact",
+        "description": "Erase the contact for good. Only once it has been archived.\n\nThis is the erasure, not the tidy-up (#143): the row goes, and every task,\ndeal and interaction that named this person stops naming anyone.",
         "operationId": "delete_contact_contacts__contact_id__delete",
         "security": [
           {
@@ -380,6 +391,104 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contacts/{contact_id}/archive": {
+      "post": {
+        "tags": [
+          "contacts"
+        ],
+        "summary": "Archive Contact",
+        "description": "Put the contact away, keeping everything that points at them.\n\nThe interactions, deals and tasks that name this contact go on naming them.\nThat is the difference from DELETE, which leaves each of those pointing at\nnobody.",
+        "operationId": "archive_contact_contacts__contact_id__archive_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "contact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Contact Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contacts/{contact_id}/restore": {
+      "post": {
+        "tags": [
+          "contacts"
+        ],
+        "summary": "Restore Contact",
+        "description": "Bring an archived contact back, exactly as it was put away.",
+        "operationId": "restore_contact_contacts__contact_id__restore_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "contact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Contact Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactRead"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -467,6 +576,16 @@
                 }
               ],
               "title": "Search"
+            }
+          },
+          {
+            "name": "archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Archived"
             }
           }
         ],
@@ -675,7 +794,7 @@
           "captures"
         ],
         "summary": "Delete Capture",
-        "description": "Remove it outright — what Undo in the quick-add box calls.\n\nDistinct from /dismiss, which keeps the row as a decision that was made.\nA typo is not a decision.",
+        "description": "Remove it outright — what Undo in the quick-add box calls.\n\nDistinct from /dismiss, which keeps the row as a decision that was made.\nA typo is not a decision.\n\nThe one delete that does not ask for archiving first, and only while the\ncapture is still `new`: nothing has been made of it and nothing points at\nit, so there is no trail to lose, and Undo that took two steps would not be\none. Once worked, a capture is erased like everything else.",
         "operationId": "delete_capture_captures__capture_id__delete",
         "security": [
           {
@@ -819,6 +938,104 @@
         }
       }
     },
+    "/captures/{capture_id}/archive": {
+      "post": {
+        "tags": [
+          "captures"
+        ],
+        "summary": "Archive Capture",
+        "description": "Put the capture away, whatever was decided about it.\n\nDifferent from /dismiss, which is itself a decision and stays in the inbox's\nhistory. This takes the row out of the inbox and its history alike, and\nleaves its status as it was.",
+        "operationId": "archive_capture_captures__capture_id__archive_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "capture_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Capture Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaptureRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/captures/{capture_id}/restore": {
+      "post": {
+        "tags": [
+          "captures"
+        ],
+        "summary": "Restore Capture",
+        "description": "Bring an archived capture back, with the status it was put away in.",
+        "operationId": "restore_capture_captures__capture_id__restore_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "capture_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Capture Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaptureRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/organizations/": {
       "get": {
         "tags": [
@@ -869,6 +1086,16 @@
                 }
               ],
               "title": "Search"
+            }
+          },
+          {
+            "name": "archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Archived"
             }
           }
         ],
@@ -1048,7 +1275,7 @@
           "organizations"
         ],
         "summary": "Delete Organization",
-        "description": "Deleting a company keeps its people: their organization_id becomes NULL.",
+        "description": "Erase the company for good. Only once it has been archived.\n\nDeleting a company keeps its people: their organization_id becomes NULL.",
         "operationId": "delete_organization_organizations__organization_id__delete",
         "security": [
           {
@@ -1070,6 +1297,104 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizations/{organization_id}/archive": {
+      "post": {
+        "tags": [
+          "organizations"
+        ],
+        "summary": "Archive Organization",
+        "description": "Put the company away. Its people stay where they are, still filed under it.\n\nNothing cascades: whether the contacts go too is a separate decision, and\nmaking it silently is the opposite of recoverable.",
+        "operationId": "archive_organization_organizations__organization_id__archive_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Organization Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizations/{organization_id}/restore": {
+      "post": {
+        "tags": [
+          "organizations"
+        ],
+        "summary": "Restore Organization",
+        "description": "Bring an archived company back, exactly as it was put away.",
+        "operationId": "restore_organization_organizations__organization_id__restore_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Organization Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationRead"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -1257,6 +1582,16 @@
               ],
               "title": "Sort"
             }
+          },
+          {
+            "name": "archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Archived"
+            }
           }
         ],
         "responses": {
@@ -1435,6 +1770,7 @@
           "deals"
         ],
         "summary": "Delete Deal",
+        "description": "Erase the deal for good. Only once it has been archived.",
         "operationId": "delete_deal_deals__deal_id__delete",
         "security": [
           {
@@ -1505,6 +1841,104 @@
             }
           }
         },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DealRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/deals/{deal_id}/archive": {
+      "post": {
+        "tags": [
+          "deals"
+        ],
+        "summary": "Archive Deal",
+        "description": "Put the deal away: off the board, out of the pipeline and its numbers.\n\nNot the same as losing it. A lost deal is an outcome and stays in the\nconversion figures; an archived one is a record that should not have been\ncounted at all, and comes back with its stage and its history untouched.",
+        "operationId": "archive_deal_deals__deal_id__archive_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "deal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Deal Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DealRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/deals/{deal_id}/restore": {
+      "post": {
+        "tags": [
+          "deals"
+        ],
+        "summary": "Restore Deal",
+        "description": "Bring an archived deal back, in the stage it was put away in.",
+        "operationId": "restore_deal_deals__deal_id__restore_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "deal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Deal Id"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1657,6 +2091,13 @@
                 }
               ],
               "title": "Due Before"
+            "name": "archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Archived"
             }
           }
         ],
@@ -1836,6 +2277,7 @@
           "tasks"
         ],
         "summary": "Delete Task",
+        "description": "Erase the task for good. Only once it has been archived.",
         "operationId": "delete_task_tasks__task_id__delete",
         "security": [
           {
@@ -1857,6 +2299,104 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tasks/{task_id}/archive": {
+      "post": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "Archive Task",
+        "description": "Put the task away without calling it done.\n\nDone is a claim that the work happened, and completing a repeating task\nschedules the next one. Archiving says neither: the task leaves the list\nand the briefing, and a series stops where it is.",
+        "operationId": "archive_task_tasks__task_id__archive_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tasks/{task_id}/restore": {
+      "post": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "Restore Task",
+        "description": "Bring an archived task back, as open or as done as it was.",
+        "operationId": "restore_task_tasks__task_id__restore_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskRead"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -1989,6 +2529,16 @@
                 }
               ],
               "title": "Project Id"
+            }
+          },
+          {
+            "name": "archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Archived"
             }
           }
         ],
@@ -2168,6 +2718,7 @@
           "documents"
         ],
         "summary": "Delete Document",
+        "description": "Erase the document and its file for good. Only once it has been archived.\n\nOn a versioned bucket the delete below leaves earlier versions behind, so\nthis is not yet a complete erasure of the file — see #143.",
         "operationId": "delete_document_documents__document_id__delete",
         "security": [
           {
@@ -2351,6 +2902,104 @@
         }
       }
     },
+    "/documents/{document_id}/archive": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Archive Document",
+        "description": "Put the document away. The file stays in the bucket and stays readable.\n\nOnly the row is marked: nothing is moved or removed in storage, so\nrestoring is the same file under the same key.",
+        "operationId": "archive_document_documents__document_id__archive_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/documents/{document_id}/restore": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Restore Document",
+        "description": "Bring an archived document back, still filed where it was.",
+        "operationId": "restore_document_documents__document_id__restore_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/projects/": {
       "get": {
         "tags": [
@@ -2401,6 +3050,16 @@
                 }
               ],
               "title": "Search"
+            }
+          },
+          {
+            "name": "archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Archived"
             }
           }
         ],
@@ -2580,6 +3239,7 @@
           "projects"
         ],
         "summary": "Delete Project",
+        "description": "Erase the project for good. Only once it has been archived.",
         "operationId": "delete_project_projects__project_id__delete",
         "security": [
           {
@@ -2601,6 +3261,104 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project_id}/archive": {
+      "post": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Archive Project",
+        "description": "Put the project away. Its contacts, tasks and documents stay filed under it.",
+        "operationId": "archive_project_projects__project_id__archive_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Project Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project_id}/restore": {
+      "post": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Restore Project",
+        "description": "Bring an archived project back, with everything still filed under it.",
+        "operationId": "restore_project_projects__project_id__restore_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Project Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectRead"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -2774,6 +3532,16 @@
                 }
               ],
               "title": "Upcoming"
+            }
+          },
+          {
+            "name": "archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Archived"
             }
           }
         ],
@@ -2953,6 +3721,7 @@
           "interactions"
         ],
         "summary": "Delete Interaction",
+        "description": "Erase the entry for good. Only once it has been archived.",
         "operationId": "delete_interaction_interactions__interaction_id__delete",
         "security": [
           {
@@ -2974,6 +3743,104 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/interactions/{interaction_id}/archive": {
+      "post": {
+        "tags": [
+          "interactions"
+        ],
+        "summary": "Archive Interaction",
+        "description": "Put the entry away: off every timeline, and out of the briefing if planned.",
+        "operationId": "archive_interaction_interactions__interaction_id__archive_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "interaction_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Interaction Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InteractionRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/interactions/{interaction_id}/restore": {
+      "post": {
+        "tags": [
+          "interactions"
+        ],
+        "summary": "Restore Interaction",
+        "description": "Bring an archived entry back onto the timelines it was on.",
+        "operationId": "restore_interaction_interactions__interaction_id__restore_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "interaction_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Interaction Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InteractionRead"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -3109,6 +3976,16 @@
                 }
               ],
               "title": "Active"
+            }
+          },
+          {
+            "name": "archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Archived"
             }
           }
         ],
@@ -3288,7 +4165,7 @@
           "watches"
         ],
         "summary": "Delete Watch",
-        "description": "Deleting a watch takes its check history with it (CASCADE).\n\nPausing with `active=false` is the non-destructive option, and what the UI\noffers first.",
+        "description": "Erase a watch for good, and its check history with it (CASCADE).\n\nOnly once it has been archived. Pausing with `active=false` and archiving\nare the non-destructive options, and what the UI offers first.",
         "operationId": "delete_watch_watches__watch_id__delete",
         "security": [
           {
@@ -3438,6 +4315,104 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Page_WatchCheckRead_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/watches/{watch_id}/archive": {
+      "post": {
+        "tags": [
+          "watches"
+        ],
+        "summary": "Archive Watch",
+        "description": "Put the source away, keeping its check history.\n\nOff the sweep list and out of the briefing, like a paused one — and off the\nwatch list as well, which pausing with `active=false` does not do.",
+        "operationId": "archive_watch_watches__watch_id__archive_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "watch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Watch Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/watches/{watch_id}/restore": {
+      "post": {
+        "tags": [
+          "watches"
+        ],
+        "summary": "Restore Watch",
+        "description": "Bring an archived source back, due when it was due before.",
+        "operationId": "restore_watch_watches__watch_id__restore_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "watch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Watch Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchRead"
                 }
               }
             }
@@ -5358,6 +6333,18 @@
             "type": "string",
             "format": "date-time",
             "title": "Updated At"
+          },
+          "archived_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
           }
         },
         "type": "object",
@@ -6001,6 +6988,18 @@
             "type": "string",
             "format": "date-time",
             "title": "Updated At"
+          },
+          "archived_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
           }
         },
         "type": "object",
@@ -6776,6 +7775,18 @@
             "type": "string",
             "format": "date-time",
             "title": "Updated At"
+          },
+          "archived_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
           }
         },
         "type": "object",
@@ -7151,6 +8162,18 @@
             "type": "string",
             "format": "date-time",
             "title": "Updated At"
+          },
+          "archived_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
           },
           "has_preview": {
             "type": "boolean",
@@ -7546,6 +8569,18 @@
             "type": "string",
             "format": "date-time",
             "title": "Updated At"
+          },
+          "archived_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
           }
         },
         "type": "object",
@@ -7979,6 +9014,18 @@
             "type": "string",
             "format": "date-time",
             "title": "Updated At"
+          },
+          "archived_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
           }
         },
         "type": "object",
@@ -8607,6 +9654,18 @@
             "type": "string",
             "format": "date-time",
             "title": "Updated At"
+          },
+          "archived_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
           }
         },
         "type": "object",
@@ -9277,6 +10336,18 @@
             "format": "date-time",
             "title": "Updated"
           },
+          "archived_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
+          },
           "next_occurrence": {
             "anyOf": [
               {
@@ -9602,6 +10673,18 @@
             "type": "string",
             "format": "date-time",
             "title": "Updated"
+          },
+          "archived_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
           }
         },
         "type": "object",
@@ -10381,6 +11464,18 @@
             "type": "string",
             "format": "date-time",
             "title": "Updated At"
+          },
+          "archived_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
           }
         },
         "type": "object",

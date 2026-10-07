@@ -5,9 +5,17 @@ import { Tab, TabList, TabPanel, Tabs } from 'react-aria-components'
 import { z } from 'zod'
 import { ApiError } from '../../../../api/client'
 import type { OrganizationRead } from '../../../../api/types'
+import { ArchiveButton, ArchivedNotice } from '../../../../components/Archive'
+import { useArchive } from '../../../../useArchive'
 import { Fact, Facts, Rows } from '../../../../components/RecordPage'
 import { useSelectedTabInView } from '../../../../useSelectedTabInView'
-import { orgContactsQuery, organizationQuery } from '../../../../organizations'
+import {
+  archiveOrganization,
+  deleteOrganization,
+  orgContactsQuery,
+  organizationQuery,
+  restoreOrganization,
+} from '../../../../organizations'
 import { DocumentRows } from '../../../../components/DocumentRows'
 import { linkedDocumentsQuery } from '../../../../documents'
 import { InteractionList } from '../../../../components/InteractionList'
@@ -30,7 +38,8 @@ export const Route = createFileRoute('/_authed/organizations/$organizationId/')(
 function OrganizationDetail() {
   const { api } = Route.useRouteContext()
   const { organizationId } = Route.useParams()
-  const { q, tab = 'contacts' } = Route.useSearch()
+  // The list's own search and its archive switch ride along, for the way back.
+  const { tab = 'contacts', ...filters } = Route.useSearch()
   const navigate = Route.useNavigate()
   const org = useQuery(organizationQuery(api, organizationId))
   // All three load up front: each tab label shows its count, and switching
@@ -46,10 +55,18 @@ function OrganizationDetail() {
 
   const tabsRef = useSelectedTabInView(tab, org.isSuccess)
 
+  const archiving = useArchive({
+    queryKey: organizationQuery(api, organizationId).queryKey,
+    archive: () => archiveOrganization(api, organizationId),
+    restore: () => restoreOrganization(api, organizationId),
+    remove: () => deleteOrganization(api, organizationId),
+    leave: () => navigate({ to: '/organizations', search: filters, replace: true }),
+  })
+
   if (org.isPending || org.error) {
     return (
       <div className="page">
-        <Link to="/organizations" search={{ q }} className="back-link">
+        <Link to="/organizations" search={filters} className="back-link">
           ← Organizations
         </Link>
         {org.isPending ? (
@@ -74,23 +91,32 @@ function OrganizationDetail() {
 
   return (
     <div className="page">
-      <Link to="/organizations" search={{ q }} className="back-link">
+      <Link to="/organizations" search={filters} className="back-link">
         ← Organizations
       </Link>
+
+      <ArchivedNotice record={o} noun="organization" name={o.name} archiving={archiving}>
+        Its people, deals and watches are kept, with no organization on them.
+      </ArchivedNotice>
 
       <header className="page-header page-header-row">
         <div className="page-header">
           <h1>{o.name}</h1>
           {(o.industry || o.domain) && <p>{[o.industry, o.domain].filter(Boolean).join(' · ')}</p>}
         </div>
-        <Link
-          to="/organizations/$organizationId/edit"
-          params={{ organizationId }}
-          search={{ q }}
-          className="button button-quiet"
-        >
-          Edit
-        </Link>
+        {!o.archived_at && (
+          <div className="header-actions">
+            <ArchiveButton archiving={archiving} />
+            <Link
+              to="/organizations/$organizationId/edit"
+              params={{ organizationId }}
+              search={filters}
+              className="button button-quiet"
+            >
+              Edit
+            </Link>
+          </div>
+        )}
       </header>
 
       <div className="profile">
@@ -104,7 +130,7 @@ function OrganizationDetail() {
           selectedKey={tab}
           onSelectionChange={(key) => {
             const next = tabs.find((t) => t === key) ?? 'contacts'
-            void navigate({ search: { q, tab: next === 'contacts' ? undefined : next }, replace: true })
+            void navigate({ search: { ...filters, tab: next === 'contacts' ? undefined : next }, replace: true })
           }}
         >
           <TabList className="tabs" aria-label="Linked records" ref={tabsRef}>
