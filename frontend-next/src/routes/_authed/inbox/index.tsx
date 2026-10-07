@@ -12,10 +12,12 @@ export const Route = createFileRoute('/_authed/inbox/')({
   component: Inbox,
 })
 
-const statuses: { value: CaptureStatus; label: string }[] = [
+const statuses: { value: CaptureStatus | 'archived'; label: string }[] = [
   { value: 'new', label: 'Waiting' },
   { value: 'converted', label: 'Converted' },
   { value: 'dismissed', label: 'Dismissed' },
+  // Not a status: whatever was put away, whatever had been decided about it.
+  { value: 'archived', label: 'Archived' },
 ]
 
 function Inbox() {

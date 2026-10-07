@@ -3,6 +3,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { InteractionList } from '../../../components/InteractionList'
 import { Pagination } from '../../../components/ui/Pagination'
+import { ArchivedToggle } from '../../../components/Archive'
 import { SearchField } from '../../../components/ui/SearchField'
 import { Select } from '../../../components/ui/Select'
 import { PAGE_SIZE } from '../../../contacts'
@@ -19,7 +20,7 @@ export const Route = createFileRoute('/_authed/interactions/')({
 function Activity() {
   const { api } = Route.useRouteContext()
   const filters = Route.useSearch()
-  const { q = '', kind, planned = 1, page = 1 } = filters
+  const { q = '', kind, archived = false, planned = 1, page = 1 } = filters
   const navigate = Route.useNavigate()
 
   const [input, setInput] = useState(q)
@@ -33,8 +34,8 @@ function Activity() {
       })
   }, [search, q, navigate])
 
-  const upcoming = useQuery(interactionsQuery(api, true, { q: search, kind, page: planned }))
-  const log = useQuery(interactionsQuery(api, false, { q: search, kind, page }))
+  const upcoming = useQuery(interactionsQuery(api, true, { q: search, kind, archived, page: planned }))
+  const log = useQuery(interactionsQuery(api, false, { q: search, kind, archived, page }))
   const { toggle, pendingId, error: toggleError } = useToggleHappened(api)
   const [now] = useState(() => Date.now())
 
@@ -63,6 +64,12 @@ function Activity() {
               search: (prev) => ({ ...prev, kind: v || undefined, planned: undefined, page: undefined }),
               replace: true,
             })
+          }
+        />
+        <ArchivedToggle
+          isSelected={archived}
+          onChange={(v) =>
+            void navigate({ search: (prev) => ({ ...prev, archived: v || undefined, planned: undefined, page: undefined }), replace: true })
           }
         />
       </div>

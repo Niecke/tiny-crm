@@ -6,6 +6,7 @@ from sqlalchemy import Column, DateTime, ForeignKey, String, Table, func
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.archive import Archivable
 from app.db import Base
 from app.models.contact import Contact
 from app.models.deal import Deal
@@ -43,7 +44,7 @@ interaction_deals = _link_table("interaction_deals", "deal_id", "deals")
 interaction_projects = _link_table("interaction_projects", "project_id", "projects")
 
 
-class Interaction(Base):
+class Interaction(Archivable, Base):
     """A touchpoint with contacts: a call, meeting, mail or plain note.
 
     occurred_at in the past = activity log entry; in the future = a planned

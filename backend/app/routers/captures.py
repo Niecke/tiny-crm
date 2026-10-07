@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.archive import archived_is, live, require_archived, require_live, set_archived
 from app.auth import current_active_user
 from app.auth.users import User
 from app.captures import parse_capture
@@ -70,10 +71,11 @@ async def list_captures(
     # question rather than the daily one.
     status: CaptureStatus | Literal["all"] = Query(default="new"),
     search: str | None = Query(default=None),
+    archived: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> Page[CaptureRead]:
-    q = select(Capture).where(Capture.user_id == user.id)
+    q = select(Capture).where(Capture.user_id == user.id, archived_is(Capture, archived))
     if status != "all":
         q = q.where(Capture.status == status)
     if search:
@@ -108,11 +110,13 @@ async def count_captures(
 
     One query for the badge rather than a page of rows nobody renders.
     """
-    waiting = select(Capture).where(Capture.user_id == user.id, Capture.status == "new")
+    waiting = select(Capture).where(
+        Capture.user_id == user.id, Capture.status == "new", live(Capture)
+    )
     total = await count_rows(session, waiting)
     oldest = await session.scalar(
         select(func.min(Capture.created_at)).where(
-            Capture.user_id == user.id, Capture.status == "new"
+            Capture.user_id == user.id, Capture.status == "new", live(Capture)
         )
     )
     oldest_days = None if oldest is None else max(0, (datetime.now(UTC) - oldest).days)
@@ -172,6 +176,7 @@ async def update_capture(
     exists to avoid.
     """
     capture = await _get_owned(session, capture_id, user)
+    require_live(capture, "Capture")
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(capture, field, value)
     await session.commit()
@@ -189,8 +194,15 @@ async def delete_capture(
 
     Distinct from /dismiss, which keeps the row as a decision that was made.
     A typo is not a decision.
+
+    The one delete that does not ask for archiving first, and only while the
+    capture is still `new`: nothing has been made of it and nothing points at
+    it, so there is no trail to lose, and Undo that took two steps would not be
+    one. Once worked, a capture is erased like everything else.
     """
     capture = await _get_owned(session, capture_id, user)
+    if capture.status != "new":
+        require_archived(capture, "Capture")
     await session.delete(capture)
     await session.commit()
 
@@ -226,6 +238,7 @@ async def convert_capture(
     shape as POST /watches/{id}/check.
     """
     capture = await _get_owned(session, capture_id, user)
+    require_live(capture, "Capture")
     _reject_unless_new(capture)
 
     contact: Contact
@@ -326,9 +339,39 @@ async def dismiss_capture(
     Use DELETE for a typo, which is not a decision.
     """
     capture = await _get_owned(session, capture_id, user)
+    require_live(capture, "Capture")
     _reject_unless_new(capture)
     capture.status = "dismissed"
     capture.triaged_at = datetime.now(UTC)
     await session.commit()
     await session.refresh(capture)
+    return capture
+
+
+@router.post("/{capture_id}/archive", response_model=CaptureRead)
+async def archive_capture(
+    capture_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_active_user),
+) -> Capture:
+    """Put the capture away, whatever was decided about it.
+
+    Different from /dismiss, which is itself a decision and stays in the inbox's
+    history. This takes the row out of the inbox and its history alike, and
+    leaves its status as it was.
+    """
+    capture = await _get_owned(session, capture_id, user)
+    await set_archived(session, capture, True)
+    return capture
+
+
+@router.post("/{capture_id}/restore", response_model=CaptureRead)
+async def restore_capture(
+    capture_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_active_user),
+) -> Capture:
+    """Bring an archived capture back, with the status it was put away in."""
+    capture = await _get_owned(session, capture_id, user)
+    await set_archived(session, capture, False)
     return capture

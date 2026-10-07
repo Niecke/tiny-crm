@@ -9,11 +9,15 @@ export const LIST_LIMIT = 100
 // and the total says when there is more.
 export const DETAIL_LIMIT = 20
 
-export const organizationsQuery = (api: Api, search: string) =>
+export const organizationsQuery = (api: Api, search: string, archived = false) =>
   queryOptions({
-    queryKey: ['organizations', 'list', search],
+    queryKey: ['organizations', 'list', search, archived],
     queryFn: () =>
-      unwrap(api.GET('/organizations/', { params: { query: { limit: LIST_LIMIT, search: search || undefined } } })),
+      unwrap(
+        api.GET('/organizations/', {
+          params: { query: { limit: LIST_LIMIT, search: search || undefined, archived: archived || undefined } },
+        }),
+      ),
     // Keep the old rows on screen while the next search loads, instead of
     // flashing an empty list on every keystroke.
     placeholderData: keepPreviousData,
@@ -32,6 +36,16 @@ export const createOrganization = (api: Api, body: OrganizationCreate) =>
 // than left as it was.
 export const updateOrganization = (api: Api, id: string, body: OrganizationCreate) =>
   unwrap(api.PATCH('/organizations/{organization_id}', { params: { path: { organization_id: id } }, body }))
+
+// Only once archived; the people filed under it stay, with no company.
+export const deleteOrganization = (api: Api, id: string) =>
+  unwrap(api.DELETE('/organizations/{organization_id}', { params: { path: { organization_id: id } } }))
+
+export const archiveOrganization = (api: Api, id: string) =>
+  unwrap(api.POST('/organizations/{organization_id}/archive', { params: { path: { organization_id: id } } }))
+
+export const restoreOrganization = (api: Api, id: string) =>
+  unwrap(api.POST('/organizations/{organization_id}/restore', { params: { path: { organization_id: id } } }))
 
 // Contacts and documents each filter by organization_id. Three
 // calls rather than one generic helper: each path is checked against the

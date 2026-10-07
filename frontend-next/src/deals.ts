@@ -102,7 +102,7 @@ export function valueSummary(d: DealRead): string | null {
   return d.is_open_ended && headline ? `${headline} · open-ended` : headline
 }
 
-export type DealFilters = { q?: string; scope?: string; page?: number }
+export type DealFilters = { q?: string; scope?: string; archived?: boolean; page?: number }
 
 const scopeQuery = (scope: string | undefined) => {
   const s = scopeOf(scope)
@@ -110,14 +110,20 @@ const scopeQuery = (scope: string | undefined) => {
 }
 
 // Soonest expected close first — the API's order.
-export const dealsQuery = (api: Api, { q, scope, page = 1 }: DealFilters) =>
+export const dealsQuery = (api: Api, { q, scope, archived, page = 1 }: DealFilters) =>
   queryOptions({
-    queryKey: ['deals', 'list', { q, scope, page }],
+    queryKey: ['deals', 'list', { q, scope, archived, page }],
     queryFn: () =>
       unwrap(
         api.GET('/deals/', {
           params: {
-            query: { search: q || undefined, ...scopeQuery(scope), skip: (page - 1) * PAGE_SIZE, limit: PAGE_SIZE },
+            query: {
+              search: q || undefined,
+              // The archive is read whole: a scope is a question about the pipeline.
+              ...(archived ? { archived: true } : scopeQuery(scope)),
+              skip: (page - 1) * PAGE_SIZE,
+              limit: PAGE_SIZE,
+            },
           },
         }),
       ),
@@ -157,6 +163,12 @@ export const updateDeal = (api: Api, id: string, body: DealUpdate) =>
 
 export const deleteDeal = (api: Api, id: string) =>
   unwrap(api.DELETE('/deals/{deal_id}', { params: { path: { deal_id: id } } }))
+
+export const archiveDeal = (api: Api, id: string) =>
+  unwrap(api.POST('/deals/{deal_id}/archive', { params: { path: { deal_id: id } } }))
+
+export const restoreDeal = (api: Api, id: string) =>
+  unwrap(api.POST('/deals/{deal_id}/restore', { params: { path: { deal_id: id } } }))
 
 // The one move the pipeline is made of. The server stamps or clears the close
 // date, pins probability to 100 or 0 once decided, and keeps a lost reason

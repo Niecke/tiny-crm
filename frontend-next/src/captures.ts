@@ -9,11 +9,22 @@ import type { CaptureConvert, CaptureStatus } from './api/types'
 // Oldest first — the API's order, and the order an inbox is worked in.
 export const INBOX_LIMIT = 100
 
-export const capturesQuery = (api: Api, status: CaptureStatus, search: string) =>
+export const capturesQuery = (api: Api, status: CaptureStatus | 'archived', search: string) =>
   queryOptions({
     queryKey: ['captures', 'list', status, search],
     queryFn: () =>
-      unwrap(api.GET('/captures/', { params: { query: { status, search: search || undefined, limit: INBOX_LIMIT } } })),
+      unwrap(
+        api.GET('/captures/', {
+          params: {
+            query: {
+              // The archive is read whole, whatever was decided about each one.
+              ...(status === 'archived' ? { status: 'all' as const, archived: true } : { status }),
+              search: search || undefined,
+              limit: INBOX_LIMIT,
+            },
+          },
+        }),
+      ),
     placeholderData: keepPreviousData,
   })
 
@@ -36,6 +47,12 @@ export const createCapture = (api: Api, body: { raw: string; note?: string; url?
 // For a typo, not a decision — a decision is a dismiss, which stays on record.
 export const deleteCapture = (api: Api, id: string) =>
   unwrap(api.DELETE('/captures/{capture_id}', { params: { path: { capture_id: id } } }))
+
+export const archiveCapture = (api: Api, id: string) =>
+  unwrap(api.POST('/captures/{capture_id}/archive', { params: { path: { capture_id: id } } }))
+
+export const restoreCapture = (api: Api, id: string) =>
+  unwrap(api.POST('/captures/{capture_id}/restore', { params: { path: { capture_id: id } } }))
 
 export const convertCapture = (api: Api, id: string, body: CaptureConvert) =>
   unwrap(api.POST('/captures/{capture_id}/convert', { params: { path: { capture_id: id } }, body }))

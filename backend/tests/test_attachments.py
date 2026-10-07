@@ -20,7 +20,7 @@ import pytest
 from httpx2 import AsyncClient
 
 from app.routers import documents
-from tests.conftest import Account, create_resource
+from tests.conftest import Account, create_resource, erase
 
 OCCURRED_AT = (datetime.now(UTC) - timedelta(days=1)).isoformat()
 
@@ -278,9 +278,7 @@ async def test_deleting_the_record_drops_the_link_not_the_document(
         deal_ids=f'["{records["deal"]["id"]}"]',
     )
 
-    assert (
-        await client.delete(f"/deals/{records['deal']['id']}", headers=alice.headers)
-    ).status_code == 204
+    assert (await erase(client, alice, f"/deals/{records['deal']['id']}")).status_code == 204
 
     # CASCADE removes the join row; the file itself is not collateral damage.
     survivor = await client.get(f"/documents/{uploaded['id']}", headers=alice.headers)
@@ -497,9 +495,7 @@ async def test_deleting_the_record_drops_the_interaction_link_not_the_interactio
         project_ids=[records["project"]["id"]],
     )
 
-    assert (
-        await client.delete(f"/projects/{records['project']['id']}", headers=alice.headers)
-    ).status_code == 204
+    assert (await erase(client, alice, f"/projects/{records['project']['id']}")).status_code == 204
 
     survivor = await client.get(f"/interactions/{interaction['id']}", headers=alice.headers)
     assert survivor.status_code == 200

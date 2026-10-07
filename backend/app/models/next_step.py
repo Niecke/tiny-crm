@@ -22,6 +22,7 @@ from datetime import datetime
 from sqlalchemy import ColumnElement, exists, func, or_
 from sqlalchemy.orm import column_property
 
+from app.archive import live
 from app.models.deal import Deal
 from app.models.interaction import Interaction, interaction_deals
 from app.models.task import Task
@@ -41,8 +42,16 @@ def next_step_exists(after: datetime | ColumnElement[datetime]) -> ColumnElement
     either one still names the next thing to do; overdue tasks already have a
     briefing section of their own. A planned interaction is one not yet marked
     as happened, matching the briefing's own idea of "planned".
+
+    Neither counts once archived. A task that no list shows will never come
+    due in front of anyone, so the deal it belongs to is as forgotten as one
+    with no task at all.
     """
-    open_task = exists().where(Task.deal_id == Deal.id, Task.done.is_(False)).correlate_except(Task)
+    open_task = (
+        exists()
+        .where(Task.deal_id == Deal.id, Task.done.is_(False), live(Task))
+        .correlate_except(Task)
+    )
     planned = (
         exists()
         .where(
@@ -50,6 +59,7 @@ def next_step_exists(after: datetime | ColumnElement[datetime]) -> ColumnElement
             interaction_deals.c.interaction_id == Interaction.id,
             Interaction.done.is_(False),
             Interaction.occurred_at >= after,
+            live(Interaction),
         )
         .correlate_except(Interaction, interaction_deals)
     )

@@ -995,6 +995,38 @@ a {
   color: var(--color-accent);
 }
 
+/* On an archived record: what it means, and the two ways out of it. */
+.archived-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+
+.archived-notice p {
+  flex: 1 1 20rem;
+}
+
+.archived-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* A fieldset only for its `disabled`, which turns off every control inside an
+   archived record's form at once. It should not look like a fieldset. */
+.form-lock {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.form-lock:disabled {
+  opacity: 0.7;
+}
+
 .capture-list {
   padding: var(--space-2) var(--space-3);
 }

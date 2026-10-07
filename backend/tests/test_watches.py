@@ -24,7 +24,7 @@ from typing import Any
 import pytest
 from httpx2 import AsyncClient
 
-from tests.conftest import Account, create_resource
+from tests.conftest import Account, create_resource, erase
 
 
 async def _watch(client: AsyncClient, account: Account, **fields: Any) -> dict[str, Any]:
@@ -80,7 +80,7 @@ async def test_a_watch_survives_a_full_round_trip(client: AsyncClient, alice: Ac
     assert patched.status_code == 200
     assert patched.json()["name"] == "ANKÖ (Vergabeportal)"
 
-    deleted = await client.delete(f"/watches/{created['id']}", headers=alice.headers)
+    deleted = await erase(client, alice, f"/watches/{created['id']}")
     assert deleted.status_code == 204
     assert (await client.get(f"/watches/{created['id']}", headers=alice.headers)).status_code == 404
 
@@ -150,9 +150,7 @@ async def test_losing_the_company_keeps_the_watch(client: AsyncClient, alice: Ac
     organization = await create_resource(client, alice, "/organizations/", {"name": "EBCONT"})
     created = await _watch(client, alice, kind="careers_page", organization_id=organization["id"])
 
-    assert (
-        await client.delete(f"/organizations/{organization['id']}", headers=alice.headers)
-    ).status_code == 204
+    assert (await erase(client, alice, f"/organizations/{organization['id']}")).status_code == 204
 
     # The careers page is still worth checking.
     survivor = await client.get(f"/watches/{created['id']}", headers=alice.headers)
@@ -360,7 +358,7 @@ async def test_deleting_the_deal_keeps_the_record_of_finding_it(
     )
     deal_id = result["check"]["created_deal_id"]
 
-    assert (await client.delete(f"/deals/{deal_id}", headers=alice.headers)).status_code == 204
+    assert (await erase(client, alice, f"/deals/{deal_id}")).status_code == 204
 
     history = await client.get(f"/watches/{watch['id']}/checks", headers=alice.headers)
     assert history.json()["total"] == 1
@@ -372,9 +370,7 @@ async def test_deleting_a_watch_takes_its_history(client: AsyncClient, alice: Ac
     watch = await _watch(client, alice)
     await _check(client, alice, watch["id"])
 
-    assert (
-        await client.delete(f"/watches/{watch['id']}", headers=alice.headers)
-    ).status_code == 204
+    assert (await erase(client, alice, f"/watches/{watch['id']}")).status_code == 204
 
     # The log is part of the watch, so the checks go with it — pausing is the
     # non-destructive option.

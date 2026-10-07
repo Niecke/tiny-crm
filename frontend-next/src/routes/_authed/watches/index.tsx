@@ -3,6 +3,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { Cell, Column, Row, Table, TableBody, TableHeader } from 'react-aria-components'
 import { Pagination } from '../../../components/ui/Pagination'
+import { ArchivedToggle } from '../../../components/Archive'
 import { SearchField } from '../../../components/ui/SearchField'
 import { Select } from '../../../components/ui/Select'
 import { PAGE_SIZE } from '../../../contacts'
@@ -17,7 +18,7 @@ export const Route = createFileRoute('/_authed/watches/')({
 function Watches() {
   const { api } = Route.useRouteContext()
   const filters = Route.useSearch()
-  const { q = '', scope = 'due', kind, page = 1 } = filters
+  const { q = '', scope = 'due', kind, archived = false, page = 1 } = filters
   const navigate = Route.useNavigate()
   const [input, setInput] = useState(q)
   const search = useDebounced(input.trim())
@@ -26,7 +27,9 @@ function Watches() {
       void navigate({ search: (prev) => ({ ...prev, q: search || undefined, page: undefined }), replace: true })
   }, [search, q, navigate])
 
-  const { data, error, isPending, isPlaceholderData } = useQuery(watchesQuery(api, { q: search, scope, kind, page }))
+  const { data, error, isPending, isPlaceholderData } = useQuery(
+    watchesQuery(api, { q: search, scope, kind, archived, page }),
+  )
   const [now] = useState(() => Date.now())
 
   return (
@@ -65,6 +68,12 @@ function Watches() {
             void navigate({ search: (prev) => ({ ...prev, kind: v || undefined, page: undefined }), replace: true })
           }
         />
+        <ArchivedToggle
+          isSelected={archived}
+          onChange={(v) =>
+            void navigate({ search: (prev) => ({ ...prev, archived: v || undefined, page: undefined }), replace: true })
+          }
+        />
       </div>
 
       {isPending ? (
@@ -72,7 +81,9 @@ function Watches() {
       ) : error ? (
         <p className="form-error">{error.message}</p>
       ) : data.items.length === 0 && page === 1 ? (
-        <p className="muted">{scope === 'due' && !search && !kind ? 'Nothing due. All swept.' : 'No sources here.'}</p>
+        <p className="muted">
+          {archived ? 'Nothing archived.' : scope === 'due' && !search && !kind ? 'Nothing due. All swept.' : 'No sources here.'}
+        </p>
       ) : (
         <>
           <div className="panel table-wrap" data-stale={isPlaceholderData || undefined}>

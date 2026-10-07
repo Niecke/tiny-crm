@@ -95,6 +95,9 @@ async def _search_one(
     document = searchable.document()
     q: Select[tuple[Any]] = select(searchable.model).where(
         searchable.user_id == user_id,
+        # Archived records are not found, and there is no switch to find them:
+        # each list has its own archive, and that is where to look (#140).
+        searchable.archived_at.is_(None),
         *(contains(document, term) for term in terms),
     )
     phrase = " ".join(terms)

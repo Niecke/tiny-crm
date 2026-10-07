@@ -2,7 +2,7 @@
 
 from httpx2 import AsyncClient
 
-from tests.conftest import Account, create_resource
+from tests.conftest import Account, create_resource, erase
 
 
 async def test_a_contact_survives_a_full_round_trip(client: AsyncClient, alice: Account) -> None:
@@ -27,7 +27,7 @@ async def test_a_contact_survives_a_full_round_trip(client: AsyncClient, alice: 
     assert patched.json()["email"] == "ada@somerset.example"
     assert patched.json()["name"] == "Ada Lovelace"
 
-    deleted = await client.delete(f"/contacts/{created['id']}", headers=alice.headers)
+    deleted = await erase(client, alice, f"/contacts/{created['id']}")
     assert deleted.status_code == 204
 
     gone = await client.get(f"/contacts/{created['id']}", headers=alice.headers)

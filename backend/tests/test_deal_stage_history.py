@@ -21,7 +21,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.models.deal import Deal, DealStageEvent
-from tests.conftest import Account, create_resource
+from tests.conftest import Account, create_resource, erase
 
 Sessions = async_sessionmaker[AsyncSession]
 
@@ -165,7 +165,7 @@ async def test_deleting_a_deal_takes_its_history_with_it(
     await _move(client, alice, deal["id"], "qualified")
     assert len(await _events(session_factory, deal["id"])) == 2
 
-    deleted = await client.delete(f"/deals/{deal['id']}", headers=alice.headers)
+    deleted = await erase(client, alice, f"/deals/{deal['id']}")
 
     assert deleted.status_code == 204
     assert await _events(session_factory, deal["id"]) == []

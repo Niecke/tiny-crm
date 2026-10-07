@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.archive import archived_is, require_archived, require_live, set_archived
 from app.auth import current_active_user
 from app.auth.users import User
 from app.db import contains, count_rows, get_session
@@ -18,6 +19,13 @@ from app.schemas.project import ProjectCreate, ProjectRead, ProjectUpdate
 router = APIRouter(prefix="/projects", tags=["projects"])
 
 
+async def _get_owned(session: AsyncSession, project_id: UUID, user: User) -> Project:
+    project = await session.get(Project, project_id)
+    if project is None or project.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return project
+
+
 def _to_read(p: Project) -> ProjectRead:
     return ProjectRead(
         id=p.id,
@@ -28,6 +36,7 @@ def _to_read(p: Project) -> ProjectRead:
         contact_ids=[c.id for c in p.contacts],
         task_ids=[t.id for t in p.tasks],
         document_ids=[d.id for d in p.documents],
+        archived_at=p.archived_at,
         created_at=p.created_at,
         updated_at=p.updated_at,
     )
@@ -43,10 +52,11 @@ async def list_projects(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
     search: str | None = None,
+    archived: bool = False,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> Page[ProjectRead]:
-    query = select(Project).where(Project.user_id == user.id)
+    query = select(Project).where(Project.user_id == user.id, archived_is(Project, archived))
     if search:
         query = query.where(contains(Project.name, search))
     total = await count_rows(session, query)
@@ -67,10 +77,7 @@ async def get_project(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> ProjectRead:
-    project = await session.get(Project, project_id)
-    if project is None or project.user_id != user.id:
-        raise HTTPException(status_code=404, detail="Project not found")
-    return _to_read(project)
+    return _to_read(await _get_owned(session, project_id, user))
 
 
 @router.post("/", response_model=ProjectRead, status_code=201)
@@ -97,9 +104,8 @@ async def update_project(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> ProjectRead:
-    project = await session.get(Project, project_id)
-    if project is None or project.user_id != user.id:
-        raise HTTPException(status_code=404, detail="Project not found")
+    project = await _get_owned(session, project_id, user)
+    require_live(project, "Project")
     updates = body.model_dump(exclude_unset=True)
     for field, value in updates.items():
         if field == "contact_ids":
@@ -115,14 +121,38 @@ async def update_project(
     return _to_read(project)
 
 
+@router.post("/{project_id}/archive", response_model=ProjectRead)
+async def archive_project(
+    project_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_active_user),
+) -> ProjectRead:
+    """Put the project away. Its contacts, tasks and documents stay filed under it."""
+    project = await _get_owned(session, project_id, user)
+    await set_archived(session, project, True)
+    return _to_read(project)
+
+
+@router.post("/{project_id}/restore", response_model=ProjectRead)
+async def restore_project(
+    project_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_active_user),
+) -> ProjectRead:
+    """Bring an archived project back, with everything still filed under it."""
+    project = await _get_owned(session, project_id, user)
+    await set_archived(session, project, False)
+    return _to_read(project)
+
+
 @router.delete("/{project_id}", status_code=204)
 async def delete_project(
     project_id: UUID,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> None:
-    project = await session.get(Project, project_id)
-    if project is None or project.user_id != user.id:
-        raise HTTPException(status_code=404, detail="Project not found")
+    """Erase the project for good. Only once it has been archived."""
+    project = await _get_owned(session, project_id, user)
+    require_archived(project, "Project")
     await session.delete(project)
     await session.commit()

@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { Pagination } from '../../../components/ui/Pagination'
+import { ArchivedToggle } from '../../../components/Archive'
 import { SearchField } from '../../../components/ui/SearchField'
 import { PAGE_SIZE } from '../../../contacts'
 import { formatDay } from '../../../format'
@@ -19,7 +20,7 @@ const order: ProjectStatus[] = ['active', 'upcoming', 'completed']
 function ProjectsList() {
   const { api } = Route.useRouteContext()
   const filters = Route.useSearch()
-  const { q = '', page = 1 } = filters
+  const { q = '', archived = false, page = 1 } = filters
   const navigate = Route.useNavigate()
   const [input, setInput] = useState(q)
   const search = useDebounced(input.trim())
@@ -28,7 +29,7 @@ function ProjectsList() {
       void navigate({ search: (prev) => ({ ...prev, q: search || undefined, page: undefined }), replace: true })
   }, [search, q, navigate])
 
-  const { data, error, isPending, isPlaceholderData } = useQuery(projectsQuery(api, { q: search, page }))
+  const { data, error, isPending, isPlaceholderData } = useQuery(projectsQuery(api, { q: search, archived, page }))
 
   return (
     <div className="page">
@@ -41,6 +42,12 @@ function ProjectsList() {
 
       <div className="toolbar filters">
         <SearchField label="Search projects" placeholder="Search names" value={input} onChange={setInput} />
+        <ArchivedToggle
+          isSelected={archived}
+          onChange={(v) =>
+            void navigate({ search: (prev) => ({ ...prev, archived: v || undefined, page: undefined }), replace: true })
+          }
+        />
       </div>
 
       {isPending ? (
