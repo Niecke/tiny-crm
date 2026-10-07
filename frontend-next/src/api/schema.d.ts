@@ -603,7 +603,7 @@ export interface paths {
          *
          *     Pipeline, the per-stage ages and the attention counts are as of now; the
          *     rest covers the period, which is echoed back resolved. `trends` is always
-         *     the last twelve weeks. Today is a calendar day in BRIEFING_TIMEZONE, as in
+         *     the last ten weeks. Today is a calendar day in BRIEFING_TIMEZONE, as in
          *     the morning briefing.
          */
         get: operations["get_dashboard_metrics_metrics_dashboard_get"];
@@ -2576,7 +2576,7 @@ export interface components {
         };
         /**
          * TrendMetrics
-         * @description A fixed window, independent of `period`: the last WEEKS calendar weeks,
+         * @description A fixed window, independent of `period`: the last ten calendar weeks (WEEKS),
          *     oldest first, ending with the current one. Weeks with nothing are zeros,
          *     so the series has no gaps a chart would have to guess about.
          */

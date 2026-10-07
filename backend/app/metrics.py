@@ -433,9 +433,9 @@ async def activity_metrics(session: AsyncSession, user_id: UUID, period: Period)
 
 # --- Trends -------------------------------------------------------------------
 
-# How many calendar weeks a weekly series covers: a quarter, enough to tell a
-# slow week from a slowing trend.
-WEEKS = 12
+# How many calendar weeks a weekly series covers: enough to tell a slow week
+# from a slowing trend, few enough to read at a glance.
+WEEKS = 10
 
 
 async def trend_metrics(

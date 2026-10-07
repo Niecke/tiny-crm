@@ -1,12 +1,14 @@
 import { formatWeek, type WeekCount, weeklySummary } from '../metrics'
 
-// New deals per week, the last twelve calendar weeks (GET /metrics/dashboard,
-// `trends`). One series, so one hue and no legend; the running week is drawn
-// lighter because its count is so far, not final. Counts show on hover and
-// focus, and a table carries every value for a screen reader.
+// New deals per week, the last ten calendar weeks (GET /metrics/dashboard,
+// `trends`). One series, so one hue and no legend. Every column carries its
+// count and its week, so nothing needs a hover to be read; the running week
+// is drawn lighter because its count is so far, not final. A table carries
+// the same values for a screen reader.
 export function WeeklyDeals({ weeks }: { weeks: WeekCount[] }) {
   const { current, previous, average } = weeklySummary(weeks)
   const most = Math.max(1, ...weeks.map((w) => w.count))
+  const height = (count: number) => `${(count / most) * 100}%`
 
   return (
     <div className="weekly">
@@ -22,34 +24,31 @@ export function WeeklyDeals({ weeks }: { weeks: WeekCount[] }) {
           <dd>{previous?.count ?? 0}</dd>
         </div>
         <div>
-          <dt>Average</dt>
+          <dt title="Over the complete weeks; the running one is left out">Weekly average</dt>
           <dd>
             {average ?? '–'} <span className="muted">/ week</span>
           </dd>
         </div>
       </dl>
 
-      <div className="weekly-chart" aria-hidden="true">
-        {average != null && average > 0 && (
-          <span className="weekly-average" style={{ bottom: `${(average / most) * 100}%` }} />
-        )}
-        {weeks.map((w) => (
-          <span
-            key={w.start}
-            className="weekly-column"
-            data-partial={!w.complete || undefined}
-            title={`Week of ${formatWeek(w.start)}: ${w.count} ${w.count === 1 ? 'deal' : 'deals'}${w.complete ? '' : ' so far'}`}
-          >
-            {w.count > 0 && <span className="weekly-bar" style={{ height: `${(w.count / most) * 100}%` }} />}
-          </span>
-        ))}
-      </div>
-      {weeks.length > 0 && (
-        <div className="weekly-axis" aria-hidden="true">
-          <span>{formatWeek(weeks[0].start)}</span>
-          <span>this week</span>
+      <div className="weekly-plot" aria-hidden="true">
+        <div className="weekly-chart">
+          {average != null && average > 0 && <span className="weekly-average" style={{ bottom: height(average) }} />}
+          {weeks.map((w) => (
+            <span key={w.start} className="weekly-column" data-partial={!w.complete || undefined}>
+              {w.count > 0 && <span className="weekly-bar" style={{ height: height(w.count) }} />}
+              <span className="weekly-count" style={{ bottom: height(w.count) }}>
+                {w.count}
+              </span>
+            </span>
+          ))}
         </div>
-      )}
+        <div className="weekly-dates">
+          {weeks.map((w) => (
+            <span key={w.start}>{w.complete ? formatWeek(w.start) : 'This week'}</span>
+          ))}
+        </div>
+      </div>
 
       <table className="sr-only">
         <caption>New deals per week</caption>

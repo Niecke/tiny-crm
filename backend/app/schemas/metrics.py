@@ -187,7 +187,7 @@ class WeekCount(BaseModel):
 
 
 class TrendMetrics(BaseModel):
-    """A fixed window, independent of `period`: the last WEEKS calendar weeks,
+    """A fixed window, independent of `period`: the last ten calendar weeks (WEEKS),
     oldest first, ending with the current one. Weeks with nothing are zeros,
     so the series has no gaps a chart would have to guess about."""
 

@@ -114,8 +114,9 @@ function Money({ totals, empty }: { totals: MoneyByCurrency[]; empty: string }) 
   )
 }
 
-// New deals per week beside today's list: whether the top of the funnel is
-// being fed, week by week. The same cached request as the tiles.
+// New deals per week, across the page under the headline tiles: whether the
+// top of the funnel is being fed, week by week. The same cached request as
+// the tiles.
 export function WeeklyDealsPanel() {
   const { api } = useRouteContext({ from: '/_authed' })
   const metrics = useQuery(metricsQuery(api, 'quarter'))
@@ -124,8 +125,9 @@ export function WeeklyDealsPanel() {
     <section className="panel" aria-label="New deals per week">
       <div className="panel-header weekly-header">
         <h2>New deals per week</h2>
-        <Link to="/deals" search={{ scope: 'all', view: 'list' }} className="small">
-          Deals
+        <span className="summary-when">Last 10 weeks</span>
+        <Link to="/deals" search={{ scope: 'all', view: 'list' }} className="small weekly-link">
+          All deals
         </Link>
       </div>
       <div className="panel-body">

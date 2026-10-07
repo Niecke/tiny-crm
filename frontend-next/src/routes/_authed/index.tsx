@@ -39,6 +39,7 @@ function Dashboard() {
       </header>
 
       <NumbersSummary />
+      <WeeklyDealsPanel />
 
       <div className="dashboard">
         <section className="panel" aria-label="Today">
@@ -53,10 +54,7 @@ function Dashboard() {
           </div>
         </section>
 
-        <div className="dashboard-side">
-          <Queues briefing={briefing.data} />
-          <WeeklyDealsPanel />
-        </div>
+        <Queues briefing={briefing.data} />
       </div>
     </div>
   )

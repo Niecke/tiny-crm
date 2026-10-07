@@ -492,7 +492,7 @@ function Activity({ data }: { data: DashboardMetrics }) {
         </div>
       </div>
       <div className="numbers-activity-col">
-        <h3>New deals per week · last 12 weeks</h3>
+        <h3>New deals per week · last 10 weeks</h3>
         <WeeklyDeals weeks={data.trends.deals_opened_weekly} />
       </div>
     </Panel>

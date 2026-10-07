@@ -520,36 +520,35 @@ a {
   }
 }
 
-.dashboard-side {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-  min-width: 0;
-}
-
-/* New deals per week: twelve columns on one baseline, the running week
-   lighter, a dashed line at the average of the complete weeks. */
+/* New deals per week: the figures beside ten labelled columns on one
+   baseline, the running week lighter, a dashed line at the average of the
+   complete weeks. Stacked on a phone. */
 .weekly {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
+  display: grid;
+  grid-template-columns: minmax(10rem, 14rem) minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: end;
 }
 
 .weekly-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-3);
+  gap: var(--space-1) var(--space-3);
 }
 
 .weekly-header h2 {
   font-size: 0.95rem;
 }
 
+.weekly-link {
+  margin-left: auto;
+}
+
 .weekly-figures {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
   margin: 0;
 }
 
@@ -560,8 +559,9 @@ a {
 
 .weekly-figures dd {
   margin: 0;
-  font-size: 1.15rem;
+  font-size: 1.25rem;
   font-weight: 600;
+  line-height: 1.2;
   font-variant-numeric: tabular-nums;
 }
 
@@ -570,33 +570,58 @@ a {
   font-weight: 400;
 }
 
+.weekly-plot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+/* Room at the top for the tallest column's label. */
 .weekly-chart {
   position: relative;
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);
-  gap: 3px;
-  align-items: end;
-  height: 72px;
+  gap: var(--space-2);
+  height: 140px;
+  margin-top: 1.25rem;
   border-bottom: 1px solid var(--color-border-strong);
 }
 
 .weekly-column {
-  display: flex;
-  align-items: flex-end;
+  position: relative;
   height: 100%;
 }
 
 .weekly-bar {
-  display: block;
-  width: 100%;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
   min-height: 2px;
   background: var(--color-accent);
-  border-radius: 3px 3px 0 0;
+  border-radius: 4px 4px 0 0;
 }
 
 .weekly-column[data-partial] .weekly-bar {
   opacity: 0.4;
+}
+
+.weekly-count {
+  position: absolute;
+  left: 0;
+  right: 0;
+  margin-bottom: 2px;
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+
+.weekly-column[data-partial] .weekly-count {
+  color: var(--color-text-muted);
 }
 
 .weekly-average {
@@ -607,12 +632,53 @@ a {
   pointer-events: none;
 }
 
-.weekly-axis {
-  display: flex;
-  justify-content: space-between;
+.weekly-dates {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: var(--space-2);
   font-size: 0.75rem;
   color: var(--color-text-muted);
-  margin-top: calc(-1 * var(--space-2));
+  text-align: center;
+  white-space: nowrap;
+}
+
+.weekly-dates span {
+  overflow: hidden;
+  text-overflow: clip;
+}
+
+@media (max-width: 767px) {
+  .weekly {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .weekly-figures {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .weekly-chart,
+  .weekly-dates {
+    gap: 3px;
+  }
+
+  /* Ten dates do not fit a phone: every other one, and the running week,
+     which may overhang its column to the right edge. */
+  .weekly-dates span:nth-child(even),
+  .weekly-dates span:nth-last-child(2) {
+    visibility: hidden;
+  }
+
+  /* The shown dates spill into their hidden neighbours' room. */
+  .weekly-dates span {
+    overflow: visible;
+  }
+
+  .weekly-dates span:last-child {
+    visibility: visible;
+    direction: rtl;
+  }
 }
 
 .sr-only {
@@ -2605,7 +2671,7 @@ textarea.input {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .dashboard-side {
+  .queues {
     order: -1;
   }
 

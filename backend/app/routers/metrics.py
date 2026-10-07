@@ -42,7 +42,7 @@ async def get_dashboard_metrics(
 
     Pipeline, the per-stage ages and the attention counts are as of now; the
     rest covers the period, which is echoed back resolved. `trends` is always
-    the last twelve weeks. Today is a calendar day in BRIEFING_TIMEZONE, as in
+    the last ten weeks. Today is a calendar day in BRIEFING_TIMEZONE, as in
     the morning briefing.
     """
     window = Period.containing(period, now, ZoneInfo(settings.briefing_timezone))
