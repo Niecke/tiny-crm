@@ -64,6 +64,20 @@ export const tasksQuery = (api: Api, { q, done, archived, page = 1 }: TaskFilter
     placeholderData: keepPreviousData,
   })
 
+// Open tasks due today or earlier, for the Tasks entry in the nav. "Today"
+// is the reader's day: due dates are filed as 23:59 local, so the bound is the
+// start of tomorrow here, not on the server.
+export const dueCountQuery = (api: Api) =>
+  queryOptions({
+    queryKey: ['tasks', 'due-count'],
+    queryFn: async () => {
+      const tomorrow = new Date()
+      tomorrow.setHours(24, 0, 0, 0)
+      return (await unwrap(api.GET('/tasks/', { params: { query: { due_before: tomorrow.toISOString(), limit: 1 } } })))
+        .total
+    },
+  })
+
 export const taskQuery = (api: Api, id: string) =>
   queryOptions({
     queryKey: ['tasks', 'detail', id],

@@ -4,6 +4,7 @@ import { type ReactNode, useState } from 'react'
 import { Dialog, Modal, ModalOverlay } from 'react-aria-components'
 import { logout, meQuery } from '../auth'
 import { captureCountQuery } from '../captures'
+import { dueCountQuery as dueTasksQuery } from '../tasks'
 import { dueCountQuery } from '../watches'
 import { GlobalSearch } from './GlobalSearch'
 import { QuickCaptureButton } from './QuickCapture'
@@ -40,6 +41,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Sources due for a sweep, on the Watches entry, for the same reason: a
   // watch list nobody looks at is the failure it exists to prevent.
   const { data: due = 0 } = useQuery(dueCountQuery(api))
+  // Open tasks due today or overdue, on the Tasks entry, like the watches.
+  const { data: dueTasks = 0 } = useQuery(dueTasksQuery(api))
   // The menu is open on the history entry it was opened on, and only there:
   // any navigation closes it — the back button too, which never goes through
   // a link in it, even back to an identical URL — without an effect to reset
@@ -73,7 +76,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <aside className="sidebar">
         <div className="brand">tinyCRM</div>
         <QuickCaptureButton className="quick-note-sidebar" />
-        <NavLinks waiting={waiting} due={due} />
+        <NavLinks waiting={waiting} due={due} dueTasks={dueTasks} />
         <Account />
       </aside>
 
@@ -88,7 +91,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 ×
               </Button>
             </div>
-            <NavLinks waiting={waiting} due={due} onNavigate={() => setMenuOpen(false)} />
+            <NavLinks waiting={waiting} due={due} dueTasks={dueTasks} onNavigate={() => setMenuOpen(false)} />
             <Account />
           </Dialog>
         </Modal>
@@ -107,7 +110,17 @@ export function AppShell({ children }: { children: ReactNode }) {
   )
 }
 
-function NavLinks({ waiting, due, onNavigate }: { waiting: number; due: number; onNavigate?: () => void }) {
+function NavLinks({
+  waiting,
+  due,
+  dueTasks,
+  onNavigate,
+}: {
+  waiting: number
+  due: number
+  dueTasks: number
+  onNavigate?: () => void
+}) {
   return (
     <nav className="nav" aria-label="Main">
       {nav.map((item) => (
@@ -126,6 +139,11 @@ function NavLinks({ waiting, due, onNavigate }: { waiting: number; due: number; 
           {item.to === '/inbox' && waiting > 0 && (
             <span className="nav-count" aria-label={`${waiting} waiting`}>
               {waiting}
+            </span>
+          )}
+          {item.to === '/tasks' && dueTasks > 0 && (
+            <span className="nav-count" aria-label={`${dueTasks} due`}>
+              {dueTasks}
             </span>
           )}
           {item.to === '/watches' && due > 0 && (

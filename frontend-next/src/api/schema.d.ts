@@ -4315,6 +4315,7 @@ export interface operations {
                 contact_id?: string | null;
                 deal_id?: string | null;
                 interaction_id?: string | null;
+                due_before?: string | null;
                 archived?: boolean;
             };
             header?: never;
