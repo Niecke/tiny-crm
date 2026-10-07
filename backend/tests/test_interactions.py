@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 from httpx2 import AsyncClient
 
-from tests.conftest import Account, create_resource
+from tests.conftest import Account, create_resource, erase
 
 PAST = (datetime.now(UTC) - timedelta(days=2)).isoformat()
 FUTURE = (datetime.now(UTC) + timedelta(days=2)).isoformat()
@@ -39,9 +39,7 @@ async def test_an_interaction_survives_a_full_round_trip(
     assert patched.json()["subject"] == "Kickoff call (rescheduled)"
     assert patched.json()["contact_ids"] == []
 
-    assert (
-        await client.delete(f"/interactions/{created['id']}", headers=alice.headers)
-    ).status_code == 204
+    assert (await erase(client, alice, f"/interactions/{created['id']}")).status_code == 204
 
 
 async def test_upcoming_and_past_are_separate_views(client: AsyncClient, alice: Account) -> None:

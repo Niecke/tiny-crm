@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { Cell, Column, Row, Table, TableBody, TableHeader } from 'react-aria-components'
+import { ArchivedToggle } from '../../../components/Archive'
 import { Pagination } from '../../../components/ui/Pagination'
 import { SearchField } from '../../../components/ui/SearchField'
 import { Select } from '../../../components/ui/Select'
@@ -15,7 +16,7 @@ export const Route = createFileRoute('/_authed/contacts/')({
 function ContactsList() {
   const { api } = Route.useRouteContext()
   const filters = Route.useSearch()
-  const { q = '', status, relation, page = 1 } = filters
+  const { q = '', status, relation, archived = false, page = 1 } = filters
   const navigate = Route.useNavigate()
 
   const [input, setInput] = useState(q)
@@ -28,7 +29,7 @@ function ContactsList() {
   }, [search, q, navigate])
 
   const { data, error, isPending, isPlaceholderData } = useQuery(
-    contactsQuery(api, { q: search, status, relation, page }),
+    contactsQuery(api, { q: search, status, relation, archived, page }),
   )
   const filtered = Boolean(search || status || relation)
 
@@ -63,6 +64,12 @@ function ContactsList() {
             void navigate({ search: (prev) => ({ ...prev, relation: v || undefined, page: undefined }), replace: true })
           }
         />
+        <ArchivedToggle
+          isSelected={archived}
+          onChange={(v) =>
+            void navigate({ search: (prev) => ({ ...prev, archived: v || undefined, page: undefined }), replace: true })
+          }
+        />
       </div>
 
       {isPending ? (
@@ -70,7 +77,9 @@ function ContactsList() {
       ) : error ? (
         <p className="form-error">{error.message}</p>
       ) : data.items.length === 0 && page === 1 ? (
-        <p className="muted">{filtered ? 'No contact matches these filters.' : 'No contacts yet.'}</p>
+        <p className="muted">
+          {filtered ? 'No contact matches these filters.' : archived ? 'Nothing archived.' : 'No contacts yet.'}
+        </p>
       ) : (
         <>
           <div className="panel table-wrap" data-stale={isPlaceholderData || undefined}>

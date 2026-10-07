@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.archive import archived_is, require_archived, require_live, set_archived
 from app.auth import current_active_user
 from app.auth.users import User
 from app.db import contains, count_rows, get_session
@@ -37,6 +38,13 @@ LINK_TARGETS: tuple[tuple[str, type[LinkTarget], str], ...] = (
     ("deal_id", Deal, "Deal"),
     ("interaction_id", Interaction, "Interaction"),
 )
+
+
+async def _get_owned(session: AsyncSession, task_id: UUID, user: User) -> Task:
+    task = await session.get(Task, task_id)
+    if task is None or task.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return task
 
 
 async def _check_links(session: AsyncSession, values: dict[str, Any], user: User) -> None:
@@ -141,10 +149,15 @@ async def list_tasks(
     contact_id: UUID | None = Query(default=None),
     deal_id: UUID | None = Query(default=None),
     interaction_id: UUID | None = Query(default=None),
+    # Due before this moment — the nav's "due" count. The client sends the
+    # start of tomorrow in its own time zone, which the server does not know,
+    # so tasks due today count as well as overdue ones.
+    due_before: datetime | None = Query(default=None),
+    archived: bool = False,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> Page[TaskRead]:
-    query = select(Task).where(Task.user_id == user.id)
+    query = select(Task).where(Task.user_id == user.id, archived_is(Task, archived))
     if not include_done:
         query = query.where(Task.done.is_(False))
     if search:
@@ -155,6 +168,8 @@ async def list_tasks(
         query = query.where(Task.deal_id == deal_id)
     if interaction_id is not None:
         query = query.where(Task.interaction_id == interaction_id)
+    if due_before is not None:
+        query = query.where(Task.due_date < due_before)
     total = await count_rows(session, query)
     # NULLS LAST so tasks without a due date sink to the bottom; client renders
     # overdue (due_date < now) red, and ascending order naturally floats them up.
@@ -177,10 +192,7 @@ async def get_task(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> Task:
-    task = await session.get(Task, task_id)
-    if task is None or task.user_id != user.id:
-        raise HTTPException(status_code=404, detail="Task not found")
-    return task
+    return await _get_owned(session, task_id, user)
 
 
 @router.post("/", response_model=TaskRead, status_code=201)
@@ -204,9 +216,10 @@ async def update_task(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> TaskCompletionRead:
-    task = await session.get(Task, task_id)
-    if task is None or task.user_id != user.id:
-        raise HTTPException(status_code=404, detail="Task not found")
+    task = await _get_owned(session, task_id, user)
+    # Which also keeps an archived task from being completed, and so from
+    # spawning the next one of a series nobody is looking at.
+    require_live(task, "Task")
 
     updates = body.model_dump(exclude_unset=True)
     # Only links the caller actually sent are checked; clearing one to null is
@@ -241,14 +254,43 @@ async def update_task(
     return completed
 
 
+@router.post("/{task_id}/archive", response_model=TaskRead)
+async def archive_task(
+    task_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_active_user),
+) -> Task:
+    """Put the task away without calling it done.
+
+    Done is a claim that the work happened, and completing a repeating task
+    schedules the next one. Archiving says neither: the task leaves the list
+    and the briefing, and a series stops where it is.
+    """
+    task = await _get_owned(session, task_id, user)
+    await set_archived(session, task, True)
+    return task
+
+
+@router.post("/{task_id}/restore", response_model=TaskRead)
+async def restore_task(
+    task_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_active_user),
+) -> Task:
+    """Bring an archived task back, as open or as done as it was."""
+    task = await _get_owned(session, task_id, user)
+    await set_archived(session, task, False)
+    return task
+
+
 @router.delete("/{task_id}", status_code=204)
 async def delete_task(
     task_id: UUID,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> None:
-    task = await session.get(Task, task_id)
-    if task is None or task.user_id != user.id:
-        raise HTTPException(status_code=404, detail="Task not found")
+    """Erase the task for good. Only once it has been archived."""
+    task = await _get_owned(session, task_id, user)
+    require_archived(task, "Task")
     await session.delete(task)
     await session.commit()

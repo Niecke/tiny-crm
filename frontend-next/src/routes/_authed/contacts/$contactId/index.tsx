@@ -1,22 +1,23 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import { Tab, TabList, TabPanel, Tabs } from 'react-aria-components'
 import { z } from 'zod'
 import { ApiError } from '../../../../api/client'
 import type { ContactRead } from '../../../../api/types'
+import { ArchiveButton, ArchivedNotice } from '../../../../components/Archive'
+import { useArchive } from '../../../../useArchive'
 import { Fact, Facts } from '../../../../components/RecordPage'
 import { useSelectedTabInView } from '../../../../useSelectedTabInView'
-import { Button } from '../../../../components/ui/Button'
-import { ConfirmDialog } from '../../../../components/ui/ConfirmDialog'
 import {
+  archiveContact,
   contactQuery,
   deleteContact,
   freelancerAnswer,
-  invalidateContacts,
   labelOf,
   lifecycleOptions,
   relationOptions,
+  restoreContact,
   sourceOptions,
 } from '../../../../contacts'
 import { formatDay, localDay } from '../../../../format'
@@ -46,7 +47,6 @@ function ContactDetail() {
   const { contactId } = Route.useParams()
   const { tab = 'tasks', ...filters } = Route.useSearch()
   const navigate = useNavigate()
-  const queryClient = useQueryClient()
   const contact = useQuery(contactQuery(api, contactId))
   // All three load up front: each tab label shows its count.
   const [showDone, setShowDone] = useState(false)
@@ -58,14 +58,12 @@ function ContactDetail() {
   const [now] = useState(() => Date.now())
   const tabsRef = useSelectedTabInView(tab, contact.isSuccess)
 
-  const [confirmDelete, setConfirmDelete] = useState(false)
-  const remove = useMutation({
-    mutationFn: () => deleteContact(api, contactId),
-    onSuccess: async () => {
-      await navigate({ to: '/contacts', search: filters, replace: true })
-      queryClient.removeQueries({ queryKey: contactQuery(api, contactId).queryKey })
-      await invalidateContacts(queryClient)
-    },
+  const archiving = useArchive({
+    queryKey: contactQuery(api, contactId).queryKey,
+    archive: () => archiveContact(api, contactId),
+    restore: () => restoreContact(api, contactId),
+    remove: () => deleteContact(api, contactId),
+    leave: () => navigate({ to: '/contacts', search: filters, replace: true }),
   })
 
   const back = (
@@ -102,6 +100,10 @@ function ContactDetail() {
     <div className="page">
       {back}
 
+      <ArchivedNotice record={c} noun="contact" name={c.name} archiving={archiving}>
+        Their tasks, deals, interactions and documents are kept, with no contact on them.
+      </ArchivedNotice>
+
       <header className="page-header page-header-row">
         <div className="page-header">
           <h1>{c.name}</h1>
@@ -117,19 +119,19 @@ function ContactDetail() {
             </p>
           )}
         </div>
-        <div className="header-actions">
-          <Button variant="quiet" onPress={() => setConfirmDelete(true)}>
-            Delete
-          </Button>
-          <Link
-            to="/contacts/$contactId/edit"
-            params={{ contactId }}
-            search={filters}
-            className="button button-quiet"
-          >
-            Edit
-          </Link>
-        </div>
+        {!c.archived_at && (
+          <div className="header-actions">
+            <ArchiveButton archiving={archiving} />
+            <Link
+              to="/contacts/$contactId/edit"
+              params={{ contactId }}
+              search={filters}
+              className="button button-quiet"
+            >
+              Edit
+            </Link>
+          </div>
+        )}
       </header>
 
       <div className="profile">
@@ -249,21 +251,6 @@ function ContactDetail() {
           </TabPanel>
         </Tabs>
       </div>
-
-      <ConfirmDialog
-        title="Delete this contact?"
-        isOpen={confirmDelete}
-        onOpenChange={setConfirmDelete}
-        onConfirm={() => remove.mutate()}
-        confirmLabel="Delete"
-        pendingLabel="Deleting…"
-        pending={remove.isPending}
-        error={remove.error}
-      >
-        <p>
-          <strong>{c.name}</strong> will be permanently deleted.
-        </p>
-      </ConfirmDialog>
     </div>
   )
 }

@@ -1,25 +1,26 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import { Tab, TabList, TabPanel, Tabs } from 'react-aria-components'
 import { z } from 'zod'
 import { ApiError } from '../../../../api/client'
 import type { DealRead } from '../../../../api/types'
+import { ArchiveButton, ArchivedNotice } from '../../../../components/Archive'
+import { useArchive } from '../../../../useArchive'
 import { DocumentRows } from '../../../../components/DocumentRows'
 import { InteractionList } from '../../../../components/InteractionList'
 import { LostReasonDialog } from '../../../../components/LostReasonDialog'
 import { Fact, Facts } from '../../../../components/RecordPage'
 import { TaskList } from '../../../../components/TaskList'
-import { Button } from '../../../../components/ui/Button'
 import { Checkbox } from '../../../../components/ui/Checkbox'
-import { ConfirmDialog } from '../../../../components/ui/ConfirmDialog'
 import { Select } from '../../../../components/ui/Select'
 import {
+  archiveDeal,
   dealQuery,
   dealValue,
   deleteDeal,
-  invalidateDeals,
   isDecided,
+  restoreDeal,
   type Stage,
   stageLabel,
   stageOptions,
@@ -49,7 +50,6 @@ function DealDetail() {
   const { dealId } = Route.useParams()
   const { tab = 'tasks', ...filters } = Route.useSearch()
   const navigate = useNavigate()
-  const queryClient = useQueryClient()
   const deal = useQuery(dealQuery(api, dealId))
   const [showDone, setShowDone] = useState(false)
   const tasks = useQuery(linkedTasksQuery(api, { deal_id: dealId }, showDone))
@@ -61,14 +61,12 @@ function DealDetail() {
   const [now] = useState(() => Date.now())
   const tabsRef = useSelectedTabInView(tab, deal.isSuccess)
 
-  const [confirmDelete, setConfirmDelete] = useState(false)
-  const remove = useMutation({
-    mutationFn: () => deleteDeal(api, dealId),
-    onSuccess: async () => {
-      await navigate({ to: '/deals', search: filters, replace: true })
-      queryClient.removeQueries({ queryKey: dealQuery(api, dealId).queryKey })
-      await invalidateDeals(queryClient)
-    },
+  const archiving = useArchive({
+    queryKey: dealQuery(api, dealId).queryKey,
+    archive: () => archiveDeal(api, dealId),
+    restore: () => restoreDeal(api, dealId),
+    remove: () => deleteDeal(api, dealId),
+    leave: () => navigate({ to: '/deals', search: filters, replace: true }),
   })
 
   const back = (
@@ -105,6 +103,10 @@ function DealDetail() {
     <div className="page">
       {back}
 
+      <ArchivedNotice record={d} noun="deal" name={d.title} archiving={archiving}>
+        Its stage history goes with it; its tasks, interactions and documents are kept.
+      </ArchivedNotice>
+
       <header className="page-header page-header-row">
         <div className="page-header">
           <h1>{d.title}</h1>
@@ -122,14 +124,14 @@ function DealDetail() {
             )}
           </p>
         </div>
-        <div className="header-actions">
-          <Button variant="quiet" onPress={() => setConfirmDelete(true)}>
-            Delete
-          </Button>
-          <Link to="/deals/$dealId/edit" params={{ dealId }} search={filters} className="button button-quiet">
-            Edit
-          </Link>
-        </div>
+        {!d.archived_at && (
+          <div className="header-actions">
+            <ArchiveButton archiving={archiving} />
+            <Link to="/deals/$dealId/edit" params={{ dealId }} search={filters} className="button button-quiet">
+              Edit
+            </Link>
+          </div>
+        )}
       </header>
 
       {mover.error && (
@@ -233,21 +235,6 @@ function DealDetail() {
       </div>
 
       <LostReasonDialog deal={mover.askingWhy} onConfirm={mover.confirmLost} onCancel={mover.cancelLost} />
-
-      <ConfirmDialog
-        title="Delete this deal?"
-        isOpen={confirmDelete}
-        onOpenChange={setConfirmDelete}
-        onConfirm={() => remove.mutate()}
-        confirmLabel="Delete"
-        pendingLabel="Deleting…"
-        pending={remove.isPending}
-        error={remove.error}
-      >
-        <p>
-          <strong>{d.title}</strong> will be permanently deleted. Its tasks, interactions and documents are kept.
-        </p>
-      </ConfirmDialog>
     </div>
   )
 }
@@ -263,13 +250,16 @@ function DealFacts({ deal: d, onMove, moving }: { deal: DealRead; onMove: (stage
             <span className="deal-headline">{headline ?? <span className="muted">No value yet</span>}</span>
             {detail && <span className="row-meta">{detail}</span>}
           </div>
-          {/* The one move the pipeline is made of; Lost asks why first. */}
-          <Select
-            label={moving ? 'Stage (moving…)' : 'Stage'}
-            options={stageOptions}
-            value={d.stage}
-            onChange={(v) => v && onMove(v)}
-          />
+          {/* The one move the pipeline is made of; Lost asks why first. An
+              archived deal cannot be moved, and its stage is in the header. */}
+          {!d.archived_at && (
+            <Select
+              label={moving ? 'Stage (moving…)' : 'Stage'}
+              options={stageOptions}
+              value={d.stage}
+              onChange={(v) => v && onMove(v)}
+            />
+          )}
         </div>
       }
     >

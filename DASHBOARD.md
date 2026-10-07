@@ -134,6 +134,10 @@ the cause was three months ago.
 GET /metrics/dashboard?period=quarter    # week | month | quarter | year
 ```
 
+Archived records are in none of these numbers (#140). Every figure links to
+the list behind it, and no list shows an archived row; an archived deal leaves
+the pipeline, the conversion rate and the sales cycle until it is restored.
+
 One request, one response, one Pydantic model per group. Reasons for a single
 endpoint rather than one per metric: a dashboard assembled from twelve requests
 is twelve chances to render half a page, the groups share window and

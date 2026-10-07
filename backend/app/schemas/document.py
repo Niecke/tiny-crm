@@ -29,6 +29,9 @@ class DocumentRead(DocumentLinks):
     preview_key: str | None = Field(exclude=True)
     created_at: datetime
     updated_at: datetime
+    # Set once the record has been archived: out of every list, read-only, and
+    # still reachable by its id. NULL for everything in use.
+    archived_at: datetime | None = None
 
     @computed_field  # type: ignore[prop-decorator]
     @property

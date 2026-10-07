@@ -51,13 +51,15 @@ export type ContactFilters = {
   q?: string
   status?: Lifecycle
   relation?: Relation
+  // The archive instead of the list (#140).
+  archived?: boolean
   page?: number
 }
 
 // Sorted by name on the server.
-export const contactsQuery = (api: Api, { q, status, relation, page = 1 }: ContactFilters) =>
+export const contactsQuery = (api: Api, { q, status, relation, archived, page = 1 }: ContactFilters) =>
   queryOptions({
-    queryKey: ['contacts', 'list', { q, status, relation, page }],
+    queryKey: ['contacts', 'list', { q, status, relation, archived, page }],
     queryFn: () =>
       unwrap(
         api.GET('/contacts/', {
@@ -66,6 +68,7 @@ export const contactsQuery = (api: Api, { q, status, relation, page = 1 }: Conta
               search: q || undefined,
               lifecycle_status: status,
               relation_type: relation,
+              archived: archived || undefined,
               skip: (page - 1) * PAGE_SIZE,
               limit: PAGE_SIZE,
             },
@@ -97,6 +100,12 @@ export const updateContact = (api: Api, id: string, body: ContactCreate) =>
 
 export const deleteContact = (api: Api, id: string) =>
   unwrap(api.DELETE('/contacts/{contact_id}', { params: { path: { contact_id: id } } }))
+
+export const archiveContact = (api: Api, id: string) =>
+  unwrap(api.POST('/contacts/{contact_id}/archive', { params: { path: { contact_id: id } } }))
+
+export const restoreContact = (api: Api, id: string) =>
+  unwrap(api.POST('/contacts/{contact_id}/restore', { params: { path: { contact_id: id } } }))
 
 // A contact write changes every contact list, and the contact count on its
 // organization (old and new, after a move), so organizations go too.

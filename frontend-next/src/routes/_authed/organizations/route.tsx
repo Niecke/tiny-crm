@@ -6,6 +6,8 @@ import { z } from 'zod'
 // form lands on the same filtered list.
 const searchSchema = z.object({
   q: z.string().optional().catch(undefined),
+  // The archive instead of the list (#140).
+  archived: z.boolean().optional().catch(undefined),
 })
 
 export const Route = createFileRoute('/_authed/organizations')({

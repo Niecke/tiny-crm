@@ -4,10 +4,11 @@ from uuid import UUID, uuid4
 from sqlalchemy import ForeignKey, func
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.archive import Archivable
 from app.db import Base
 
 
-class Organization(Base):
+class Organization(Archivable, Base):
     """A company a contact belongs to.
 
     Replaces the free-text `Contact.company`: two spellings of one customer used

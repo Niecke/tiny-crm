@@ -142,6 +142,11 @@ class Searchable:
         column: InstrumentedAttribute[Any] = getattr(self.model, "id")
         return column
 
+    @property
+    def archived_at(self) -> InstrumentedAttribute[Any]:
+        column: InstrumentedAttribute[Any] = getattr(self.model, "archived_at")
+        return column
+
     def document(self) -> ColumnElement[str]:
         parts: list[ColumnElement[str]] = [_text(self.title)] if self.title_in_document else []
         parts += [_text(getattr(self.model, attr)) for attr, _ in self.fields]

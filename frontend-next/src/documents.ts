@@ -11,13 +11,23 @@ export const extensionFor = (format: string) => ({ pdf: 'pdf', markdown: 'md', t
 
 export type DocumentLinks = Pick<DocumentUpdate, 'contact_ids' | 'organization_ids' | 'deal_ids' | 'project_ids'>
 
-export const documentsQuery = (api: Api, { q, page = 1 }: { q?: string; page?: number }) =>
+export const documentsQuery = (
+  api: Api,
+  { q, archived, page = 1 }: { q?: string; archived?: boolean; page?: number },
+) =>
   queryOptions({
-    queryKey: ['documents', 'list', { q, page }],
+    queryKey: ['documents', 'list', { q, archived, page }],
     queryFn: () =>
       unwrap(
         api.GET('/documents/', {
-          params: { query: { search: q || undefined, skip: (page - 1) * PAGE_SIZE, limit: PAGE_SIZE } },
+          params: {
+            query: {
+              search: q || undefined,
+              archived: archived || undefined,
+              skip: (page - 1) * PAGE_SIZE,
+              limit: PAGE_SIZE,
+            },
+          },
         }),
       ),
     placeholderData: keepPreviousData,
@@ -111,6 +121,12 @@ export const updateDocument = (api: Api, id: string, body: DocumentUpdate) =>
 
 export const deleteDocument = (api: Api, id: string) =>
   unwrap(api.DELETE('/documents/{document_id}', { params: { path: { document_id: id } } }))
+
+export const archiveDocument = (api: Api, id: string) =>
+  unwrap(api.POST('/documents/{document_id}/archive', { params: { path: { document_id: id } } }))
+
+export const restoreDocument = (api: Api, id: string) =>
+  unwrap(api.POST('/documents/{document_id}/restore', { params: { path: { document_id: id } } }))
 
 // Lists and details only. A file and its preview are keyed by `updated_at`,
 // so they never go stale; refetching one that was just replaced asks for a

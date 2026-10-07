@@ -6,6 +6,7 @@ import { DocumentThumb } from '../../../components/DocumentThumb'
 import { DocumentViewer } from '../../../components/DocumentViewer'
 import { Button } from '../../../components/ui/Button'
 import { Pagination } from '../../../components/ui/Pagination'
+import { ArchivedToggle } from '../../../components/Archive'
 import { SearchField } from '../../../components/ui/SearchField'
 import { PAGE_SIZE } from '../../../contacts'
 import { contentQuery, documentsQuery, filenameFor, saveBlob } from '../../../documents'
@@ -19,7 +20,7 @@ export const Route = createFileRoute('/_authed/documents/')({
 function DocumentsList() {
   const { api } = Route.useRouteContext()
   const filters = Route.useSearch()
-  const { q = '', page = 1 } = filters
+  const { q = '', archived = false, page = 1 } = filters
   const navigate = Route.useNavigate()
   const queryClient = useQueryClient()
 
@@ -30,7 +31,7 @@ function DocumentsList() {
       void navigate({ search: (prev) => ({ ...prev, q: search || undefined, page: undefined }), replace: true })
   }, [search, q, navigate])
 
-  const { data, error, isPending, isPlaceholderData } = useQuery(documentsQuery(api, { q: search, page }))
+  const { data, error, isPending, isPlaceholderData } = useQuery(documentsQuery(api, { q: search, archived, page }))
   const [viewing, setViewing] = useState<DocumentRead | null>(null)
   const [downloadError, setDownloadError] = useState<string | null>(null)
 
@@ -54,6 +55,12 @@ function DocumentsList() {
 
       <div className="toolbar filters">
         <SearchField label="Search documents" placeholder="Search titles and descriptions" value={input} onChange={setInput} />
+        <ArchivedToggle
+          isSelected={archived}
+          onChange={(v) =>
+            void navigate({ search: (prev) => ({ ...prev, archived: v || undefined, page: undefined }), replace: true })
+          }
+        />
       </div>
 
       {downloadError && (

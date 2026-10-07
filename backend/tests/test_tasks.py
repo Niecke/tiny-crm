@@ -2,7 +2,7 @@
 
 from httpx2 import AsyncClient
 
-from tests.conftest import Account, create_resource
+from tests.conftest import Account, create_resource, erase
 
 
 async def test_a_task_survives_a_full_round_trip(client: AsyncClient, alice: Account) -> None:
@@ -29,9 +29,7 @@ async def test_a_task_survives_a_full_round_trip(client: AsyncClient, alice: Acc
     assert patched.status_code == 200
     assert patched.json()["done"] is True
 
-    assert (
-        await client.delete(f"/tasks/{created['id']}", headers=alice.headers)
-    ).status_code == 204
+    assert (await erase(client, alice, f"/tasks/{created['id']}")).status_code == 204
     assert (await client.get(f"/tasks/{created['id']}", headers=alice.headers)).status_code == 404
 
 
@@ -62,3 +60,29 @@ async def test_a_task_without_a_title_is_rejected(client: AsyncClient, alice: Ac
     response = await client.post("/tasks/", json={"priority": 1}, headers=alice.headers)
 
     assert response.status_code == 422
+
+
+async def test_due_before_counts_only_tasks_due_before_the_moment(
+    client: AsyncClient, alice: Account
+) -> None:
+    await create_resource(client, alice, "/tasks/", {"title": "Someday"})
+    await create_resource(
+        client, alice, "/tasks/", {"title": "Overdue", "due_date": "2026-08-20T21:59:00Z"}
+    )
+    await create_resource(
+        client, alice, "/tasks/", {"title": "Today", "due_date": "2026-08-26T21:59:00Z"}
+    )
+    await create_resource(
+        client, alice, "/tasks/", {"title": "Tomorrow", "due_date": "2026-08-27T21:59:00Z"}
+    )
+    done = await create_resource(
+        client, alice, "/tasks/", {"title": "Done", "due_date": "2026-08-20T21:59:00Z"}
+    )
+    await client.patch(f"/tasks/{done['id']}", json={"done": True}, headers=alice.headers)
+
+    page = await client.get(
+        "/tasks/", params={"due_before": "2026-08-27T00:00:00+02:00"}, headers=alice.headers
+    )
+
+    assert page.json()["total"] == 2
+    assert [t["title"] for t in page.json()["items"]] == ["Overdue", "Today"]

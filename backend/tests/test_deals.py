@@ -21,7 +21,7 @@ from typing import Any
 
 from httpx2 import AsyncClient
 
-from tests.conftest import Account, create_resource
+from tests.conftest import Account, create_resource, erase
 
 
 async def _deal(client: AsyncClient, account: Account, **fields: Any) -> dict[str, Any]:
@@ -64,7 +64,7 @@ async def test_a_deal_survives_a_full_round_trip(client: AsyncClient, alice: Acc
     assert patched.json()["expected_value"] == "14000.00"
     assert patched.json()["title"] == "Website relaunch"
 
-    deleted = await client.delete(f"/deals/{created['id']}", headers=alice.headers)
+    deleted = await erase(client, alice, f"/deals/{created['id']}")
     assert deleted.status_code == 204
     assert (await client.get(f"/deals/{created['id']}", headers=alice.headers)).status_code == 404
 
@@ -542,9 +542,7 @@ async def test_deleting_a_contact_keeps_the_deal(client: AsyncClient, alice: Acc
     contact = await create_resource(client, alice, "/contacts/", {"name": "Ada"})
     deal = await _deal(client, alice, fixed_value="5000.00", contact_id=contact["id"])
 
-    assert (
-        await client.delete(f"/contacts/{contact['id']}", headers=alice.headers)
-    ).status_code == 204
+    assert (await erase(client, alice, f"/contacts/{contact['id']}")).status_code == 204
 
     # Losing the person must never delete the record of what was sold to them.
     survivor = await client.get(f"/deals/{deal['id']}", headers=alice.headers)
@@ -558,9 +556,7 @@ async def test_deleting_an_organization_keeps_the_deal(client: AsyncClient, alic
     organization = await create_resource(client, alice, "/organizations/", {"name": "ACME"})
     deal = await _deal(client, alice, organization_id=organization["id"])
 
-    assert (
-        await client.delete(f"/organizations/{organization['id']}", headers=alice.headers)
-    ).status_code == 204
+    assert (await erase(client, alice, f"/organizations/{organization['id']}")).status_code == 204
 
     survivor = await client.get(f"/deals/{deal['id']}", headers=alice.headers)
     assert survivor.status_code == 200

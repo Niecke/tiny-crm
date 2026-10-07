@@ -40,19 +40,21 @@ export function recurrenceLabel(
 export const isOverdue = (task: Pick<TaskRead, 'done' | 'due_date'>, now = Date.now()) =>
   !task.done && task.due_date !== null && task.due_date !== undefined && Date.parse(task.due_date) < now
 
-export type TaskFilters = { q?: string; done?: boolean; page?: number }
+export type TaskFilters = { q?: string; done?: boolean; archived?: boolean; page?: number }
 
 // Soonest due first, undated last — the API's order.
-export const tasksQuery = (api: Api, { q, done, page = 1 }: TaskFilters) =>
+export const tasksQuery = (api: Api, { q, done, archived, page = 1 }: TaskFilters) =>
   queryOptions({
-    queryKey: ['tasks', 'list', { q, done, page }],
+    queryKey: ['tasks', 'list', { q, done, archived, page }],
     queryFn: () =>
       unwrap(
         api.GET('/tasks/', {
           params: {
             query: {
               search: q || undefined,
-              include_done: done || undefined,
+              // The archive is read whole, done or not.
+              include_done: done || archived || undefined,
+              archived: archived || undefined,
               skip: (page - 1) * PAGE_SIZE,
               limit: PAGE_SIZE,
             },
@@ -60,6 +62,20 @@ export const tasksQuery = (api: Api, { q, done, page = 1 }: TaskFilters) =>
         }),
       ),
     placeholderData: keepPreviousData,
+  })
+
+// Open tasks due today or earlier, for the Tasks entry in the nav. "Today"
+// is the reader's day: due dates are filed as 23:59 local, so the bound is the
+// start of tomorrow here, not on the server.
+export const dueCountQuery = (api: Api) =>
+  queryOptions({
+    queryKey: ['tasks', 'due-count'],
+    queryFn: async () => {
+      const tomorrow = new Date()
+      tomorrow.setHours(24, 0, 0, 0)
+      return (await unwrap(api.GET('/tasks/', { params: { query: { due_before: tomorrow.toISOString(), limit: 1 } } })))
+        .total
+    },
   })
 
 export const taskQuery = (api: Api, id: string) =>
@@ -88,6 +104,12 @@ export const updateTask = (api: Api, id: string, body: TaskUpdate) =>
 
 export const deleteTask = (api: Api, id: string) =>
   unwrap(api.DELETE('/tasks/{task_id}', { params: { path: { task_id: id } } }))
+
+export const archiveTask = (api: Api, id: string) =>
+  unwrap(api.POST('/tasks/{task_id}/archive', { params: { path: { task_id: id } } }))
+
+export const restoreTask = (api: Api, id: string) =>
+  unwrap(api.POST('/tasks/{task_id}/restore', { params: { path: { task_id: id } } }))
 
 // A task write changes every task list, the record pages' task tabs (all under
 // ['tasks']) and the dashboard briefing — and projects, since completing a

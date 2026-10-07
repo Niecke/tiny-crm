@@ -11,7 +11,7 @@ import pytest
 from httpx2 import AsyncClient
 
 from app.routers import documents
-from tests.conftest import Account
+from tests.conftest import Account, erase
 
 
 @pytest.fixture
@@ -115,7 +115,7 @@ async def test_deleting_a_document_removes_the_object(
 ) -> None:
     document = await _upload(client, alice)
 
-    response = await client.delete(f"/documents/{document['id']}", headers=alice.headers)
+    response = await erase(client, alice, f"/documents/{document['id']}")
 
     assert response.status_code == 204
     assert object_store == {}

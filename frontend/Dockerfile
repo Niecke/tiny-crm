@@ -14,7 +14,7 @@ RUN echo "{\"version\":\"$GIT_COMMIT\"}" > web/version.json && \
       --dart-define=GIT_COMMIT=$GIT_COMMIT \
       --wasm
 
-FROM caddy:alpine@sha256:d44355d3c2149dc580ce2cac735955d1c08d3d00882c30489c241aa51a5c10d9
+FROM caddy:alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
 COPY --from=builder /app/build/web /srv
 COPY Caddyfile /etc/caddy/Caddyfile
 

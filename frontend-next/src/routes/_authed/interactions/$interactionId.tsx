@@ -1,20 +1,22 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useLeave } from '../../../useLeave'
-import { useState } from 'react'
 import { ApiError } from '../../../api/client'
 import type { InteractionCreate } from '../../../api/types'
+import { ArchiveButton, ArchivedNotice, ReadOnlyWhenArchived } from '../../../components/Archive'
+import { useArchive } from '../../../useArchive'
 import { InteractionForm } from '../../../components/InteractionForm'
 import { Button } from '../../../components/ui/Button'
-import { ConfirmDialog } from '../../../components/ui/ConfirmDialog'
 import {
+  archiveInteraction,
   deleteInteraction,
   interactionQuery,
   invalidateInteractions,
+  restoreInteraction,
   updateInteraction,
 } from '../../../interactions'
 
-// An interaction's page is its form: read it, change it, delete it, or turn
+// An interaction's page is its form: read it, change it, archive it, or turn
 // it into a follow-up task.
 export const Route = createFileRoute('/_authed/interactions/$interactionId')({
   component: EditInteraction,
@@ -26,7 +28,6 @@ function EditInteraction() {
   const filters = Route.useSearch()
   const queryClient = useQueryClient()
   const interaction = useQuery(interactionQuery(api, interactionId))
-  const [confirmDelete, setConfirmDelete] = useState(false)
   const leave = useLeave({ to: '/interactions', search: filters })
 
   const save = useMutation({
@@ -38,13 +39,12 @@ function EditInteraction() {
     },
   })
 
-  const remove = useMutation({
-    mutationFn: () => deleteInteraction(api, interactionId),
-    onSuccess: async () => {
-      await leave()
-      queryClient.removeQueries({ queryKey: interactionQuery(api, interactionId).queryKey })
-      await invalidateInteractions(queryClient)
-    },
+  const archiving = useArchive({
+    queryKey: interactionQuery(api, interactionId).queryKey,
+    archive: () => archiveInteraction(api, interactionId),
+    restore: () => restoreInteraction(api, interactionId),
+    remove: () => deleteInteraction(api, interactionId),
+    leave,
   })
 
   const i = interaction.data
@@ -66,6 +66,11 @@ function EditInteraction() {
           </Link>
         )}
       </header>
+      {i && (
+        <ArchivedNotice record={i} noun="interaction" name={i.subject} archiving={archiving}>
+          Tasks following up on it are kept.
+        </ArchivedNotice>
+      )}
 
       {interaction.isPending ? (
         <p className="muted">Loading…</p>
@@ -76,40 +81,23 @@ function EditInteraction() {
             : interaction.error.message}
         </p>
       ) : (
-        <InteractionForm
-          key={interaction.data.updated_at}
-          initial={interaction.data}
-          onSubmit={(body) => save.mutate(body)}
-          submitLabel="Save changes"
-          pending={save.isPending}
-          error={save.error}
-          cancel={
-            <Button variant="quiet" onPress={() => void leave()}>
-              Cancel
-            </Button>
-          }
-          extraActions={
-            <Button variant="quiet" onPress={() => setConfirmDelete(true)}>
-              Delete
-            </Button>
-          }
-        />
+        <ReadOnlyWhenArchived record={interaction.data}>
+          <InteractionForm
+            key={interaction.data.updated_at}
+            initial={interaction.data}
+            onSubmit={(body) => save.mutate(body)}
+            submitLabel="Save changes"
+            pending={save.isPending}
+            error={save.error}
+            cancel={
+              <Button variant="quiet" onPress={() => void leave()}>
+                Cancel
+              </Button>
+            }
+            extraActions={!interaction.data.archived_at && <ArchiveButton archiving={archiving} />}
+          />
+        </ReadOnlyWhenArchived>
       )}
-
-      <ConfirmDialog
-        title="Delete this interaction?"
-        isOpen={confirmDelete}
-        onOpenChange={setConfirmDelete}
-        onConfirm={() => remove.mutate()}
-        confirmLabel="Delete"
-        pendingLabel="Deleting…"
-        pending={remove.isPending}
-        error={remove.error}
-      >
-        <p>
-          <strong>{i?.subject}</strong> will be permanently deleted. Tasks following up on it are kept.
-        </p>
-      </ConfirmDialog>
     </div>
   )
 }
