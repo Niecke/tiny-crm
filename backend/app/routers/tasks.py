@@ -141,6 +141,10 @@ async def list_tasks(
     contact_id: UUID | None = Query(default=None),
     deal_id: UUID | None = Query(default=None),
     interaction_id: UUID | None = Query(default=None),
+    # Due before this moment — the nav's "due" count. The client sends the
+    # start of tomorrow in its own time zone, which the server does not know,
+    # so tasks due today count as well as overdue ones.
+    due_before: datetime | None = Query(default=None),
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> Page[TaskRead]:
@@ -155,6 +159,8 @@ async def list_tasks(
         query = query.where(Task.deal_id == deal_id)
     if interaction_id is not None:
         query = query.where(Task.interaction_id == interaction_id)
+    if due_before is not None:
+        query = query.where(Task.due_date < due_before)
     total = await count_rows(session, query)
     # NULLS LAST so tasks without a due date sink to the bottom; client renders
     # overdue (due_date < now) red, and ascending order naturally floats them up.
