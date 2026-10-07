@@ -17,6 +17,10 @@ Plus `user_id` on every query. There is one operator, so a missing filter
 would never be noticed in use; tests/test_metrics.py proves it with a second
 user's rows.
 
+A draft is not in play (#255): the pipeline, its velocity and what needs
+attention all start counting at `lead`, when the letter has gone out. Only the
+activity group counts a draft, because preparing one is work done.
+
 And nothing archived is counted, in any number (#140). Every figure links to
 the list behind it, and no list shows an archived row; a won deal that was
 archived leaves the conversion rate until it is restored.
@@ -50,7 +54,7 @@ from app.archive import live
 from app.briefing import DayWindow, briefing_queries
 from app.db import count_rows
 from app.models import Capture, Deal, DealStageEvent, Interaction, Task
-from app.models.deal import OPEN_STAGES, WON_STAGES, overdue_on
+from app.models.deal import IN_PLAY_STAGES, OPEN_STAGES, WON_STAGES, overdue_on
 from app.schemas.interaction import InteractionKind
 from app.schemas.metrics import (
     ActivityMetrics,
@@ -191,14 +195,14 @@ async def pipeline_metrics(session: AsyncSession, user_id: UUID) -> PipelineMetr
             .group_by(*group, Deal.currency)
         )
 
-    by_stage = await session.execute(money_query(Deal.stage).where(Deal.stage.in_(OPEN_STAGES)))
+    by_stage = await session.execute(money_query(Deal.stage).where(Deal.stage.in_(IN_PLAY_STAGES)))
     committed = await session.execute(money_query().where(Deal.stage.in_(COMMITTED_STAGES)))
 
     stages = [
         StageMoney(stage=stage, currency=currency, count=n, value=_money(total), open_ended=oe)
         for stage, currency, n, total, oe in by_stage
     ]
-    stages.sort(key=lambda s: (OPEN_STAGES.index(s.stage), s.currency))
+    stages.sort(key=lambda s: (IN_PLAY_STAGES.index(s.stage), s.currency))
     return PipelineMetrics(
         by_stage=stages,
         committed=sorted(
@@ -216,7 +220,7 @@ async def pipeline_metrics(session: AsyncSession, user_id: UUID) -> PipelineMetr
 
 async def velocity_metrics(session: AsyncSession, user_id: UUID, period: Period) -> VelocityMetrics:
     day = period.day
-    open_deals = Deal.user_id == user_id, Deal.stage.in_(OPEN_STAGES), live(Deal)
+    open_deals = Deal.user_id == user_id, Deal.stage.in_(IN_PLAY_STAGES), live(Deal)
 
     in_stage = _days_since(Deal.stage_changed_at, day)
     medians = await session.execute(
@@ -248,7 +252,7 @@ async def velocity_metrics(session: AsyncSession, user_id: UUID, period: Period)
         )
         for stage, n, median in medians
     ]
-    by_stage.sort(key=lambda s: OPEN_STAGES.index(s.stage))
+    by_stage.sort(key=lambda s: IN_PLAY_STAGES.index(s.stage))
 
     # Distinct deals, not events: a deal moved back into proposal and forward
     # again entered proposal once as far as throughput is concerned.
@@ -271,7 +275,7 @@ async def velocity_metrics(session: AsyncSession, user_id: UUID, period: Period)
 
 
 async def _conversion(session: AsyncSession, user_id: UUID) -> list[StageConversion]:
-    """Of the deals that ever entered each open stage, how many went further.
+    """Of the deals that ever entered each stage in play, how many went further.
 
     "Further" is any later stage on PIPELINE entered after it, so a deal that
     skipped from qualified straight to negotiation still advanced out of
@@ -310,7 +314,7 @@ async def _conversion(session: AsyncSession, user_id: UUID) -> list[StageConvers
                 later.c.at > entry.c.at,
             ),
         )
-        .where(entry.c.stage.in_(OPEN_STAGES))
+        .where(entry.c.stage.in_(IN_PLAY_STAGES))
         .group_by(entry.c.stage)
     )
     found = {stage: (n, advanced) for stage, n, advanced in rows}
@@ -320,7 +324,7 @@ async def _conversion(session: AsyncSession, user_id: UUID) -> list[StageConvers
             entered=found.get(stage, (0, 0))[0],
             advanced=found.get(stage, (0, 0))[1],
         )
-        for stage in OPEN_STAGES
+        for stage in IN_PLAY_STAGES
     ]
 
 

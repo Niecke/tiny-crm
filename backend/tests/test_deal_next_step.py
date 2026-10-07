@@ -143,9 +143,12 @@ async def test_stalled_lists_open_deals_with_nothing_next_longest_waiting_first(
     tasked = await _deal(client, alice, title="Has a task", stage="proposal")
     await _deal(client, alice, title="Won, running", stage="running")
     await _deal(client, alice, title="Lost", stage="lost")
+    # Nothing has been sent, so there is nothing to follow up on (#255).
+    unsent = await _deal(client, alice, title="Unsent letter", stage="draft")
     await _deal(client, bob, title="Bob's quiet deal")
 
     await create_resource(client, alice, "/tasks/", {"title": "Call", "deal_id": tasked["id"]})
+    await _age(session_factory, unsent, 200)
     await _age(session_factory, old, 30)
     await _age(session_factory, ancient, 90)
     await _age(session_factory, tasked, 120)

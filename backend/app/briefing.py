@@ -45,7 +45,7 @@ from app.auth.users import User
 # fails. See app/models/__init__.py — the API is only safe here because it
 # imports every router.
 from app.models import Capture, Deal, Interaction, Task, Watch
-from app.models.deal import OPEN_STAGES
+from app.models.deal import IN_PLAY_STAGES
 from app.models.next_step import next_step_exists
 
 logger = logging.getLogger(__name__)
@@ -212,7 +212,7 @@ def briefing_queries(user_id: UUID, window: DayWindow) -> BriefingQueries:
         stalled_deals=select(Deal)
         .where(
             Deal.user_id == user_id,
-            Deal.stage.in_(OPEN_STAGES),
+            Deal.stage.in_(IN_PLAY_STAGES),
             ~next_step_exists(window.start),
             live(Deal),
         )

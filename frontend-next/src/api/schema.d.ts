@@ -1400,7 +1400,7 @@ export interface components {
              * Stage
              * @enum {string}
              */
-            stage: "lead" | "qualified" | "proposal" | "negotiation" | "won" | "running" | "completed" | "lost";
+            stage: "draft" | "lead" | "qualified" | "proposal" | "negotiation" | "won" | "running" | "completed" | "lost";
             /** Contact Name */
             contact_name: string | null;
             /** Organization Name */
@@ -1922,7 +1922,7 @@ export interface components {
              * @default lead
              * @enum {string}
              */
-            stage: "lead" | "qualified" | "proposal" | "negotiation" | "won" | "running" | "completed" | "lost";
+            stage: "draft" | "lead" | "qualified" | "proposal" | "negotiation" | "won" | "running" | "completed" | "lost";
             /** Expected Close Date */
             expected_close_date?: string | null;
             /** Probability */
@@ -1970,7 +1970,7 @@ export interface components {
              * Stage
              * @enum {string}
              */
-            stage: "lead" | "qualified" | "proposal" | "negotiation" | "won" | "running" | "completed" | "lost";
+            stage: "draft" | "lead" | "qualified" | "proposal" | "negotiation" | "won" | "running" | "completed" | "lost";
             /** Expected Close Date */
             expected_close_date: string | null;
             /** Probability */
@@ -2024,7 +2024,7 @@ export interface components {
              * Stage
              * @enum {string}
              */
-            stage: "lead" | "qualified" | "proposal" | "negotiation" | "won" | "running" | "completed" | "lost";
+            stage: "draft" | "lead" | "qualified" | "proposal" | "negotiation" | "won" | "running" | "completed" | "lost";
             /** Lost Reason */
             lost_reason?: string | null;
         };
@@ -2047,7 +2047,7 @@ export interface components {
             /** Currency */
             currency?: string | null;
             /** Stage */
-            stage?: ("lead" | "qualified" | "proposal" | "negotiation" | "won" | "running" | "completed" | "lost") | null;
+            stage?: ("draft" | "lead" | "qualified" | "proposal" | "negotiation" | "won" | "running" | "completed" | "lost") | null;
             /** Expected Close Date */
             expected_close_date?: string | null;
             /** Probability */
@@ -2737,7 +2737,7 @@ export interface components {
              * Stage
              * @enum {string}
              */
-            stage: "lead" | "qualified" | "proposal" | "negotiation" | "won" | "running" | "completed" | "lost";
+            stage: "draft" | "lead" | "qualified" | "proposal" | "negotiation" | "won" | "running" | "completed" | "lost";
             /** Entered */
             entered: number;
             /** Advanced */
@@ -2752,7 +2752,7 @@ export interface components {
              * Stage
              * @enum {string}
              */
-            stage: "lead" | "qualified" | "proposal" | "negotiation" | "won" | "running" | "completed" | "lost";
+            stage: "draft" | "lead" | "qualified" | "proposal" | "negotiation" | "won" | "running" | "completed" | "lost";
             /** Count */
             count: number;
         };
@@ -2770,18 +2770,18 @@ export interface components {
              * Stage
              * @enum {string}
              */
-            stage: "lead" | "qualified" | "proposal" | "negotiation" | "won" | "running" | "completed" | "lost";
+            stage: "draft" | "lead" | "qualified" | "proposal" | "negotiation" | "won" | "running" | "completed" | "lost";
         };
         /**
          * StageVelocity
-         * @description Now, one open stage.
+         * @description Now, one stage in play.
          */
         StageVelocity: {
             /**
              * Stage
              * @enum {string}
              */
-            stage: "lead" | "qualified" | "proposal" | "negotiation" | "won" | "running" | "completed" | "lost";
+            stage: "draft" | "lead" | "qualified" | "proposal" | "negotiation" | "won" | "running" | "completed" | "lost";
             /** Count */
             count: number;
             /** Median Days In Stage */
@@ -4069,7 +4069,7 @@ export interface operations {
                 skip?: number;
                 limit?: number;
                 search?: string | null;
-                stage?: ("lead" | "qualified" | "proposal" | "negotiation" | "won" | "running" | "completed" | "lost") | null;
+                stage?: ("draft" | "lead" | "qualified" | "proposal" | "negotiation" | "won" | "running" | "completed" | "lost") | null;
                 status?: ("open" | "active" | "won" | "finished") | null;
                 contact_id?: string | null;
                 organization_id?: string | null;

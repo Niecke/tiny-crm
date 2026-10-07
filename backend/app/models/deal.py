@@ -29,7 +29,13 @@ from app.models.organization import Organization
 # Winning is not the end of it: an engagement billed per hour worked *starts*
 # when it is won, so `running` and `completed` sit after `won`. Without them
 # every long engagement leaves the board the day the work begins.
-OPEN_STAGES = ("lead", "qualified", "proposal", "negotiation")
+#
+# And a deal does not start when the letter goes out either: `draft` is the
+# research and the writing before it (#255). It is on the board like any other
+# open deal, but nobody has been asked anything yet, so everything that counts
+# or chases the pipeline starts at `lead` — IN_PLAY_STAGES, not OPEN_STAGES.
+IN_PLAY_STAGES = ("lead", "qualified", "proposal", "negotiation")
+OPEN_STAGES = ("draft",) + IN_PLAY_STAGES
 WON_STAGES = ("won", "running", "completed")
 DEAL_STAGES = OPEN_STAGES + WON_STAGES + ("lost",)
 
@@ -169,7 +175,7 @@ class Deal(Archivable, Base):
 
     @property
     def is_open(self) -> bool:
-        """Still being competed for — not yet won or lost."""
+        """Not yet won or lost — being prepared, or being competed for."""
         return self.stage in OPEN_STAGES
 
     @property
@@ -193,11 +199,14 @@ class Deal(Archivable, Base):
 
 
 def overdue_on(today: date) -> ColumnElement[bool]:
-    """Still open, with an expected close date before `today`: a forecast that
-    has expired (#117). One definition for the `?overdue=true` list and the
-    dashboard's count, so the number and the list behind it cannot differ.
-    `today` is the caller's local day — DayWindow's, not UTC's."""
-    return and_(Deal.stage.in_(OPEN_STAGES), Deal.expected_close_date < today)
+    """Still in play, with an expected close date before `today`: a forecast
+    that has expired (#117). One definition for the `?overdue=true` list and
+    the dashboard's count, so the number and the list behind it cannot differ.
+    `today` is the caller's local day — DayWindow's, not UTC's.
+
+    A draft is never overdue: a date on a letter that has not been sent is a
+    plan, not a forecast anyone has missed."""
+    return and_(Deal.stage.in_(IN_PLAY_STAGES), Deal.expected_close_date < today)
 
 
 class DealStageEvent(Base):

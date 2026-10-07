@@ -60,7 +60,7 @@ the schema as it stands today.
 
 | Metric | How |
 |---|---|
-| Open pipeline value, per stage | `SUM(expected_value)` over `OPEN_STAGES`, grouped by `stage` and `currency`, with the open-ended count per group |
+| Open pipeline value, per stage | `SUM(expected_value)` over `IN_PLAY_STAGES`, grouped by `stage` and `currency`, with the open-ended count per group. `draft` is open but not in play (#255): a letter that has not been sent is not pipeline, so groups A, B and D all start at `lead` |
 | Open deal count, per stage | `COUNT(*)` over the same — the shape of the funnel, which the value alone hides when one big deal dominates |
 | Weighted pipeline | `SUM(expected_value * probability / 100)`. **Needs #120** — `probability` is manual today and therefore mostly `NULL`, so this number is currently a sum over an arbitrary subset. Do not ship it before the per-stage defaults exist |
 | Committed but not delivered | `SUM(expected_value)` over `won` and `running` — work agreed and not yet finished. The figure that answers "can I take on another project" |

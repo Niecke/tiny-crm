@@ -54,8 +54,8 @@ class PipelineMetrics(BaseModel):
     """Now. Weighted pipeline is left out until stage-default probabilities
     exist (#120); today it would be a sum over an arbitrary subset."""
 
-    # Open stages, pipeline order, one row per stage and currency. A stage
-    # with no deals has no row.
+    # Stages in play — `lead` onwards, never `draft` — in pipeline order, one
+    # row per stage and currency. A stage with no deals has no row.
     by_stage: list[StageMoney]
     # Won and running: agreed and not yet delivered. One row per currency.
     committed: list[MoneyByCurrency]
@@ -72,10 +72,10 @@ class OldestDeal(BaseModel):
 
 
 class StageVelocity(BaseModel):
-    """Now, one open stage."""
+    """Now, one stage in play."""
 
     stage: DealStage
-    # Open deals currently in the stage.
+    # Deals currently in the stage.
     count: int
     # Calendar days since each entered the stage, in the operator's timezone.
     # A median, not a mean: one deal parked for a year would drag a mean.
@@ -108,11 +108,12 @@ class SalesCycle(BaseModel):
 
 
 class VelocityMetrics(BaseModel):
-    # Open stages that hold a deal, pipeline order.
+    # Stages in play that hold a deal, pipeline order.
     by_stage: list[StageVelocity]
-    # Stages entered in the period; a stage nobody entered has no row.
+    # Stages entered in the period, `draft` included — this one is the raw log.
+    # A stage nobody entered has no row.
     entered: list[StageEntered]
-    # Every open stage, pipeline order, zeros included.
+    # Every stage in play, pipeline order, zeros included.
     conversion: list[StageConversion]
     sales_cycle: SalesCycle
 
@@ -144,9 +145,9 @@ class AttentionMetrics(BaseModel):
     """Now. Rows that need later work are not fields yet: lost deals due for
     a revisit (#118) and contacts awaiting a reply (#135)."""
 
-    # Open, nothing planned, no open task. The briefing's definition.
+    # In play, nothing planned, no open task. The briefing's definition.
     stalled_deals: AttentionRow
-    # Open, expected close date before today.
+    # In play, expected close date before today.
     overdue_deals: AttentionRow
     overdue_tasks: AttentionRow
     # Planned before today, never marked as happened.

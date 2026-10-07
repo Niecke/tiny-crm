@@ -1469,6 +1469,7 @@
               "anyOf": [
                 {
                   "enum": [
+                    "draft",
                     "lead",
                     "qualified",
                     "proposal",
@@ -5445,6 +5446,7 @@
           "stage": {
             "type": "string",
             "enum": [
+              "draft",
               "lead",
               "qualified",
               "proposal",
@@ -7435,6 +7437,7 @@
           "stage": {
             "type": "string",
             "enum": [
+              "draft",
               "lead",
               "qualified",
               "proposal",
@@ -7638,6 +7641,7 @@
           "stage": {
             "type": "string",
             "enum": [
+              "draft",
               "lead",
               "qualified",
               "proposal",
@@ -7834,6 +7838,7 @@
           "stage": {
             "type": "string",
             "enum": [
+              "draft",
               "lead",
               "qualified",
               "proposal",
@@ -7992,6 +7997,7 @@
               {
                 "type": "string",
                 "enum": [
+                  "draft",
                   "lead",
                   "qualified",
                   "proposal",
@@ -10017,6 +10023,7 @@
           "stage": {
             "type": "string",
             "enum": [
+              "draft",
               "lead",
               "qualified",
               "proposal",
@@ -10051,6 +10058,7 @@
           "stage": {
             "type": "string",
             "enum": [
+              "draft",
               "lead",
               "qualified",
               "proposal",
@@ -10097,6 +10105,7 @@
           "stage": {
             "type": "string",
             "enum": [
+              "draft",
               "lead",
               "qualified",
               "proposal",
@@ -10124,6 +10133,7 @@
           "stage": {
             "type": "string",
             "enum": [
+              "draft",
               "lead",
               "qualified",
               "proposal",
@@ -10162,7 +10172,7 @@
           "oldest"
         ],
         "title": "StageVelocity",
-        "description": "Now, one open stage."
+        "description": "Now, one stage in play."
       },
       "TaskCompletionRead": {
         "properties": {

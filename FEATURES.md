@@ -83,13 +83,22 @@ company must never delete the people who worked there.
 
 `GET|POST /deals/` · `GET|PATCH|DELETE /deals/{id}` · `POST /deals/{id}/stage`
 
-**Stages.** `lead → qualified → proposal → negotiation → won → running →
-completed`, plus `lost`. Won ≠ finished: a long engagement stays on the board
-the day the work starts.
+**Stages.** `draft → lead → qualified → proposal → negotiation → won →
+running → completed`, plus `lost`. Won ≠ finished: a long engagement stays on
+the board the day the work starts.
 
-**`?status=` is the coarse question** the UI actually asks — `open` (still
-competing), `active` (on my plate, the default, includes won and running),
-`won`, `finished`. `?stage=` filters one exact column.
+**A draft is open, but not in play** (#255). `draft` is the research and the
+letter before anything is sent; moving it to `lead` says it went out, and
+starts the clock a lead is chased by. A draft is on the board and in
+`?status=open`, and is left out of everything that counts or chases the
+pipeline: `?stalled`, `?overdue`, the briefing's stalled deals, and the
+dashboard's pipeline, velocity and attention figures. A new deal still starts
+at `lead` unless `draft` is asked for.
+
+**`?status=` is the coarse question** the UI actually asks — `open` (not
+decided yet: drafts and what is still being competed for), `active` (on my
+plate, the default, includes won and running), `won`, `finished`. `?stage=`
+filters one exact column.
 
 **Value is not one number.** `value_type` picks the shape:
 
@@ -126,8 +135,8 @@ their `stage_changed_at` — a floor, not the real move — and have no events.
 is not urgent. `?sort=stage_changed_at` puts the longest-waiting deal first.
 
 **Filters.** `?search` (title) · `?stage` · `?status` · `?contact_id` ·
-`?organization_id` · `?stalled=true` (open, no next step) · `?overdue=true`
-(open, `expected_close_date` before today — today in `BRIEFING_TIMEZONE`, as
+`?organization_id` · `?stalled=true` (in play, no next step) · `?overdue=true`
+(in play, `expected_close_date` before today — today in `BRIEFING_TIMEZONE`, as
 the briefing has it).
 
 ---
@@ -525,8 +534,8 @@ resolved. One response, one model per group from [DASHBOARD.md](DASHBOARD.md)
 
 | Group | Now / period | What |
 |---|---|---|
-| `pipeline` (A) | now | open deals per stage and currency: count, value, open-ended count; won + running per currency |
-| `velocity` (B) | both | per open stage the median calendar days in stage and the oldest deal; deals entering each stage in the period; all-time conversion to a later stage; median days from opening to first win for deals won in the period |
+| `pipeline` (A) | now | deals in play (`lead` to `negotiation`, never `draft`) per stage and currency: count, value, open-ended count; won + running per currency |
+| `velocity` (B) | both | per stage in play the median calendar days in stage and the oldest deal; deals entering each stage in the period (`draft` included); all-time conversion to a later stage; median days from opening to first win for deals won in the period |
 | `attention` (D) | now | stalled deals, overdue deals, overdue tasks, unconfirmed interactions, waiting captures (with the oldest's age), each with the list request behind it |
 | `activity` (E) | period | interactions that happened, by kind; deals opened; captures converted and dismissed; tasks created |
 | `trends` | last 10 weeks | deals opened per ISO week in local time, oldest first, zeros included; the running week is marked `complete: false` |

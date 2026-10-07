@@ -8,6 +8,9 @@ from pydantic import BaseModel, Field
 from app.schemas.common import Currency, Money
 
 DealStage = Literal[
+    # Being prepared: researched and written, not sent. Moving it to `lead` is
+    # what says the letter is out.
+    "draft",
     "lead",
     "qualified",
     "proposal",
