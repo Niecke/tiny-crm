@@ -7,6 +7,7 @@ from sqlalchemy import insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.archive import archived_is, require_archived, require_live, set_archived
+from app.audit import check_version, erase_history, record_update, snapshot
 from app.auth import current_active_user
 from app.auth.users import User
 from app.db import contains, count_rows, get_session
@@ -222,6 +223,7 @@ async def update_task(
     require_live(task, "Task")
 
     updates = body.model_dump(exclude_unset=True)
+    check_version(task, updates.pop("version", None), "Task")
     # Only links the caller actually sent are checked; clearing one to null is
     # always allowed, and one already on the row is not re-validated.
     await _check_links(session, updates, user)
@@ -238,8 +240,10 @@ async def update_task(
         raise HTTPException(status_code=422, detail=str(error)) from error
 
     was_done = task.done
+    before = snapshot(task)
     for field, value in updates.items():
         setattr(task, field, value)
+    record_update(session, user, task, before)
 
     successor = None
     if task.done and not was_done:
@@ -267,7 +271,7 @@ async def archive_task(
     and the briefing, and a series stops where it is.
     """
     task = await _get_owned(session, task_id, user)
-    await set_archived(session, task, True)
+    await set_archived(session, task, True, user)
     return task
 
 
@@ -279,7 +283,7 @@ async def restore_task(
 ) -> Task:
     """Bring an archived task back, as open or as done as it was."""
     task = await _get_owned(session, task_id, user)
-    await set_archived(session, task, False)
+    await set_archived(session, task, False, user)
     return task
 
 
@@ -292,5 +296,6 @@ async def delete_task(
     """Erase the task for good. Only once it has been archived."""
     task = await _get_owned(session, task_id, user)
     require_archived(task, "Task")
+    await erase_history(session, task)
     await session.delete(task)
     await session.commit()

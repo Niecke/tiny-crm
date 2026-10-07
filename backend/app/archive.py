@@ -20,11 +20,17 @@ decisions, and making them silently is the opposite of recoverable.
 """
 
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from fastapi import HTTPException
 from sqlalchemy import ColumnElement, DateTime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
+
+from app.audit import Versioned, record
+
+if TYPE_CHECKING:
+    from app.auth.users import User
 
 
 class Archivable:
@@ -70,16 +76,24 @@ def require_archived(row: Archivable, label: str) -> None:
         )
 
 
-async def set_archived(session: AsyncSession, row: Archivable, archived: bool) -> None:
+class Record(Archivable, Versioned):
+    """What every record table is: archivable, versioned, and with a history.
+
+    The base of the nine tables a person edits — contacts through captures.
+    The logs beside them (stage events, watch checks) are neither.
+    """
+
+
+async def set_archived(session: AsyncSession, row: Record, archived: bool, actor: "User") -> None:
     """Archive or restore `row`, and commit.
 
     Both directions can be repeated without harm. Archiving again keeps the
     first timestamp: it says when the record was put away, not when someone
-    last pressed the button.
+    last pressed the button — and adds nothing to the history, since nothing
+    happened.
     """
-    if not archived:
-        row.archived_at = None
-    elif row.archived_at is None:
-        row.archived_at = datetime.now(UTC)
+    if archived != (row.archived_at is not None):
+        row.archived_at = datetime.now(UTC) if archived else None
+        record(session, actor, row, "archive" if archived else "restore")
     await session.commit()
     await session.refresh(row)

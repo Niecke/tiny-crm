@@ -103,8 +103,9 @@ export const checksQuery = (api: Api, id: string, page = 1) =>
 
 export const createWatch = (api: Api, body: WatchCreate) => unwrap(api.POST('/watches/', { body }))
 
-export const updateWatch = (api: Api, id: string, body: WatchUpdate) =>
-  unwrap(api.PATCH('/watches/{watch_id}', { params: { path: { watch_id: id } }, body }))
+// `version` makes the save conditional — see useEditVersion (#142).
+export const updateWatch = (api: Api, id: string, body: WatchUpdate, version?: number) =>
+  unwrap(api.PATCH('/watches/{watch_id}', { params: { path: { watch_id: id } }, body: { ...body, version } }))
 
 export const deleteWatch = (api: Api, id: string) =>
   unwrap(api.DELETE('/watches/{watch_id}', { params: { path: { watch_id: id } } }))

@@ -3,6 +3,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, computed_field
 
+from app.schemas.common import VersionedUpdate
+
 
 class DocumentLinks(BaseModel):
     """What a document is filed against. All independent, all optional.
@@ -32,6 +34,9 @@ class DocumentRead(DocumentLinks):
     # Set once the record has been archived: out of every list, read-only, and
     # still reachable by its id. NULL for everything in use.
     archived_at: datetime | None = None
+    # Goes up by one on every save. Send it back on PATCH to have the save
+    # refused if someone else saved first; see VersionedUpdate.
+    version: int
 
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -41,7 +46,7 @@ class DocumentRead(DocumentLinks):
     model_config = {"from_attributes": True}
 
 
-class DocumentUpdate(BaseModel):
+class DocumentUpdate(VersionedUpdate):
     title: str | None = None
     description: str | None = None
     tags: list[str] | None = None

@@ -4434,6 +4434,98 @@
         }
       }
     },
+    "/history/{entity_type}/{entity_id}": {
+      "get": {
+        "tags": [
+          "history"
+        ],
+        "summary": "List History",
+        "description": "The record's changes, newest first. Archived records keep theirs.\n\n404 for a record that is not the caller's, exactly as its own GET answers:\nan empty page instead would confirm that the id exists somewhere.",
+        "operationId": "list_history_history__entity_type___entity_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "contact",
+                "organization",
+                "deal",
+                "task",
+                "interaction",
+                "project",
+                "document",
+                "watch",
+                "capture"
+              ],
+              "type": "string",
+              "title": "Entity Type"
+            }
+          },
+          {
+            "name": "entity_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Entity Id"
+            }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Skip"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_AuditEventRead_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/search/": {
       "get": {
         "tags": [
@@ -5190,6 +5282,79 @@
           "list"
         ],
         "title": "AttentionRow"
+      },
+      "AuditEventRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "entity_type": {
+            "type": "string",
+            "enum": [
+              "contact",
+              "organization",
+              "deal",
+              "task",
+              "interaction",
+              "project",
+              "document",
+              "watch",
+              "capture"
+            ],
+            "title": "Entity Type"
+          },
+          "entity_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Entity Id"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "update",
+              "archive",
+              "restore"
+            ],
+            "title": "Action"
+          },
+          "actor_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Id"
+          },
+          "changes": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FieldChange"
+            },
+            "type": "object",
+            "title": "Changes"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "entity_type",
+          "entity_id",
+          "action",
+          "actor_id",
+          "changes",
+          "created_at"
+        ],
+        "title": "AuditEventRead"
       },
       "Body_login_auth_jwt_login_post": {
         "properties": {
@@ -6350,6 +6515,10 @@
               }
             ],
             "title": "Archived At"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
           }
         },
         "type": "object",
@@ -6358,12 +6527,24 @@
           "raw",
           "status",
           "created_at",
-          "updated_at"
+          "updated_at",
+          "version"
         ],
         "title": "CaptureRead"
       },
       "CaptureUpdate": {
         "properties": {
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
           "raw": {
             "anyOf": [
               {
@@ -7005,6 +7186,10 @@
               }
             ],
             "title": "Archived At"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
           }
         },
         "type": "object",
@@ -7012,12 +7197,24 @@
           "name",
           "id",
           "created_at",
-          "updated_at"
+          "updated_at",
+          "version"
         ],
         "title": "ContactRead"
       },
       "ContactUpdate": {
         "properties": {
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
           "name": {
             "anyOf": [
               {
@@ -7798,6 +7995,10 @@
               }
             ],
             "title": "Archived At"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
           }
         },
         "type": "object",
@@ -7829,7 +8030,8 @@
           "is_active",
           "has_next_step",
           "created_at",
-          "updated_at"
+          "updated_at",
+          "version"
         ],
         "title": "DealRead"
       },
@@ -7871,6 +8073,17 @@
       },
       "DealUpdate": {
         "properties": {
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
           "title": {
             "anyOf": [
               {
@@ -8188,6 +8401,10 @@
             ],
             "title": "Archived At"
           },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
           "has_preview": {
             "type": "boolean",
             "title": "Has Preview",
@@ -8205,12 +8422,24 @@
           "storage_key",
           "created_at",
           "updated_at",
+          "version",
           "has_preview"
         ],
         "title": "DocumentRead"
       },
       "DocumentUpdate": {
         "properties": {
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
           "title": {
             "anyOf": [
               {
@@ -8333,6 +8562,23 @@
           "detail"
         ],
         "title": "ErrorModel"
+      },
+      "FieldChange": {
+        "properties": {
+          "old": {
+            "title": "Old"
+          },
+          "new": {
+            "title": "New"
+          }
+        },
+        "type": "object",
+        "required": [
+          "old",
+          "new"
+        ],
+        "title": "FieldChange",
+        "description": "One field's value before and after, as JSON holds it.\n\nAmounts come back as strings and dates as ISO 8601, the same spelling the\nrecord itself uses. Link lists (`contact_ids`, ...) are sorted id lists."
       },
       "HTTPValidationError": {
         "properties": {
@@ -8594,6 +8840,10 @@
               }
             ],
             "title": "Archived At"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
           }
         },
         "type": "object",
@@ -8607,12 +8857,24 @@
           "done",
           "tags",
           "created_at",
-          "updated_at"
+          "updated_at",
+          "version"
         ],
         "title": "InteractionRead"
       },
       "InteractionUpdate": {
         "properties": {
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
           "kind": {
             "anyOf": [
               {
@@ -9039,6 +9301,10 @@
               }
             ],
             "title": "Archived At"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
           }
         },
         "type": "object",
@@ -9047,12 +9313,24 @@
           "id",
           "contact_count",
           "created_at",
-          "updated_at"
+          "updated_at",
+          "version"
         ],
         "title": "OrganizationRead"
       },
       "OrganizationUpdate": {
         "properties": {
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
           "name": {
             "anyOf": [
               {
@@ -9133,6 +9411,37 @@
         },
         "type": "object",
         "title": "OrganizationUpdate"
+      },
+      "Page_AuditEventRead_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AuditEventRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "skip": {
+            "type": "integer",
+            "title": "Skip"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "skip",
+          "limit"
+        ],
+        "title": "Page[AuditEventRead]"
       },
       "Page_CaptureRead_": {
         "properties": {
@@ -9679,6 +9988,10 @@
               }
             ],
             "title": "Archived At"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
           }
         },
         "type": "object",
@@ -9692,12 +10005,24 @@
           "task_ids",
           "document_ids",
           "created_at",
-          "updated_at"
+          "updated_at",
+          "version"
         ],
         "title": "ProjectRead"
       },
       "ProjectUpdate": {
         "properties": {
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
           "name": {
             "anyOf": [
               {
@@ -10365,6 +10690,10 @@
             ],
             "title": "Archived At"
           },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
           "next_occurrence": {
             "anyOf": [
               {
@@ -10381,7 +10710,8 @@
           "title",
           "id",
           "created",
-          "updated"
+          "updated",
+          "version"
         ],
         "title": "TaskCompletionRead",
         "description": "A patched task, plus the instance that completing it created.\n\n`next_occurrence` is only filled in on the response that created it, so the\nUI can say when the next one is due instead of guessing that a repeat\nhappened (the series may have ended at `recurrence_until`)."
@@ -10702,6 +11032,10 @@
               }
             ],
             "title": "Archived At"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
           }
         },
         "type": "object",
@@ -10709,7 +11043,8 @@
           "title",
           "id",
           "created",
-          "updated"
+          "updated",
+          "version"
         ],
         "title": "TaskRead"
       },
@@ -10750,6 +11085,17 @@
               }
             ],
             "title": "Interaction Id"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
           },
           "title": {
             "anyOf": [
@@ -11510,6 +11856,10 @@
               }
             ],
             "title": "Archived At"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
           }
         },
         "type": "object",
@@ -11530,12 +11880,24 @@
           "found_count",
           "check_count",
           "created_at",
-          "updated_at"
+          "updated_at",
+          "version"
         ],
         "title": "WatchRead"
       },
       "WatchUpdate": {
         "properties": {
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
           "name": {
             "anyOf": [
               {

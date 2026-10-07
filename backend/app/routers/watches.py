@@ -7,6 +7,7 @@ from sqlalchemy import Label, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.archive import archived_is, require_archived, require_live, set_archived
+from app.audit import check_version, erase_history, record_update, snapshot
 from app.auth import current_active_user
 from app.auth.users import User
 from app.db import contains, count_rows, get_session
@@ -74,6 +75,7 @@ def _to_read(watch: Watch, found_count: int, check_count: int) -> WatchRead:
         next_due_at=watch.next_due_at,
         active=watch.active,
         archived_at=watch.archived_at,
+        version=watch.version,
         found_count=found_count,
         check_count=check_count,
         created_at=watch.created_at,
@@ -189,9 +191,11 @@ async def update_watch(
     require_live(watch, "Watch")
 
     updates = body.model_dump(exclude_unset=True)
+    check_version(watch, updates.pop("version", None), "Watch")
     if "organization_id" in updates:
         await _check_organization(session, updates["organization_id"], user)
 
+    before = snapshot(watch)
     cadence_changed = any(f in updates for f in ("recurrence_rule", "recurrence_interval"))
     for field, value in updates.items():
         setattr(watch, field, value)
@@ -205,6 +209,7 @@ async def update_watch(
     # brand new watch out of "due today" just for editing it.
     if cadence_changed and "next_due_at" not in updates and watch.last_checked_at is not None:
         watch.next_due_at = _next_due(watch, watch.last_checked_at, watch.last_checked_at)
+    record_update(session, user, watch, before)
 
     await session.commit()
     await session.refresh(watch)
@@ -354,7 +359,7 @@ async def archive_watch(
     watch list as well, which pausing with `active=false` does not do.
     """
     watch = await _get_owned(session, watch_id, user)
-    await set_archived(session, watch, True)
+    await set_archived(session, watch, True, user)
     return _to_read(watch, *await _counts(session, watch.id))
 
 
@@ -366,7 +371,7 @@ async def restore_watch(
 ) -> WatchRead:
     """Bring an archived source back, due when it was due before."""
     watch = await _get_owned(session, watch_id, user)
-    await set_archived(session, watch, False)
+    await set_archived(session, watch, False, user)
     return _to_read(watch, *await _counts(session, watch.id))
 
 
@@ -383,5 +388,6 @@ async def delete_watch(
     """
     watch = await _get_owned(session, watch_id, user)
     require_archived(watch, "Watch")
+    await erase_history(session, watch)
     await session.delete(watch)
     await session.commit()

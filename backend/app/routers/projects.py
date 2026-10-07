@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.archive import archived_is, require_archived, require_live, set_archived
+from app.audit import check_version, erase_history, record_update, snapshot
 from app.auth import current_active_user
 from app.auth.users import User
 from app.db import contains, count_rows, get_session
@@ -37,6 +38,7 @@ def _to_read(p: Project) -> ProjectRead:
         task_ids=[t.id for t in p.tasks],
         document_ids=[d.id for d in p.documents],
         archived_at=p.archived_at,
+        version=p.version,
         created_at=p.created_at,
         updated_at=p.updated_at,
     )
@@ -107,6 +109,8 @@ async def update_project(
     project = await _get_owned(session, project_id, user)
     require_live(project, "Project")
     updates = body.model_dump(exclude_unset=True)
+    check_version(project, updates.pop("version", None), "Project")
+    before = snapshot(project)
     for field, value in updates.items():
         if field == "contact_ids":
             project.contacts = await _load_scoped(session, Contact, value, user.id)
@@ -116,6 +120,7 @@ async def update_project(
             project.documents = await _load_scoped(session, Document, value, user.id)
         else:
             setattr(project, field, value)
+    record_update(session, user, project, before)
     await session.commit()
     await session.refresh(project)
     return _to_read(project)
@@ -129,7 +134,7 @@ async def archive_project(
 ) -> ProjectRead:
     """Put the project away. Its contacts, tasks and documents stay filed under it."""
     project = await _get_owned(session, project_id, user)
-    await set_archived(session, project, True)
+    await set_archived(session, project, True, user)
     return _to_read(project)
 
 
@@ -141,7 +146,7 @@ async def restore_project(
 ) -> ProjectRead:
     """Bring an archived project back, with everything still filed under it."""
     project = await _get_owned(session, project_id, user)
-    await set_archived(session, project, False)
+    await set_archived(session, project, False, user)
     return _to_read(project)
 
 
@@ -154,5 +159,6 @@ async def delete_project(
     """Erase the project for good. Only once it has been archived."""
     project = await _get_owned(session, project_id, user)
     require_archived(project, "Project")
+    await erase_history(session, project)
     await session.delete(project)
     await session.commit()

@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import Boolean, DateTime, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.archive import Archivable
+from app.archive import Record
 from app.db import Base
 from app.models.organization import Organization
 
@@ -22,7 +22,7 @@ WATCH_KINDS = ("job_board", "careers_page", "tender_portal", "other")
 CHECK_OUTCOMES = ("nothing", "found")
 
 
-class Watch(Archivable, Base):
+class Watch(Record, Base):
     """A source swept on a cadence: a job board, a careers page, a tender portal.
 
     The intake end of the pipeline. Everything from Deal onward records

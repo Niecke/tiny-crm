@@ -4,6 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, StringConstraints, field_validator, model_validator
 
+from app.schemas.common import VersionedUpdate
 from app.schemas.contact import (
     ContactRead,
     ContactSource,
@@ -45,7 +46,7 @@ class CaptureCreate(BaseModel):
     source: ContactSource | None = None
 
 
-class CaptureUpdate(BaseModel):
+class CaptureUpdate(VersionedUpdate):
     """Fixing up a capture before working it.
 
     `status` is deliberately absent. It moves through /convert and /dismiss and
@@ -80,6 +81,9 @@ class CaptureRead(BaseModel):
     # Set once the record has been archived: out of every list, read-only, and
     # still reachable by its id. NULL for everything in use.
     archived_at: datetime | None = None
+    # Goes up by one on every save. Send it back on PATCH to have the save
+    # refused if someone else saved first; see VersionedUpdate.
+    version: int
 
     model_config = {"from_attributes": True}
 

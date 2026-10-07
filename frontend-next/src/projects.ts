@@ -64,8 +64,9 @@ export const createProject = (api: Api, body: ProjectCreate) => unwrap(api.POST(
 
 // Only the fields sent are changed; the link lists, when sent, replace what is
 // stored.
-export const updateProject = (api: Api, id: string, body: ProjectUpdate) =>
-  unwrap(api.PATCH('/projects/{project_id}', { params: { path: { project_id: id } }, body }))
+// `version` makes the save conditional — see useEditVersion (#142).
+export const updateProject = (api: Api, id: string, body: ProjectUpdate, version?: number) =>
+  unwrap(api.PATCH('/projects/{project_id}', { params: { path: { project_id: id } }, body: { ...body, version } }))
 
 export const deleteProject = (api: Api, id: string) =>
   unwrap(api.DELETE('/projects/{project_id}', { params: { path: { project_id: id } } }))

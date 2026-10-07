@@ -7,6 +7,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.archive import archived_is, live, require_archived, require_live, set_archived
+from app.audit import check_version, erase_history, record_update, snapshot
 from app.auth import current_active_user
 from app.auth.users import User
 from app.captures import parse_capture
@@ -177,8 +178,12 @@ async def update_capture(
     """
     capture = await _get_owned(session, capture_id, user)
     require_live(capture, "Capture")
-    for field, value in body.model_dump(exclude_unset=True).items():
+    updates = body.model_dump(exclude_unset=True)
+    check_version(capture, updates.pop("version", None), "Capture")
+    before = snapshot(capture)
+    for field, value in updates.items():
         setattr(capture, field, value)
+    record_update(session, user, capture, before)
     await session.commit()
     await session.refresh(capture)
     return capture
@@ -203,6 +208,7 @@ async def delete_capture(
     capture = await _get_owned(session, capture_id, user)
     if capture.status != "new":
         require_archived(capture, "Capture")
+    await erase_history(session, capture)
     await session.delete(capture)
     await session.commit()
 
@@ -305,10 +311,12 @@ async def convert_capture(
             interaction.deals.append(deal)
         session.add(interaction)
 
+    before = snapshot(capture)
     capture.status = "converted"
     capture.triaged_at = datetime.now(UTC)
     capture.contact_id = contact.id
     capture.deal_id = deal.id if deal is not None else None
+    record_update(session, user, capture, before)
 
     await session.commit()
     await session.refresh(capture)
@@ -341,8 +349,10 @@ async def dismiss_capture(
     capture = await _get_owned(session, capture_id, user)
     require_live(capture, "Capture")
     _reject_unless_new(capture)
+    before = snapshot(capture)
     capture.status = "dismissed"
     capture.triaged_at = datetime.now(UTC)
+    record_update(session, user, capture, before)
     await session.commit()
     await session.refresh(capture)
     return capture
@@ -361,7 +371,7 @@ async def archive_capture(
     leaves its status as it was.
     """
     capture = await _get_owned(session, capture_id, user)
-    await set_archived(session, capture, True)
+    await set_archived(session, capture, True, user)
     return capture
 
 
@@ -373,5 +383,5 @@ async def restore_capture(
 ) -> Capture:
     """Bring an archived capture back, with the status it was put away in."""
     capture = await _get_owned(session, capture_id, user)
-    await set_archived(session, capture, False)
+    await set_archived(session, capture, False, user)
     return capture

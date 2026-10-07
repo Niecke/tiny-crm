@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.archive import archived_is, require_archived, require_live, set_archived
+from app.audit import check_version, erase_history, record_update, snapshot
 from app.auth import current_active_user
 from app.auth.users import User
 from app.db import contains, count_rows, get_session
@@ -182,13 +183,16 @@ async def update_contact(
     contact = await _get_owned(session, contact_id, user)
     require_live(contact, "Contact")
     updates = body.model_dump(exclude_unset=True)
+    check_version(contact, updates.pop("version", None), "Contact")
     if "organization_id" in updates:
         await _check_organization(session, updates["organization_id"], user)
     if "known_day_rate" in updates or "rate_currency" in updates:
         _merge_rate_fields(contact, updates)
+    before = snapshot(contact)
     # exclude_unset=True — only update fields the caller actually sent
     for field, value in updates.items():
         setattr(contact, field, value)
+    record_update(session, user, contact, before)
     await session.commit()
     await session.refresh(contact)
     return contact
@@ -207,7 +211,7 @@ async def archive_contact(
     nobody.
     """
     contact = await _get_owned(session, contact_id, user)
-    await set_archived(session, contact, True)
+    await set_archived(session, contact, True, user)
     return contact
 
 
@@ -219,7 +223,7 @@ async def restore_contact(
 ) -> Contact:
     """Bring an archived contact back, exactly as it was put away."""
     contact = await _get_owned(session, contact_id, user)
-    await set_archived(session, contact, False)
+    await set_archived(session, contact, False, user)
     return contact
 
 
@@ -236,5 +240,6 @@ async def delete_contact(
     """
     contact = await _get_owned(session, contact_id, user)
     require_archived(contact, "Contact")
+    await erase_history(session, contact)
     await session.delete(contact)
     await session.commit()

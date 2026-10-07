@@ -5,7 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, StringConstraints
 
-from app.schemas.common import Currency, Money
+from app.schemas.common import Currency, Money, VersionedUpdate
 
 # How far along we are with this party.
 LifecycleStatus = Literal["lead", "prospect", "customer", "former"]
@@ -76,7 +76,7 @@ class ContactCreate(BaseModel):
 
 
 # PATCH uses the same fields but all optional — only sent fields are updated
-class ContactUpdate(BaseModel):
+class ContactUpdate(VersionedUpdate):
     name: str | None = None
     job_title: str | None = None
     organization_id: UUID | None = None
@@ -120,5 +120,8 @@ class ContactRead(ContactCreate):
     # Set once the record has been archived: out of every list, read-only, and
     # still reachable by its id. NULL for everything in use.
     archived_at: datetime | None = None
+    # Goes up by one on every save. Send it back on PATCH to have the save
+    # refused if someone else saved first; see VersionedUpdate.
+    version: int
 
     model_config = {"from_attributes": True}  # lets Pydantic read SQLAlchemy model instances

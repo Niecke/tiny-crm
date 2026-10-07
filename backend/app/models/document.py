@@ -6,7 +6,7 @@ from sqlalchemy import Column, ForeignKey, String, Table, func
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.archive import Archivable
+from app.archive import Record
 from app.db import Base
 from app.models.contact import Contact
 from app.models.deal import Deal
@@ -42,7 +42,7 @@ document_organizations = _link_table("document_organizations", "organization_id"
 document_deals = _link_table("document_deals", "deal_id", "deals")
 
 
-class Document(Archivable, Base):
+class Document(Record, Base):
     """A stored file, attachable to any record it is actually about."""
 
     __tablename__ = "documents"

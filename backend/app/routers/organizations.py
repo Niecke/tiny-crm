@@ -5,6 +5,7 @@ from sqlalchemy import Label, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.archive import archived_is, live, require_archived, require_live, set_archived
+from app.audit import check_version, erase_history, record_update, snapshot
 from app.auth import current_active_user
 from app.auth.users import User
 from app.db import contains, count_rows, get_session
@@ -54,6 +55,7 @@ def _to_read(organization: Organization, contact_count: int) -> OrganizationRead
         notes=organization.notes,
         contact_count=contact_count,
         archived_at=organization.archived_at,
+        version=organization.version,
         created_at=organization.created_at,
         updated_at=organization.updated_at,
     )
@@ -136,8 +138,12 @@ async def update_organization(
     organization = await _get_owned(session, organization_id, user)
     require_live(organization, "Organization")
     # exclude_unset=True — only update fields the caller actually sent
-    for field, value in body.model_dump(exclude_unset=True).items():
+    updates = body.model_dump(exclude_unset=True)
+    check_version(organization, updates.pop("version", None), "Organization")
+    before = snapshot(organization)
+    for field, value in updates.items():
         setattr(organization, field, value)
+    record_update(session, user, organization, before)
     await session.commit()
     await session.refresh(organization)
     return _to_read(organization, await _count_contacts(session, organization.id))
@@ -155,7 +161,7 @@ async def archive_organization(
     making it silently is the opposite of recoverable.
     """
     organization = await _get_owned(session, organization_id, user)
-    await set_archived(session, organization, True)
+    await set_archived(session, organization, True, user)
     return _to_read(organization, await _count_contacts(session, organization.id))
 
 
@@ -167,7 +173,7 @@ async def restore_organization(
 ) -> OrganizationRead:
     """Bring an archived company back, exactly as it was put away."""
     organization = await _get_owned(session, organization_id, user)
-    await set_archived(session, organization, False)
+    await set_archived(session, organization, False, user)
     return _to_read(organization, await _count_contacts(session, organization.id))
 
 
@@ -183,5 +189,6 @@ async def delete_organization(
     """
     organization = await _get_owned(session, organization_id, user)
     require_archived(organization, "Organization")
+    await erase_history(session, organization)
     await session.delete(organization)
     await session.commit()

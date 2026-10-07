@@ -965,6 +965,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/history/{entity_type}/{entity_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List History
+         * @description The record's changes, newest first. Archived records keep theirs.
+         *
+         *     404 for a record that is not the caller's, exactly as its own GET answers:
+         *     an empty page instead would confirm that the id exists somewhere.
+         */
+        get: operations["list_history_history__entity_type___entity_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/search/": {
         parameters: {
             query?: never;
@@ -1274,6 +1297,40 @@ export interface components {
             list: components["schemas"]["ListQuery"];
             /** Oldest Days */
             oldest_days?: number | null;
+        };
+        /** AuditEventRead */
+        AuditEventRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Entity Type
+             * @enum {string}
+             */
+            entity_type: "contact" | "organization" | "deal" | "task" | "interaction" | "project" | "document" | "watch" | "capture";
+            /**
+             * Entity Id
+             * Format: uuid
+             */
+            entity_id: string;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "update" | "archive" | "restore";
+            /** Actor Id */
+            actor_id: string | null;
+            /** Changes */
+            changes: {
+                [key: string]: components["schemas"]["FieldChange"];
+            };
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** Body_login_auth_jwt_login_post */
         Body_login_auth_jwt_login_post: {
@@ -1696,6 +1753,8 @@ export interface components {
             updated_at: string;
             /** Archived At */
             archived_at?: string | null;
+            /** Version */
+            version: number;
         };
         /**
          * CaptureUpdate
@@ -1706,6 +1765,8 @@ export interface components {
          *     that arriving at an ending always stamps everything that ending implies.
          */
         CaptureUpdate: {
+            /** Version */
+            version?: number | null;
             /** Raw */
             raw?: string | null;
             /** Name */
@@ -1835,9 +1896,13 @@ export interface components {
             updated_at: string;
             /** Archived At */
             archived_at?: string | null;
+            /** Version */
+            version: number;
         };
         /** ContactUpdate */
         ContactUpdate: {
+            /** Version */
+            version?: number | null;
             /** Name */
             name?: string | null;
             /** Job Title */
@@ -2014,6 +2079,8 @@ export interface components {
             updated_at: string;
             /** Archived At */
             archived_at?: string | null;
+            /** Version */
+            version: number;
         };
         /**
          * DealStageChange
@@ -2030,6 +2097,8 @@ export interface components {
         };
         /** DealUpdate */
         DealUpdate: {
+            /** Version */
+            version?: number | null;
             /** Title */
             title?: string | null;
             /** Value Type */
@@ -2112,11 +2181,15 @@ export interface components {
             updated_at: string;
             /** Archived At */
             archived_at?: string | null;
+            /** Version */
+            version: number;
             /** Has Preview */
             readonly has_preview: boolean;
         };
         /** DocumentUpdate */
         DocumentUpdate: {
+            /** Version */
+            version?: number | null;
             /** Title */
             title?: string | null;
             /** Description */
@@ -2138,6 +2211,19 @@ export interface components {
             detail: string | {
                 [key: string]: string;
             };
+        };
+        /**
+         * FieldChange
+         * @description One field's value before and after, as JSON holds it.
+         *
+         *     Amounts come back as strings and dates as ISO 8601, the same spelling the
+         *     record itself uses. Link lists (`contact_ids`, ...) are sorted id lists.
+         */
+        FieldChange: {
+            /** Old */
+            old: unknown;
+            /** New */
+            new: unknown;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -2263,9 +2349,13 @@ export interface components {
             updated_at: string;
             /** Archived At */
             archived_at?: string | null;
+            /** Version */
+            version: number;
         };
         /** InteractionUpdate */
         InteractionUpdate: {
+            /** Version */
+            version?: number | null;
             /** Kind */
             kind?: ("call" | "meeting" | "event" | "email" | "note" | "other") | null;
             /** Subject */
@@ -2390,9 +2480,13 @@ export interface components {
             updated_at: string;
             /** Archived At */
             archived_at?: string | null;
+            /** Version */
+            version: number;
         };
         /** OrganizationUpdate */
         OrganizationUpdate: {
+            /** Version */
+            version?: number | null;
             /** Name */
             name?: string | null;
             /** Domain */
@@ -2407,6 +2501,17 @@ export interface components {
             industry?: string | null;
             /** Notes */
             notes?: string | null;
+        };
+        /** Page[AuditEventRead] */
+        Page_AuditEventRead_: {
+            /** Items */
+            items: components["schemas"]["AuditEventRead"][];
+            /** Total */
+            total: number;
+            /** Skip */
+            skip: number;
+            /** Limit */
+            limit: number;
         };
         /** Page[CaptureRead] */
         Page_CaptureRead_: {
@@ -2627,9 +2732,13 @@ export interface components {
             updated_at: string;
             /** Archived At */
             archived_at?: string | null;
+            /** Version */
+            version: number;
         };
         /** ProjectUpdate */
         ProjectUpdate: {
+            /** Version */
+            version?: number | null;
             /** Name */
             name?: string | null;
             /** Description */
@@ -2858,6 +2967,8 @@ export interface components {
             updated: string;
             /** Archived At */
             archived_at?: string | null;
+            /** Version */
+            version: number;
             next_occurrence?: components["schemas"]["TaskRead"] | null;
         };
         /** TaskCreate */
@@ -2962,6 +3073,8 @@ export interface components {
             updated: string;
             /** Archived At */
             archived_at?: string | null;
+            /** Version */
+            version: number;
         };
         /** TaskUpdate */
         TaskUpdate: {
@@ -2971,6 +3084,8 @@ export interface components {
             deal_id?: string | null;
             /** Interaction Id */
             interaction_id?: string | null;
+            /** Version */
+            version?: number | null;
             /** Title */
             title?: string | null;
             /** Description */
@@ -3253,9 +3368,13 @@ export interface components {
             updated_at: string;
             /** Archived At */
             archived_at?: string | null;
+            /** Version */
+            version: number;
         };
         /** WatchUpdate */
         WatchUpdate: {
+            /** Version */
+            version?: number | null;
             /** Name */
             name?: string | null;
             /** Url */
@@ -5621,6 +5740,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WatchRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_history_history__entity_type___entity_id__get: {
+        parameters: {
+            query?: {
+                skip?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                entity_type: "contact" | "organization" | "deal" | "task" | "interaction" | "project" | "document" | "watch" | "capture";
+                entity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_AuditEventRead_"];
                 };
             };
             /** @description Validation Error */

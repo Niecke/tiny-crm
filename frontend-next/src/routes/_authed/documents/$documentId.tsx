@@ -23,6 +23,8 @@ import {
   updateDocument,
 } from '../../../documents'
 import { formatBytes, formatDateTime } from '../../../format'
+import { StaleSaveNotice } from '../../../components/StaleSaveNotice'
+import { formError } from '../../../useEditVersion'
 
 // A document's page: the file (view, download, replace) and its details form.
 export const Route = createFileRoute('/_authed/documents/$documentId')({
@@ -41,8 +43,10 @@ function DocumentPage() {
   const [fileError, setFileError] = useState<string | null>(null)
   const leave = useLeave({ to: '/documents', search: filters })
 
+  // The form below is remounted whenever the document changes, so the version on
+  // screen is always the one it was filled from (#142, see useEditVersion).
   const save = useMutation({
-    mutationFn: (fields: DocumentFields) => updateDocument(api, documentId, fields),
+    mutationFn: (fields: DocumentFields) => updateDocument(api, documentId, fields, doc.data?.version),
     onSuccess: async (saved) => {
       queryClient.setQueryData(documentQuery(api, documentId).queryKey, saved)
       await invalidateDocuments(queryClient)
@@ -89,6 +93,7 @@ function DocumentPage() {
       <header className="page-header">
         <h1>{d?.title ?? 'Document'}</h1>
       </header>
+      <StaleSaveNotice error={save.error} onReload={() => void doc.refetch().then(() => save.reset())} />
 
       {doc.isPending ? (
         <p className="muted">Loading…</p>
@@ -135,7 +140,7 @@ function DocumentPage() {
               onSubmit={(fields) => save.mutate(fields)}
               submitLabel="Save changes"
               pending={save.isPending}
-              error={save.error}
+              error={formError(save.error)}
               cancel={
                 <Button variant="quiet" onPress={() => void leave()}>
                   Cancel

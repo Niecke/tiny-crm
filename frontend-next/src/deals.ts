@@ -163,8 +163,9 @@ export const dealOptionsQuery = (api: Api, search: string) =>
 
 export const createDeal = (api: Api, body: DealCreate) => unwrap(api.POST('/deals/', { body }))
 
-export const updateDeal = (api: Api, id: string, body: DealUpdate) =>
-  unwrap(api.PATCH('/deals/{deal_id}', { params: { path: { deal_id: id } }, body }))
+// `version` makes the save conditional — see useEditVersion (#142).
+export const updateDeal = (api: Api, id: string, body: DealUpdate, version?: number) =>
+  unwrap(api.PATCH('/deals/{deal_id}', { params: { path: { deal_id: id } }, body: { ...body, version } }))
 
 export const deleteDeal = (api: Api, id: string) =>
   unwrap(api.DELETE('/deals/{deal_id}', { params: { path: { deal_id: id } } }))

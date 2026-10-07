@@ -97,7 +97,7 @@ Priorities: **P0** not a CRM without it · **P1** daily friction · **P2** expec
 
 - [ ] **T15 · P1 · Unified timeline on contact detail**
       Contact detail shows interactions only. Merge interactions, tasks, deals, documents and field changes into one reverse-chronological history — the view that answers "where are we with this person?". Becomes the app's main screen.
-      *Unblocked:* every link it has to merge now exists — tasks carry contact / deal / interaction FKs, and documents and interactions attach to any record. Field changes need T29; ship the timeline without them rather than waiting.
+      *Unblocked:* every link it has to merge now exists — tasks carry contact / deal / interaction FKs, and documents and interactions attach to any record. Field changes come from `GET /history/{entity_type}/{id}` (change history, FEATURES.md).
       *Pairs with:* T37, which is what makes a run of unanswered outbound messages visible as a run.
       *Now has a starting point:* converting a capture logs the first outbound interaction and opens the deal, so a freshly made lead already has two rows for the timeline to merge instead of an empty history.
 
@@ -170,10 +170,6 @@ Priorities: **P0** not a CRM without it · **P1** daily friction · **P2** expec
       *Do after T19*, which is what makes duplicates common enough to be worth solving.
       *Where it belongs:* the capture triage panel already picks between "new person" and an existing contact, and `captures` deliberately has no unique constraint — refusing a duplicate at the moment of capture would be the opposite of frictionless. Warning at triage, where a human is already looking at the row, is the cheap version of this whole task.
 
-- [ ] **T29 · P2 · Change history**
-      Only `updated_at` is kept, and concurrent edits silently last-write-win. An append-only audit table gives "who changed this and when" and supports optimistic-concurrency checks on PATCH.
-      *Feeds:* T15's field-change entries — the one part of the timeline that cannot be built today.
-
 - [ ] **T32 · P2 · Error tracking and metrics**
       JSON logs and `/health` exist; nothing reports a 500 without someone reading the log. Add an error tracker and request/latency metrics.
       *Same gap, different layer:* a failed backup run is also silent (`BACKUP.md`), and a failed briefing CronJob is only visible in `kubectl get jobs`. One alerting path could cover all three.
@@ -197,8 +193,8 @@ things that are cheap and prevent expensive mistakes.
    sweep between now and this task loses the deadline. One migration, one query,
    one form section.
 3. **T15** — the unified timeline. Everything it merges now exists, and it is
-   the screen that makes the last five tasks' worth of links pay off. Ship it
-   without field changes rather than waiting for T29.
+   the screen that makes the last five tasks' worth of links pay off. Field
+   changes are recorded now (`GET /history/...`), so the timeline can show them.
 4. **T18** — one search. Do it before the data volume makes the per-panel
    `ILIKE` boxes actively misleading, and it subsumes half of T31.
 5. **T19** — import and export. The escape hatch, the GDPR portability answer,
@@ -216,7 +212,7 @@ things that are cheap and prevent expensive mistakes.
 **Cheap afternoons, slot in anywhere:** T37 (one column), T41 (one widget),
 T28 (one `SUM`, now that `expected_value` is generated), T31 (indexes).
 
-**Deferred on purpose:** T25 until there is a second user, T26/T27/T29/T33
+**Deferred on purpose:** T25 until there is a second user, T26/T27/T33
 until T19 makes duplicates and portability real, T32 until something has gone
 wrong quietly enough to matter.
 
