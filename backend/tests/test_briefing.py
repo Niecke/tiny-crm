@@ -290,6 +290,8 @@ async def test_open_deals_with_no_next_step_are_listed_longest_waiting_first(
     only_history = _deal(alice, "Only past calls", berlin("2026-08-20T09:00"))
     running = _deal(alice, "Running engagement", berlin("2026-05-01T09:00"), stage="running")
     lost = _deal(alice, "Lost", berlin("2026-05-01T09:00"), stage="lost")
+    # Not sent yet: nobody owes an answer, so there is nothing to chase (#255).
+    unsent = _deal(alice, "Unsent letter", berlin("2026-04-01T09:00"), stage="draft")
     await _seed(
         session_factory,
         quiet,
@@ -302,6 +304,7 @@ async def test_open_deals_with_no_next_step_are_listed_longest_waiting_first(
         only_history,
         running,
         lost,
+        unsent,
         _deal(bob, "Bob's quiet deal", berlin("2026-05-01T09:00")),
         _task(alice, "Chase", berlin("2026-09-01T23:59"), deal=tasked),
         _task(alice, "Someday", None, deal=undated),

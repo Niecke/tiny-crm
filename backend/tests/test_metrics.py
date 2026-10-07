@@ -177,7 +177,8 @@ async def test_pipeline_groups_by_stage_and_currency_and_counts_open_ended_deals
         _deal(alice, "Day rate, no estimate", "proposal", value=None),
         _deal(alice, "US bid", "proposal", value="12000.00", currency="USD"),
         _deal(alice, "Fresh", "lead", value=None),
-        # Not in play: decided or finished.
+        # Not in play: not sent yet (#255), decided or finished.
+        _deal(alice, "Unsent", "draft", value="99999.00"),
         _deal(alice, "Done", "completed", value="99999.00"),
         _deal(alice, "Gone", "lost", value="99999.00"),
         # Committed, not delivered.
@@ -224,6 +225,8 @@ async def test_velocity_reports_median_age_and_the_oldest_deal_per_stage(
         _deal(alice, "Lead A", "lead", since=berlin("2026-09-03T10:00")),
         _deal(alice, "Lead B", "lead", since=berlin("2026-09-01T10:00")),
         _deal(alice, "Won", "won", since=berlin("2026-01-01T10:00")),
+        # A letter that is still being written is not a deal that is not moving.
+        _deal(alice, "Unsent", "draft", since=berlin("2026-03-01T10:00")),
     )
 
     by_stage = (await _metrics(client, alice))["velocity"]["by_stage"]
@@ -255,11 +258,15 @@ async def test_deals_entering_a_stage_are_counted_within_the_local_period(
     other = _deal(alice, "Other", "won")
     _event(other, "proposal", berlin("2026-09-01T10:00"))
     _event(other, "won", berlin("2026-09-03T10:00"), "proposal")
-    await _seed(session_factory, moved, other)
+    # Starting a draft is a move like any other, and first in the order.
+    drafted = _deal(alice, "Drafted", "draft")
+    _event(drafted, "draft", berlin("2026-09-02T10:00"))
+    await _seed(session_factory, moved, other, drafted)
 
     entered = (await _metrics(client, alice))["velocity"]["entered"]
 
     assert entered == [
+        {"stage": "draft", "count": 1},
         {"stage": "qualified", "count": 1},
         {"stage": "proposal", "count": 2},
         {"stage": "won", "count": 1},
@@ -285,10 +292,15 @@ async def test_conversion_counts_deals_that_went_further_and_not_lost_ones(
     _event(winner, "lead", berlin("2026-08-01T10:00"))
     _event(winner, "negotiation", berlin("2026-08-10T10:00"), "lead")
     _event(winner, "won", berlin("2026-08-20T10:00"), "negotiation")
-    # Still sitting in lead.
+    # Prepared as a draft, then sent, and still sitting in lead. Sending it is
+    # where it enters the funnel; the draft before it is not a stage to convert.
     waiting = _deal(alice, "Waiting", "lead")
-    _event(waiting, "lead", berlin("2026-08-01T10:00"))
-    await _seed(session_factory, skipper, lost, winner, waiting)
+    _event(waiting, "draft", berlin("2026-07-20T10:00"))
+    _event(waiting, "lead", berlin("2026-08-01T10:00"), "draft")
+    # Never sent.
+    unsent = _deal(alice, "Unsent", "draft")
+    _event(unsent, "draft", berlin("2026-08-01T10:00"))
+    await _seed(session_factory, skipper, lost, winner, waiting, unsent)
 
     conversion = (await _metrics(client, alice))["velocity"]["conversion"]
 
@@ -347,6 +359,8 @@ async def test_attention_counts_match_the_briefing_and_link_to_their_lists(
         _deal(alice, "Expired", "negotiation", expected_close_date=date(2026, 9, 3)),
         _deal(alice, "Closing today", "negotiation", expected_close_date=date(2026, 9, 4)),
         _deal(alice, "Won late", "won", expected_close_date=date(2026, 8, 1)),
+        # A draft is neither: nothing was sent, so nothing is stalled or late.
+        _deal(alice, "Unsent", "draft", expected_close_date=date(2026, 8, 1)),
         Task(user_id=alice.id, title="Slipped", due_date=berlin("2026-09-03T23:59")),
         Task(user_id=alice.id, title="Tonight", due_date=berlin("2026-09-04T23:59")),
         Interaction(
@@ -402,6 +416,7 @@ async def test_the_overdue_filter_lists_what_the_dashboard_counts(
         _deal(alice, "Closing today", "negotiation", expected_close_date=date(2026, 9, 4)),
         _deal(alice, "No date", "lead"),
         _deal(alice, "Lost late", "lost", expected_close_date=date(2026, 8, 1)),
+        _deal(alice, "Unsent", "draft", expected_close_date=date(2026, 8, 1)),
         _deal(bob, "Bob's", "proposal", expected_close_date=date(2026, 8, 1)),
     )
 

@@ -13,6 +13,7 @@ day-rate-heavy pipeline reads as empty.
 *A stage is not a label.* Arriving in a decided stage stamps `closed_at`, pins
 the probability to 100 or 0, and decides whether a lost reason may exist at all.
 Winning does not finish the work, so `running` and `completed` sit after `won`.
+And a deal exists before anything is sent, so `draft` sits before `lead` (#255).
 PATCH has to apply exactly the same rules as the stage endpoint, or a deal's
 history depends on which button was pressed.
 """
@@ -84,6 +85,31 @@ async def test_a_bare_deal_starts_open_at_the_top_of_the_pipeline(
     assert created["probability"] is None
     assert created["closed_at"] is None
     assert created["lost_reason"] is None
+
+
+async def test_a_deal_can_be_prepared_as_a_draft_and_sent_later(
+    client: AsyncClient, alice: Account
+) -> None:
+    draft = await _deal(client, alice, title="Letter to Acme", stage="draft", notes="Angle: CI")
+
+    # Open and on the board like any other deal that is not decided.
+    assert draft["stage"] == "draft"
+    assert draft["is_open"] is True
+    assert draft["is_active"] is True
+    assert draft["is_won"] is False
+    assert draft["closed_at"] is None
+    assert draft["probability"] is None
+
+    sent = await client.post(
+        f"/deals/{draft['id']}/stage", json={"stage": "lead"}, headers=alice.headers
+    )
+
+    assert sent.status_code == 200, sent.text
+    assert sent.json()["stage"] == "lead"
+    # The clock a lead is chased by starts when the letter goes out, not when
+    # the research began.
+    assert sent.json()["stage_changed_at"] > draft["stage_changed_at"]
+    assert sent.json()["notes"] == "Angle: CI"
 
 
 # --- What it is worth -------------------------------------------------------
@@ -627,6 +653,7 @@ async def test_a_deal_cannot_be_filed_against_another_users_customer(
 async def test_the_list_answers_the_four_questions_the_board_asks(
     client: AsyncClient, alice: Account
 ) -> None:
+    await _deal(client, alice, title="Preparing", stage="draft")
     await _deal(client, alice, title="Bidding", stage="proposal")
     await _deal(client, alice, title="Agreed", stage="won")
     await _deal(client, alice, title="Delivering", stage="running")
@@ -638,10 +665,10 @@ async def test_the_list_answers_the_four_questions_the_board_asks(
         assert response.status_code == 200
         return {d["title"] for d in response.json()["items"]}
 
-    # What am I still competing for?
-    assert await titles("open") == {"Bidding"}
+    # What is not decided yet? A draft is, like anything still being bid for.
+    assert await titles("open") == {"Preparing", "Bidding"}
     # What is on my plate? A running engagement has to stay on the board.
-    assert await titles("active") == {"Bidding", "Agreed", "Delivering"}
+    assert await titles("active") == {"Preparing", "Bidding", "Agreed", "Delivering"}
     # What came off, whatever state the work is in?
     assert await titles("won") == {"Agreed", "Delivering", "Delivered"}
     # What is done with?
@@ -650,6 +677,9 @@ async def test_the_list_answers_the_four_questions_the_board_asks(
     one_stage = await client.get("/deals/?stage=running", headers=alice.headers)
     assert one_stage.json()["total"] == 1
     assert one_stage.json()["items"][0]["title"] == "Delivering"
+
+    drafts = await client.get("/deals/?stage=draft", headers=alice.headers)
+    assert [d["title"] for d in drafts.json()["items"]] == ["Preparing"]
 
 
 async def test_deals_can_be_filtered_by_customer_and_searched_by_title(

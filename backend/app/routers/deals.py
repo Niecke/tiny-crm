@@ -19,6 +19,7 @@ from app.models.deal import (
     ACTIVE_STAGES,
     DECIDED_STAGES,
     FINISHED_STAGES,
+    IN_PLAY_STAGES,
     OPEN_STAGES,
     WON_STAGES,
     Deal,
@@ -207,11 +208,12 @@ async def list_deals(
     status: DealStatus | None = Query(default=None),
     contact_id: UUID | None = Query(default=None),
     organization_id: UUID | None = Query(default=None),
-    # Open, with no open task and nothing planned: the deals nothing in the app
-    # would ever bring up again. Implies the stage-age order unless `sort` says
-    # otherwise — the one that has sat longest is the one to rescue first.
+    # In play, with no open task and nothing planned: the deals nothing in the
+    # app would ever bring up again. Implies the stage-age order unless `sort`
+    # says otherwise — the one that has sat longest is the one to rescue first.
+    # Drafts are left out: there is nothing to follow up on before it is sent.
     stalled: bool = Query(default=False),
-    # Open, with an expected close date before today: a forecast that has
+    # In play, with an expected close date before today: a forecast that has
     # expired (#117). Today is the briefing's — a calendar day in
     # BRIEFING_TIMEZONE — so this and the dashboard agree on what day it is.
     # The default order already puts the furthest past first.
@@ -234,7 +236,7 @@ async def list_deals(
     if organization_id is not None:
         q = q.where(Deal.organization_id == organization_id)
     if stalled:
-        q = q.where(Deal.stage.in_(OPEN_STAGES), not_(Deal.has_next_step))
+        q = q.where(Deal.stage.in_(IN_PLAY_STAGES), not_(Deal.has_next_step))
     if overdue:
         today = DayWindow.containing(now, ZoneInfo(settings.briefing_timezone)).today
         q = q.where(overdue_on(today))

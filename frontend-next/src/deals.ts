@@ -7,8 +7,10 @@ export type Stage = DealRead['stage']
 type Status = 'open' | 'active' | 'won' | 'finished'
 
 // The pipeline, left to right. Won starts the work rather than ending the
-// deal, so a running engagement has somewhere to sit.
+// deal, so a running engagement has somewhere to sit. Draft comes before
+// anything is sent: the research and the letter, moved to Lead once it is out.
 export const stageOptions: { value: Stage; label: string }[] = [
+  { value: 'draft', label: 'Draft' },
   { value: 'lead', label: 'Lead' },
   { value: 'qualified', label: 'Qualified' },
   { value: 'proposal', label: 'Proposal' },
@@ -21,14 +23,17 @@ export const stageOptions: { value: Stage; label: string }[] = [
 
 export const stageLabel = (stage: string) => stageOptions.find((o) => o.value === stage)?.label ?? stage
 
-// Groupings from models/deal.py.
-const OPEN: Stage[] = ['lead', 'qualified', 'proposal', 'negotiation']
+// Groupings from models/deal.py. A draft is open but not in play: the numbers
+// and the attention lists start at lead.
+export const IN_PLAY: Stage[] = ['lead', 'qualified', 'proposal', 'negotiation']
+const OPEN: Stage[] = ['draft', ...IN_PLAY]
 const WON: Stage[] = ['won', 'running', 'completed']
 export const DECIDED: Stage[] = [...WON, 'lost']
 export const isDecided = (stage: string) => DECIDED.includes(stage as Stage)
 
+// A draft stays plain: nothing has gone out yet.
 export const stageTone = (stage: string): 'success' | 'danger' | 'accent' | undefined =>
-  stage === 'lost' ? 'danger' : WON.includes(stage as Stage) ? 'success' : 'accent'
+  stage === 'draft' ? undefined : stage === 'lost' ? 'danger' : WON.includes(stage as Stage) ? 'success' : 'accent'
 
 // What the list is asked for, as the Flutter app's scope menu offers it: four
 // status questions and one per stage. "On my plate" is the default — it keeps
@@ -38,7 +43,7 @@ type Scope = {
   label: string
   status?: Status
   stage?: Stage
-  // The open deals that need looking at: no next step, or past their
+  // The deals in play that need looking at: no next step, or past their
   // expected close date. What the Numbers page's counts link to.
   stalled?: true
   overdue?: true
@@ -50,8 +55,8 @@ export const scopeOptions: Scope[] = [
   { value: 'competing', label: 'Still competing', status: 'open', columns: OPEN },
   { value: 'won', label: 'Won (any state)', status: 'won', columns: WON },
   { value: 'finished', label: 'Finished', status: 'finished', columns: ['completed', 'lost'] },
-  { value: 'stalled', label: 'No next step', stalled: true, columns: OPEN },
-  { value: 'overdue', label: 'Past expected close', overdue: true, columns: OPEN },
+  { value: 'stalled', label: 'No next step', stalled: true, columns: IN_PLAY },
+  { value: 'overdue', label: 'Past expected close', overdue: true, columns: IN_PLAY },
   { value: 'all', label: 'All deals', columns: stageOptions.map((o) => o.value) },
   ...stageOptions.map((o) => ({ value: `stage-${o.value}`, label: `· ${o.label}`, stage: o.value, columns: [o.value] })),
 ]

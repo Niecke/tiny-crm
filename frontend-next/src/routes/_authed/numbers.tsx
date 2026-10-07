@@ -5,7 +5,7 @@ import { z } from 'zod'
 import type { AttentionRow, DashboardMetrics } from '../../api/types'
 import { Segmented } from '../../components/ui/Segmented'
 import { WeeklyDeals } from '../../components/WeeklyDeals'
-import { stageLabel } from '../../deals'
+import { IN_PLAY, stageLabel } from '../../deals'
 import {
   byCurrency,
   conversionRate,
@@ -32,8 +32,6 @@ export const Route = createFileRoute('/_authed/numbers')({
   validateSearch: searchSchema,
   component: Numbers,
 })
-
-const OPEN_STAGES = ['lead', 'qualified', 'proposal', 'negotiation'] as const
 
 // The dashboard's aggregates (#138, DASHBOARD.md). Each panel answers one
 // question and says whether it shows now or the chosen period. What cannot be
@@ -142,7 +140,7 @@ function Pipeline({ data }: { data: DashboardMetrics }) {
         One block per currency; amounts are never added across them. Deals priced by rate with no volume estimate are
         counted as open-ended next to the amount, never as zero.
       </p>
-      {blocks.length === 0 && <p className="muted">No open deals.</p>}
+      {blocks.length === 0 && <p className="muted">No deals in play.</p>}
       {blocks.map((block) => {
         const max = largest(block.rows)
         return (
@@ -262,7 +260,7 @@ function Velocity({ data }: { data: DashboardMetrics }) {
             </tr>
           </thead>
           <tbody>
-            {OPEN_STAGES.map((stage) => {
+            {IN_PLAY.map((stage) => {
               const now = velocity.by_stage.find((s) => s.stage === stage)
               const conversion = velocity.conversion.find((c) => c.stage === stage)
               const rate = conversion && conversionRate(conversion.entered, conversion.advanced)

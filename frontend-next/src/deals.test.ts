@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { dealValue, formatMoney, isDecided, scopeOf, stageLabel, stageTone, valueSummary } from './deals'
+import { dealValue, formatMoney, isDecided, scopeOf, stageLabel, stageOptions, stageTone, valueSummary } from './deals'
 import { deal } from './test/fixtures'
 
 describe('stages', () => {
@@ -10,13 +10,18 @@ describe('stages', () => {
 
   test('won, running, completed and lost are decided', () => {
     expect(['won', 'running', 'completed', 'lost'].every(isDecided)).toBe(true)
-    expect(['lead', 'qualified', 'proposal', 'negotiation'].some(isDecided)).toBe(false)
+    expect(['draft', 'lead', 'qualified', 'proposal', 'negotiation'].some(isDecided)).toBe(false)
+  })
+
+  test('draft is the first stage of the pipeline', () => {
+    expect(stageOptions[0]).toEqual({ value: 'draft', label: 'Draft' })
   })
 
   test('tones', () => {
     expect(stageTone('lost')).toBe('danger')
     expect(stageTone('running')).toBe('success')
     expect(stageTone('proposal')).toBe('accent')
+    expect(stageTone('draft')).toBeUndefined()
   })
 })
 
@@ -26,13 +31,18 @@ describe('scopeOf', () => {
     expect(scopeOf('nonsense').value).toBe('plate')
   })
 
-  test('"On my plate" keeps won and running work on the board', () => {
-    expect(scopeOf('plate').columns).toEqual(['lead', 'qualified', 'proposal', 'negotiation', 'won', 'running'])
+  test('"On my plate" starts at draft and keeps won and running work on the board', () => {
+    expect(scopeOf('plate').columns).toEqual(['draft', 'lead', 'qualified', 'proposal', 'negotiation', 'won', 'running'])
   })
 
-  test('the attention scopes are open deals with a flag', () => {
-    expect(scopeOf('stalled')).toMatchObject({ stalled: true, columns: ['lead', 'qualified', 'proposal', 'negotiation'] })
-    expect(scopeOf('overdue')).toMatchObject({ overdue: true })
+  test('the attention scopes are deals in play with a flag, so no draft column', () => {
+    const inPlay = ['lead', 'qualified', 'proposal', 'negotiation']
+    expect(scopeOf('stalled')).toMatchObject({ stalled: true, columns: inPlay })
+    expect(scopeOf('overdue')).toMatchObject({ overdue: true, columns: inPlay })
+  })
+
+  test('a draft has a stage scope of its own', () => {
+    expect(scopeOf('stage-draft')).toMatchObject({ stage: 'draft', columns: ['draft'] })
   })
 
   test('a single stage scope asks for that stage only', () => {

@@ -31,7 +31,7 @@ export function NumbersSummary() {
   return (
     <section className="summary" aria-label="Numbers" aria-busy={metrics.isPending}>
       <Tile label="Open pipeline" when="Now" link={{ to: '/numbers' }} loading={!data}>
-        {data && <Money totals={totalsByCurrency(data.pipeline.by_stage)} empty="No open deals" />}
+        {data && <Money totals={totalsByCurrency(data.pipeline.by_stage)} empty="No deals in play" />}
       </Tile>
 
       <Tile label="Committed, not delivered" when="Now" link={{ to: '/numbers' }} loading={!data}>
