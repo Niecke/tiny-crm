@@ -1018,8 +1018,9 @@ export interface paths {
          * @description The dashboard's numbers for the calendar `period` containing today.
          *
          *     Pipeline, the per-stage ages and the attention counts are as of now; the
-         *     rest covers the period, which is echoed back resolved. Today is a calendar
-         *     day in BRIEFING_TIMEZONE, as in the morning briefing.
+         *     rest covers the period, which is echoed back resolved. `trends` is always
+         *     the last ten weeks. Today is a calendar day in BRIEFING_TIMEZONE, as in
+         *     the morning briefing.
          */
         get: operations["get_dashboard_metrics_metrics_dashboard_get"];
         put?: never;
@@ -1889,6 +1890,7 @@ export interface components {
             velocity: components["schemas"]["VelocityMetrics"];
             attention: components["schemas"]["AttentionMetrics"];
             activity: components["schemas"]["ActivityMetrics"];
+            trends: components["schemas"]["TrendMetrics"];
         };
         /** DealCreate */
         DealCreate: {
@@ -3006,6 +3008,16 @@ export interface components {
             /** Refresh Token */
             refresh_token: string;
         };
+        /**
+         * TrendMetrics
+         * @description A fixed window, independent of `period`: the last ten calendar weeks (WEEKS),
+         *     oldest first, ending with the current one. Weeks with nothing are zeros,
+         *     so the series has no gaps a chart would have to guess about.
+         */
+        TrendMetrics: {
+            /** Deals Opened Weekly */
+            deals_opened_weekly: components["schemas"]["WeekCount"][];
+        };
         /** UserRead */
         UserRead: {
             /**
@@ -3264,6 +3276,18 @@ export interface components {
             active?: boolean | null;
             /** Next Due At */
             next_due_at?: string | null;
+        };
+        /** WeekCount */
+        WeekCount: {
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+            /** Count */
+            count: number;
+            /** Complete */
+            complete: boolean;
         };
     };
     responses: never;

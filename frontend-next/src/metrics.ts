@@ -81,6 +81,32 @@ export function byCurrency(rows: StageMoney[]): CurrencyBlock[] {
   return [...blocks.values()].sort((a, b) => a.currency.localeCompare(b.currency))
 }
 
+// One total per currency over the open pipeline, for the dashboard's summary.
+// Decimal strings are added as integer cents in BigInt, so the sum is exact —
+// never through a float. Currencies are never added to each other.
+export function totalsByCurrency(rows: StageMoney[]): MoneyByCurrency[] {
+  const totals = new Map<string, { cents: bigint; count: number; open_ended: number }>()
+  for (const row of rows) {
+    const t = totals.get(row.currency) ?? { cents: BigInt(0), count: 0, open_ended: 0 }
+    t.cents += exactCents(row.value)
+    t.count += row.count
+    t.open_ended += row.open_ended
+    totals.set(row.currency, t)
+  }
+  return [...totals.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([currency, t]) => ({ currency, value: fromCents(t.cents), count: t.count, open_ended: t.open_ended }))
+}
+
+const HUNDRED = BigInt(100)
+
+function exactCents(value: string): bigint {
+  const [whole, fraction = ''] = value.trim().split('.')
+  return BigInt(whole) * HUNDRED + BigInt(fraction.padEnd(2, '0').slice(0, 2))
+}
+
+const fromCents = (cents: bigint) => `${cents / HUNDRED}.${(cents % HUNDRED).toString().padStart(2, '0')}`
+
 // Bar length for an amount, relative to the largest in its own block, without
 // turning money into a float for anything but the drawing. Integer cents keep
 // the comparison exact up to amounts no solo business reaches.
@@ -112,3 +138,25 @@ export function formatMedian(days: number | null | undefined): string {
   if (days == null) return '–'
   return `${Number.isInteger(days) ? days : days.toFixed(1)} d`
 }
+
+export type WeekCount = { start: string; count: number; complete: boolean }
+
+// The figures a weekly series is read by: this week so far, last week, and
+// the average over the complete weeks — the running one would drag it down
+// every Monday.
+export function weeklySummary(weeks: WeekCount[]): {
+  current: WeekCount | undefined
+  previous: WeekCount | undefined
+  average: number | null
+} {
+  const complete = weeks.filter((w) => w.complete)
+  const total = complete.reduce((n, w) => n + w.count, 0)
+  return {
+    current: weeks.find((w) => !w.complete),
+    previous: complete.at(-1),
+    average: complete.length > 0 ? Math.round((total / complete.length) * 10) / 10 : null,
+  }
+}
+
+export const formatWeek = (start: string) =>
+  localDate(start).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })

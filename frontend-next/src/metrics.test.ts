@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import type { StageMoney } from './api/types'
-import { byCurrency, conversionRate, formatMedian, largest, moneyPair, share } from './metrics'
+import { byCurrency, conversionRate, formatMedian, largest, moneyPair, share, totalsByCurrency, weeklySummary } from './metrics'
 
 const row = (stage: StageMoney['stage'], currency: string, value: string, count = 1, open_ended = 0): StageMoney => ({
   stage,
@@ -66,5 +66,41 @@ describe('formatMedian', () => {
     expect(formatMedian(10)).toBe('10 d')
     expect(formatMedian(6.5)).toBe('6.5 d')
     expect(formatMedian(null)).toBe('–')
+  })
+})
+
+describe('totalsByCurrency', () => {
+  test('adds exactly, per currency, and keeps the open-ended count', () => {
+    const totals = totalsByCurrency([
+      row('lead', 'EUR', '0.10', 2, 1),
+      row('proposal', 'EUR', '0.20', 1, 0),
+      row('proposal', 'USD', '12000.00', 1, 0),
+      row('negotiation', 'EUR', '999999999999.99', 1, 0),
+    ])
+    expect(totals).toEqual([
+      { currency: 'EUR', value: '1000000000000.29', count: 4, open_ended: 1 },
+      { currency: 'USD', value: '12000.00', count: 1, open_ended: 0 },
+    ])
+  })
+
+  test('is empty for an empty pipeline', () => {
+    expect(totalsByCurrency([])).toEqual([])
+  })
+})
+
+describe('weeklySummary', () => {
+  test('averages the complete weeks only', () => {
+    const summary = weeklySummary([
+      { start: '2026-08-17', count: 2, complete: true },
+      { start: '2026-08-24', count: 1, complete: true },
+      { start: '2026-08-31', count: 0, complete: false },
+    ])
+    expect(summary.current?.count).toBe(0)
+    expect(summary.previous?.start).toBe('2026-08-24')
+    expect(summary.average).toBe(1.5)
+  })
+
+  test('has no average without a complete week', () => {
+    expect(weeklySummary([{ start: '2026-08-31', count: 3, complete: false }]).average).toBeNull()
   })
 })

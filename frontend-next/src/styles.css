@@ -449,6 +449,250 @@ a {
   color: var(--color-warning);
 }
 
+/* The headline numbers above today's list (#138): four tiles, each a link
+   into the page that explains it. Two across on a phone. */
+.summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.summary-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-panel);
+  color: var(--color-text);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.summary-tile:hover {
+  border-color: var(--color-border-strong);
+}
+
+.summary-tile:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.summary-when {
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.summary-label {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.summary-value {
+  font-size: 1.15rem;
+  font-weight: 600;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+}
+
+.summary-foot {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.summary-tile[data-tone='warning'] .summary-value {
+  color: var(--color-warning);
+}
+
+.summary-tile .skeleton {
+  margin-top: var(--space-1);
+}
+
+@media (max-width: 960px) {
+  .summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* New deals per week: the figures beside ten labelled columns on one
+   baseline, the running week lighter, a dashed line at the average of the
+   complete weeks. Stacked on a phone. */
+.weekly {
+  display: grid;
+  grid-template-columns: minmax(10rem, 14rem) minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: end;
+}
+
+.weekly-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+}
+
+.weekly-header h2 {
+  font-size: 0.95rem;
+}
+
+.weekly-link {
+  margin-left: auto;
+}
+
+.weekly-figures {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.weekly-figures dt {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.weekly-figures dd {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.weekly-figures dd .muted {
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+.weekly-plot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+/* Room at the top for the tallest column's label. */
+.weekly-chart {
+  position: relative;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+  height: 140px;
+  margin-top: 1.25rem;
+  border-bottom: 1px solid var(--color-border-strong);
+}
+
+.weekly-column {
+  position: relative;
+  height: 100%;
+}
+
+.weekly-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  min-height: 2px;
+  background: var(--color-accent);
+  border-radius: 4px 4px 0 0;
+}
+
+.weekly-column[data-partial] .weekly-bar {
+  opacity: 0.4;
+}
+
+.weekly-count {
+  position: absolute;
+  left: 0;
+  right: 0;
+  margin-bottom: 2px;
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+
+.weekly-column[data-partial] .weekly-count {
+  color: var(--color-text-muted);
+}
+
+.weekly-average {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed var(--color-text-muted);
+  pointer-events: none;
+}
+
+.weekly-dates {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.weekly-dates span {
+  overflow: hidden;
+  text-overflow: clip;
+}
+
+@media (max-width: 767px) {
+  .weekly {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .weekly-figures {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .weekly-chart,
+  .weekly-dates {
+    gap: 3px;
+  }
+
+  /* Ten dates do not fit a phone: every other one, and the running week,
+     which may overhang its column to the right edge. */
+  .weekly-dates span:nth-child(even),
+  .weekly-dates span:nth-last-child(2) {
+    visibility: hidden;
+  }
+
+  /* The shown dates spill into their hidden neighbours' room. */
+  .weekly-dates span {
+    overflow: visible;
+  }
+
+  .weekly-dates span:last-child {
+    visibility: visible;
+    direction: rtl;
+  }
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* ---------- Numbers ---------- */
 
 /* The dashboard's aggregates (#138). Panels in a single column, ordered by

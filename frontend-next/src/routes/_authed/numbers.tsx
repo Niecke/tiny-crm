@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { z } from 'zod'
 import type { AttentionRow, DashboardMetrics } from '../../api/types'
 import { Segmented } from '../../components/ui/Segmented'
+import { WeeklyDeals } from '../../components/WeeklyDeals'
 import { stageLabel } from '../../deals'
 import {
   byCurrency,
@@ -489,6 +490,10 @@ function Activity({ data }: { data: DashboardMetrics }) {
             lines={1}
           />
         </div>
+      </div>
+      <div className="numbers-activity-col">
+        <h3>New deals per week · last 10 weeks</h3>
+        <WeeklyDeals weeks={data.trends.deals_opened_weekly} />
       </div>
     </Panel>
   )

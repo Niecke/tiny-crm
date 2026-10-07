@@ -22,6 +22,7 @@ from app.metrics import (
     activity_metrics,
     attention_metrics,
     pipeline_metrics,
+    trend_metrics,
     velocity_metrics,
 )
 from app.routers.briefing import current_time
@@ -40,8 +41,9 @@ async def get_dashboard_metrics(
     """The dashboard's numbers for the calendar `period` containing today.
 
     Pipeline, the per-stage ages and the attention counts are as of now; the
-    rest covers the period, which is echoed back resolved. Today is a calendar
-    day in BRIEFING_TIMEZONE, as in the morning briefing.
+    rest covers the period, which is echoed back resolved. `trends` is always
+    the last ten weeks. Today is a calendar day in BRIEFING_TIMEZONE, as in
+    the morning briefing.
     """
     window = Period.containing(period, now, ZoneInfo(settings.briefing_timezone))
     # One session, so the queries run one after another: an AsyncSession is
@@ -59,4 +61,5 @@ async def get_dashboard_metrics(
         velocity=await velocity_metrics(session, user.id, window),
         attention=await attention_metrics(session, user.id, window),
         activity=await activity_metrics(session, user.id, window),
+        trends=await trend_metrics(session, user.id, now, window.tz),
     )
