@@ -30,9 +30,10 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
+from uuid import UUID
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
+from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.auth.users import User
@@ -151,68 +152,76 @@ class Briefing:
         )
 
 
-async def gather_briefing(session: AsyncSession, user: User, window: DayWindow) -> Briefing:
-    """Everything that wants `user`'s attention today."""
-    open_tasks = select(Task).where(Task.user_id == user.id, Task.done.is_(False))
-    overdue_tasks = await session.scalars(
-        open_tasks.where(Task.due_date < window.start).order_by(
+@dataclass(frozen=True)
+class BriefingQueries:
+    """The briefing's selects, unexecuted.
+
+    Separate from `gather_briefing` so the dashboard (app/metrics.py) can count
+    the same rows instead of keeping a second definition of "overdue" or
+    "unconfirmed" — two definitions drift, and then the dashboard and the 07:00
+    message disagree about what is late (DASHBOARD.md, rule 4).
+    """
+
+    overdue_tasks: Select[tuple[Task]]
+    tasks_today: Select[tuple[Task]]
+    interactions_today: Select[tuple[Interaction]]
+    unconfirmed_interactions: Select[tuple[Interaction]]
+    watches_due: Select[tuple[Watch]]
+    captures_waiting: Select[tuple[Capture]]
+    stalled_deals: Select[tuple[Deal]]
+
+
+def briefing_queries(user_id: UUID, window: DayWindow) -> BriefingQueries:
+    """Everything that wants `user_id`'s attention on `window`'s day, as queries."""
+    open_tasks = select(Task).where(Task.user_id == user_id, Task.done.is_(False))
+    planned = select(Interaction).where(Interaction.user_id == user_id, Interaction.done.is_(False))
+    return BriefingQueries(
+        overdue_tasks=open_tasks.where(Task.due_date < window.start).order_by(
             Task.due_date.asc(), Task.priority.desc(), Task.id.asc()
-        )
-    )
-    tasks_today = await session.scalars(
-        open_tasks.where(Task.due_date >= window.start, Task.due_date < window.end).order_by(
-            Task.priority.desc(), Task.due_date.asc(), Task.id.asc()
-        )
-    )
-
-    planned = select(Interaction).where(Interaction.user_id == user.id, Interaction.done.is_(False))
-    interactions_today = await session.scalars(
-        planned.where(
+        ),
+        tasks_today=open_tasks.where(
+            Task.due_date >= window.start, Task.due_date < window.end
+        ).order_by(Task.priority.desc(), Task.due_date.asc(), Task.id.asc()),
+        interactions_today=planned.where(
             Interaction.occurred_at >= window.start, Interaction.occurred_at < window.end
-        ).order_by(Interaction.occurred_at.asc(), Interaction.id.asc())
-    )
-    unconfirmed = await session.scalars(
-        planned.where(Interaction.occurred_at < window.start).order_by(
+        ).order_by(Interaction.occurred_at.asc(), Interaction.id.asc()),
+        unconfirmed_interactions=planned.where(Interaction.occurred_at < window.start).order_by(
             Interaction.occurred_at.asc(), Interaction.id.asc()
-        )
-    )
-
-    watches_due = await session.scalars(
-        select(Watch)
-        .where(Watch.user_id == user.id, Watch.active.is_(True), Watch.next_due_at < window.end)
-        .order_by(Watch.next_due_at.asc(), Watch.id.asc())
-    )
-
-    captures_waiting = await session.scalars(
-        select(Capture)
-        .where(Capture.user_id == user.id, Capture.status == "new")
-        .order_by(Capture.created_at.asc(), Capture.id.asc())
-    )
-
-    # Planned from the start of today, not from this instant: a meeting earlier
-    # today that is still unconfirmed is in the calendar section above, so the
-    # deal it is about has not been forgotten. And the briefing's clock is the
-    # window's, not the database's `now()` that `Deal.has_next_step` reads.
-    stalled_deals = await session.scalars(
-        select(Deal)
+        ),
+        watches_due=select(Watch)
+        .where(Watch.user_id == user_id, Watch.active.is_(True), Watch.next_due_at < window.end)
+        .order_by(Watch.next_due_at.asc(), Watch.id.asc()),
+        captures_waiting=select(Capture)
+        .where(Capture.user_id == user_id, Capture.status == "new")
+        .order_by(Capture.created_at.asc(), Capture.id.asc()),
+        # Planned from the start of today, not from this instant: a meeting
+        # earlier today that is still unconfirmed is in the calendar section
+        # above, so the deal it is about has not been forgotten. And the
+        # briefing's clock is the window's, not the database's `now()` that
+        # `Deal.has_next_step` reads.
+        stalled_deals=select(Deal)
         .where(
-            Deal.user_id == user.id,
+            Deal.user_id == user_id,
             Deal.stage.in_(OPEN_STAGES),
             ~next_step_exists(window.start),
         )
-        .order_by(Deal.stage_changed_at.asc(), Deal.id.asc())
+        .order_by(Deal.stage_changed_at.asc(), Deal.id.asc()),
     )
 
+
+async def gather_briefing(session: AsyncSession, user: User, window: DayWindow) -> Briefing:
+    """Everything that wants `user`'s attention today."""
+    queries = briefing_queries(user.id, window)
     return Briefing(
         user=user,
         window=window,
-        overdue_tasks=list(overdue_tasks),
-        tasks_today=list(tasks_today),
-        interactions_today=list(interactions_today),
-        unconfirmed_interactions=list(unconfirmed),
-        watches_due=list(watches_due),
-        captures_waiting=list(captures_waiting),
-        stalled_deals=list(stalled_deals),
+        overdue_tasks=list(await session.scalars(queries.overdue_tasks)),
+        tasks_today=list(await session.scalars(queries.tasks_today)),
+        interactions_today=list(await session.scalars(queries.interactions_today)),
+        unconfirmed_interactions=list(await session.scalars(queries.unconfirmed_interactions)),
+        watches_due=list(await session.scalars(queries.watches_due)),
+        captures_waiting=list(await session.scalars(queries.captures_waiting)),
+        stalled_deals=list(await session.scalars(queries.stalled_deals)),
     )
 
 

@@ -449,6 +449,230 @@ a {
   color: var(--color-warning);
 }
 
+/* ---------- Numbers ---------- */
+
+/* The dashboard's aggregates (#138). Panels in a single column, ordered by
+   the question each answers; the two short ones share a row on a desktop. */
+.numbers-header {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.numbers-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.numbers-panel-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+}
+
+/* Whether a panel is a snapshot or follows the period switch. */
+.numbers-when {
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.numbers-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.numbers-panel-body h3 {
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+/* A group nothing can be computed for yet: the outline says "planned". */
+.numbers-panel[data-pending] {
+  background: transparent;
+  box-shadow: none;
+  border-style: dashed;
+  border-color: var(--color-border-strong);
+}
+
+.numbers-scroll {
+  overflow-x: auto;
+}
+
+.numbers-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.numbers-table caption {
+  text-align: left;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  padding-bottom: var(--space-2);
+}
+
+.numbers-table th,
+.numbers-table td {
+  padding: var(--space-2) var(--space-3) var(--space-2) 0;
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.numbers-table thead th {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.numbers-table tbody th {
+  font-weight: 500;
+}
+
+.numbers-table tbody tr {
+  border-top: 1px solid var(--color-border);
+}
+
+.numbers-table .col-num {
+  text-align: right;
+}
+
+.numbers-table td:last-child,
+.numbers-table th:last-child {
+  padding-right: 0;
+}
+
+/* The oldest deal's title may wrap; nothing else does. */
+.numbers-table .row-main {
+  white-space: normal;
+  min-width: 10rem;
+}
+
+.numbers-bar-col {
+  width: 40%;
+  min-width: 6rem;
+}
+
+.numbers-bar {
+  display: block;
+  height: 12px;
+}
+
+.numbers-bar>span {
+  display: block;
+  height: 100%;
+  background: var(--color-accent);
+  opacity: 0.75;
+  border-radius: 0 4px 4px 0;
+}
+
+.numbers-money+.numbers-money::before {
+  content: ' · ';
+  color: var(--color-text-muted);
+}
+
+.numbers-attention-row {
+  justify-content: flex-start !important;
+  align-items: center;
+  flex-wrap: nowrap !important;
+}
+
+.numbers-attention-row .queue-count {
+  min-width: 2.5rem;
+  text-align: right;
+}
+
+.numbers-attention-row[data-tone='warning'] .queue-count {
+  color: var(--color-warning);
+}
+
+.numbers-attention-row[data-tone='danger'] .queue-count {
+  color: var(--color-danger);
+}
+
+.numbers-activity {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-5);
+}
+
+.numbers-activity-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.numbers-kinds {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.numbers-kinds li {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr) 2.5rem;
+  gap: var(--space-3);
+  align-items: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.numbers-kind {
+  text-transform: capitalize;
+}
+
+/* Planned, not built: a static skeleton in the shape the figure will take,
+   and the issue it waits on. No shimmer — nothing is loading. */
+.pending {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-sm);
+}
+
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.skeleton-line {
+  display: block;
+  height: 10px;
+  border-radius: 4px;
+  background: var(--color-sidebar);
+}
+
+@media (max-width: 767px) {
+  .numbers-pair,
+  .numbers-activity {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* The figures beside it say the same; the amounts need the width. */
+  .numbers-table .numbers-bar-col {
+    display: none;
+  }
+}
+
 /* ---------- List table ---------- */
 
 /* React Aria's SearchField wraps the input; its clear button replaces the

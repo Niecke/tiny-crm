@@ -590,6 +590,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/metrics/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Dashboard Metrics
+         * @description The dashboard's numbers for the calendar `period` containing today.
+         *
+         *     Pipeline, the per-stage ages and the attention counts are as of now; the
+         *     rest covers the period, which is echoed back resolved. Today is a calendar
+         *     day in BRIEFING_TIMEZONE, as in the morning briefing.
+         */
+        get: operations["get_dashboard_metrics_metrics_dashboard_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/jwt/login": {
         parameters: {
             query?: never;
@@ -797,6 +821,43 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * ActivityMetrics
+         * @description In the period. Outbound vs inbound waits for #135. Tasks completed
+         *     waits for a completion timestamp — `done` says whether, not when.
+         */
+        ActivityMetrics: {
+            /** Interactions By Kind */
+            interactions_by_kind: components["schemas"]["InteractionKindCount"][];
+            /** Deals Opened */
+            deals_opened: number;
+            /** Captures Converted */
+            captures_converted: number;
+            /** Captures Dismissed */
+            captures_dismissed: number;
+            /** Tasks Created */
+            tasks_created: number;
+        };
+        /**
+         * AttentionMetrics
+         * @description Now. Rows that need later work are not fields yet: lost deals due for
+         *     a revisit (#118) and contacts awaiting a reply (#135).
+         */
+        AttentionMetrics: {
+            stalled_deals: components["schemas"]["AttentionRow"];
+            overdue_deals: components["schemas"]["AttentionRow"];
+            overdue_tasks: components["schemas"]["AttentionRow"];
+            unconfirmed_interactions: components["schemas"]["AttentionRow"];
+            captures_waiting: components["schemas"]["AttentionRow"];
+        };
+        /** AttentionRow */
+        AttentionRow: {
+            /** Count */
+            count: number;
+            list: components["schemas"]["ListQuery"];
+            /** Oldest Days */
+            oldest_days?: number | null;
+        };
         /** Body_login_auth_jwt_login_post */
         Body_login_auth_jwt_login_post: {
             /** Grant Type */
@@ -1401,6 +1462,14 @@ export interface components {
             /** Notes */
             notes?: string | null;
         };
+        /** DashboardMetrics */
+        DashboardMetrics: {
+            period: components["schemas"]["PeriodRead"];
+            pipeline: components["schemas"]["PipelineMetrics"];
+            velocity: components["schemas"]["VelocityMetrics"];
+            attention: components["schemas"]["AttentionMetrics"];
+            activity: components["schemas"]["ActivityMetrics"];
+        };
         /** DealCreate */
         DealCreate: {
             /**
@@ -1699,6 +1768,16 @@ export interface components {
              */
             tags: string[];
         };
+        /** InteractionKindCount */
+        InteractionKindCount: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "call" | "meeting" | "event" | "email" | "note" | "other";
+            /** Count */
+            count: number;
+        };
         /** InteractionRead */
         InteractionRead: {
             /**
@@ -1781,6 +1860,55 @@ export interface components {
             deal_ids?: string[] | null;
             /** Project Ids */
             project_ids?: string[] | null;
+        };
+        /**
+         * ListQuery
+         * @description The request that lists what a count counted, so a client links to it
+         *     without re-deriving the filter.
+         *
+         *     `field` names the list inside the response when the endpoint returns
+         *     several, as /briefing/ does.
+         */
+        ListQuery: {
+            /** Path */
+            path: string;
+            /**
+             * Params
+             * @default {}
+             */
+            params: {
+                [key: string]: string;
+            };
+            /** Field */
+            field?: string | null;
+        };
+        /** MoneyByCurrency */
+        MoneyByCurrency: {
+            /** Currency */
+            currency: string;
+            /** Count */
+            count: number;
+            /** Value */
+            value: string;
+            /** Open Ended */
+            open_ended: number;
+        };
+        /** OldestDeal */
+        OldestDeal: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /**
+             * Stage Changed At
+             * Format: date-time
+             */
+            stage_changed_at: string;
+            /** Days In Stage */
+            days_in_stage: number;
         };
         /** OrganizationCreate */
         OrganizationCreate: {
@@ -1967,6 +2095,43 @@ export interface components {
             /** New Password */
             new_password: string;
         };
+        /**
+         * PeriodRead
+         * @description The window the period figures cover, resolved: the client asked for
+         *     "quarter", this says which one and in which timezone.
+         */
+        PeriodRead: {
+            /** Kind */
+            kind: string;
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+            /**
+             * End
+             * Format: date
+             */
+            end: string;
+            /** Timezone */
+            timezone: string;
+            /**
+             * Today
+             * Format: date
+             */
+            today: string;
+        };
+        /**
+         * PipelineMetrics
+         * @description Now. Weighted pipeline is left out until stage-default probabilities
+         *     exist (#120); today it would be a sum over an arbitrary subset.
+         */
+        PipelineMetrics: {
+            /** By Stage */
+            by_stage: components["schemas"]["StageMoney"][];
+            /** Committed */
+            committed: components["schemas"]["MoneyByCurrency"][];
+        };
         /** ProjectCreate */
         ProjectCreate: {
             /** Name */
@@ -2054,6 +2219,17 @@ export interface components {
             refresh_token: string;
         };
         /**
+         * SalesCycle
+         * @description Deals first won in the period, and the median calendar days from
+         *     opening each to winning it. Null median when none were won.
+         */
+        SalesCycle: {
+            /** Deals */
+            deals: number;
+            /** Median Days */
+            median_days: number | null;
+        };
+        /**
          * SearchDate
          * @description A date that belongs in a hit's subtitle: "Due …", "Since …".
          *
@@ -2118,6 +2294,67 @@ export interface components {
             q: string;
             /** Groups */
             groups: components["schemas"]["SearchGroup"][];
+        };
+        /**
+         * StageConversion
+         * @description All-time: of the deals that ever entered `stage`, how many later
+         *     entered a stage further along the pipeline (lost does not count).
+         */
+        StageConversion: {
+            /**
+             * Stage
+             * @enum {string}
+             */
+            stage: "lead" | "qualified" | "proposal" | "negotiation" | "won" | "running" | "completed" | "lost";
+            /** Entered */
+            entered: number;
+            /** Advanced */
+            advanced: number;
+        };
+        /**
+         * StageEntered
+         * @description In the period: distinct deals that entered `stage`.
+         */
+        StageEntered: {
+            /**
+             * Stage
+             * @enum {string}
+             */
+            stage: "lead" | "qualified" | "proposal" | "negotiation" | "won" | "running" | "completed" | "lost";
+            /** Count */
+            count: number;
+        };
+        /** StageMoney */
+        StageMoney: {
+            /** Currency */
+            currency: string;
+            /** Count */
+            count: number;
+            /** Value */
+            value: string;
+            /** Open Ended */
+            open_ended: number;
+            /**
+             * Stage
+             * @enum {string}
+             */
+            stage: "lead" | "qualified" | "proposal" | "negotiation" | "won" | "running" | "completed" | "lost";
+        };
+        /**
+         * StageVelocity
+         * @description Now, one open stage.
+         */
+        StageVelocity: {
+            /**
+             * Stage
+             * @enum {string}
+             */
+            stage: "lead" | "qualified" | "proposal" | "negotiation" | "won" | "running" | "completed" | "lost";
+            /** Count */
+            count: number;
+            /** Median Days In Stage */
+            median_days_in_stage: number | null;
+            oldest: components["schemas"]["OldestDeal"];
         };
         /**
          * TaskCompletionRead
@@ -2379,6 +2616,16 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** VelocityMetrics */
+        VelocityMetrics: {
+            /** By Stage */
+            by_stage: components["schemas"]["StageVelocity"][];
+            /** Entered */
+            entered: components["schemas"]["StageEntered"][];
+            /** Conversion */
+            conversion: components["schemas"]["StageConversion"][];
+            sales_cycle: components["schemas"]["SalesCycle"];
         };
         /**
          * WatchCheckCreate
@@ -3178,6 +3425,7 @@ export interface operations {
                 contact_id?: string | null;
                 organization_id?: string | null;
                 stalled?: boolean;
+                overdue?: boolean;
                 sort?: ("expected_close_date" | "stage_changed_at") | null;
             };
             header?: never;
@@ -4408,6 +4656,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BriefingRead"];
+                };
+            };
+        };
+    };
+    get_dashboard_metrics_metrics_dashboard_get: {
+        parameters: {
+            query?: {
+                period?: "week" | "month" | "quarter" | "year";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardMetrics"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

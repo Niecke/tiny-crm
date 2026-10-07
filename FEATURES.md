@@ -126,7 +126,9 @@ their `stage_changed_at` — a floor, not the real move — and have no events.
 is not urgent. `?sort=stage_changed_at` puts the longest-waiting deal first.
 
 **Filters.** `?search` (title) · `?stage` · `?status` · `?contact_id` ·
-`?organization_id`.
+`?organization_id` · `?stalled=true` (open, no next step) · `?overdue=true`
+(open, `expected_close_date` before today — today in `BRIEFING_TIMEZONE`, as
+the briefing has it).
 
 ---
 
@@ -381,11 +383,12 @@ so the 401 handler can see one. Every delete goes through the same
 | Route | What it does |
 |---|---|
 | `/` | Dashboard: Contacts / Tasks / Upcoming panels, responsive to tabs under 700px. Contact panel filters by status, type and freelancer answer. |
+| `/numbers` | The dashboard's aggregates from `GET /metrics/dashboard`, with a Week / Month / Quarter / Year switch (`?period=`). One panel per question in DASHBOARD.md, each marked "Now" or the period. Attention counts link to the list behind them (`/deals` scoped "No next step" or "Past expected close", the inbox, today's briefing). Anything not measurable yet is a dashed skeleton naming the issue it waits on, never a zero. |
 | `/search` | Every type's hits for `?q=`, ten each, with "Show all" paging through one type. |
 | `/inbox` | The inbox: captures oldest-first beside a triage panel. **Open link** opens the profile in a new tab; one form files the person, opens a deal at stage Lead and logs that you wrote to them, then advances to the next capture. Nav badge counts what is waiting. |
 | `/capture` | Where Android's share sheet lands. Saves what was shared, then offers "Add another" or the inbox. Outside the app shell — arrived at from outside, not navigated to. |
 | `/watches` | Sources: "Due now" / "All active" / "Everything", filter by kind. **Open & sweep** opens the source in a new tab, then offers the check dialog. Nav badge counts what is due. |
-| `/deals` | List beside detail, scoped "On my plate" / "Still competing" / "Won" / "Finished" / one stage. Detail moves the deal with stage chips. |
+| `/deals` | List beside detail, scoped "On my plate" / "Still competing" / "No next step" / "Past expected close" / "Won" / "Finished" / one stage. Detail moves the deal with stage chips. |
 | `/organizations` | List beside detail: contacts at the company, add-someone-here, attached documents and interactions. |
 | `/projects` | Project list and detail with its contacts, tasks, documents and interactions. |
 | `/documents` | Upload, pdfrx viewer, markdown render, replace content, attach anywhere. |
@@ -456,6 +459,30 @@ sections), and each item carries the day count the briefing computed in
 `BRIEFING_TIMEZONE`, so the page and the 07:00 message cannot disagree about
 what is late. `app/routers/briefing.py`; the clock is a dependency
 (`current_time`) so tests pin it.
+
+---
+
+## Dashboard numbers
+
+`GET /metrics/dashboard?period=quarter` — `week` · `month` · `quarter` ·
+`year`, the calendar one containing today in `BRIEFING_TIMEZONE`, echoed back
+resolved. One response, one model per group from [DASHBOARD.md](DASHBOARD.md)
+(#138); `app/metrics.py` holds the queries, each one grouped aggregate.
+
+| Group | Now / period | What |
+|---|---|---|
+| `pipeline` (A) | now | open deals per stage and currency: count, value, open-ended count; won + running per currency |
+| `velocity` (B) | both | per open stage the median calendar days in stage and the oldest deal; deals entering each stage in the period; all-time conversion to a later stage; median days from opening to first win for deals won in the period |
+| `attention` (D) | now | stalled deals, overdue deals, overdue tasks, unconfirmed interactions, waiting captures (with the oldest's age), each with the list request behind it |
+| `activity` (E) | period | interactions that happened, by kind; deals opened; captures converted and dismissed; tasks created |
+
+**Money is a pair and never crosses currencies:** every amount is a `Decimal`
+string beside the count of deals with no derivable amount, grouped by
+currency. **A group that cannot be computed yet is absent, not zero** —
+`outcomes` (C) and `delivery` (F), and within the groups the weighted pipeline
+(#120), revisits (#118), reply direction (#135) and tasks completed (no
+completion timestamp). The attention counts run the briefing's own queries
+(`briefing_queries`), so the two cannot disagree about what is late.
 
 ---
 

@@ -3,7 +3,17 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
-from sqlalchemy import Computed, Date, DateTime, ForeignKey, Numeric, String, func
+from sqlalchemy import (
+    ColumnElement,
+    Computed,
+    Date,
+    DateTime,
+    ForeignKey,
+    Numeric,
+    String,
+    and_,
+    func,
+)
 from sqlalchemy.orm import Mapped, WriteOnlyMapped, mapped_column, relationship
 
 from app.db import Base
@@ -179,6 +189,14 @@ class Deal(Base):
         plus 2 open-ended" instead of quietly counting these as zero.
         """
         return self.value_type != "fixed" and self.estimated_volume is None
+
+
+def overdue_on(today: date) -> ColumnElement[bool]:
+    """Still open, with an expected close date before `today`: a forecast that
+    has expired (#117). One definition for the `?overdue=true` list and the
+    dashboard's count, so the number and the list behind it cannot differ.
+    `today` is the caller's local day — DayWindow's, not UTC's."""
+    return and_(Deal.stage.in_(OPEN_STAGES), Deal.expected_close_date < today)
 
 
 class DealStageEvent(Base):
