@@ -1964,6 +1964,7 @@ textarea.input {
   width: 2.1rem;
   height: 2.1rem;
   border-radius: var(--radius-sm);
+  border: 1.5px solid transparent;
   cursor: pointer;
   outline: none;
 }
@@ -1976,8 +1977,15 @@ textarea.input {
   background: var(--color-accent-soft);
 }
 
+.calendar-cell[data-current],
+.calendar-cell[data-today] {
+  border: 1.5px solid var(--color-accent);
+  font-weight: 600;
+}
+
 .calendar-cell[data-selected] {
   background: var(--color-accent);
+  border-color: var(--color-accent);
   color: var(--color-on-accent);
   font-weight: 600;
 }

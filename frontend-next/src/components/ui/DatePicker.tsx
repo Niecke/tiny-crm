@@ -1,4 +1,4 @@
-import { type CalendarDate, type CalendarDateTime, parseDate, parseDateTime } from '@internationalized/date'
+import { type CalendarDate, type CalendarDateTime, getLocalTimeZone, isSameDay, parseDate, parseDateTime, today } from '@internationalized/date'
 import {
   Button,
   Calendar,
@@ -59,7 +59,7 @@ export function DatePicker({
           {(segment) => <DateSegment segment={segment} className="date-segment" />}
         </DateInput>
         {value && (
-          <Button className="date-clear" aria-label={`Clear ${label.toLowerCase()}`} onPress={() => onChange('')}>
+          <Button slot={null} className="date-clear" aria-label={`Clear ${label.toLowerCase()}`} onPress={() => onChange('')}>
             ×
           </Button>
         )}
@@ -75,7 +75,7 @@ export function DatePicker({
       <FieldError className="field-error">{errorMessage}</FieldError>
       <Popover className="popover calendar-popover" offset={4}>
         <Dialog className="calendar-dialog">
-          <Calendar className="calendar">
+          <Calendar className="calendar" defaultFocusedValue={today(getLocalTimeZone())}>
             <header className="calendar-header">
               <Button slot="previous" className="button button-quiet">
                 ‹
@@ -86,7 +86,13 @@ export function DatePicker({
               </Button>
             </header>
             <CalendarGrid className="calendar-grid">
-              {(date) => <CalendarCell date={date} className="calendar-cell" />}
+              {(date) => (
+                <CalendarCell
+                  date={date}
+                  className="calendar-cell"
+                  data-current={isSameDay(date, today(getLocalTimeZone())) || undefined}
+                />
+              )}
             </CalendarGrid>
           </Calendar>
         </Dialog>
