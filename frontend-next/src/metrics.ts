@@ -81,6 +81,32 @@ export function byCurrency(rows: StageMoney[]): CurrencyBlock[] {
   return [...blocks.values()].sort((a, b) => a.currency.localeCompare(b.currency))
 }
 
+// One total per currency over the open pipeline, for the dashboard's summary.
+// Decimal strings are added as integer cents in BigInt, so the sum is exact —
+// never through a float. Currencies are never added to each other.
+export function totalsByCurrency(rows: StageMoney[]): MoneyByCurrency[] {
+  const totals = new Map<string, { cents: bigint; count: number; open_ended: number }>()
+  for (const row of rows) {
+    const t = totals.get(row.currency) ?? { cents: BigInt(0), count: 0, open_ended: 0 }
+    t.cents += exactCents(row.value)
+    t.count += row.count
+    t.open_ended += row.open_ended
+    totals.set(row.currency, t)
+  }
+  return [...totals.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([currency, t]) => ({ currency, value: fromCents(t.cents), count: t.count, open_ended: t.open_ended }))
+}
+
+const HUNDRED = BigInt(100)
+
+function exactCents(value: string): bigint {
+  const [whole, fraction = ''] = value.trim().split('.')
+  return BigInt(whole) * HUNDRED + BigInt(fraction.padEnd(2, '0').slice(0, 2))
+}
+
+const fromCents = (cents: bigint) => `${cents / HUNDRED}.${(cents % HUNDRED).toString().padStart(2, '0')}`
+
 // Bar length for an amount, relative to the largest in its own block, without
 // turning money into a float for anything but the drawing. Integer cents keep
 // the comparison exact up to amounts no solo business reaches.

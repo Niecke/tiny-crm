@@ -3,6 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { type Api, unwrap } from '../../api/client'
 import type { BriefingInteraction, BriefingRead, BriefingTask } from '../../api/types'
+import { NumbersSummary } from '../../components/NumbersSummary'
 import { PriorityBadge } from '../../components/PriorityBadge'
 
 // The morning briefing, as data (GET /briefing). The same function builds the
@@ -36,6 +37,8 @@ function Dashboard() {
         <h1>Today</h1>
         {briefing.data && <p>{formatDay(briefing.data.date)}</p>}
       </header>
+
+      <NumbersSummary />
 
       <div className="dashboard">
         <section className="panel" aria-label="Today">

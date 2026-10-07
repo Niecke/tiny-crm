@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import type { StageMoney } from './api/types'
-import { byCurrency, conversionRate, formatMedian, largest, moneyPair, share } from './metrics'
+import { byCurrency, conversionRate, formatMedian, largest, moneyPair, share, totalsByCurrency } from './metrics'
 
 const row = (stage: StageMoney['stage'], currency: string, value: string, count = 1, open_ended = 0): StageMoney => ({
   stage,
@@ -66,5 +66,24 @@ describe('formatMedian', () => {
     expect(formatMedian(10)).toBe('10 d')
     expect(formatMedian(6.5)).toBe('6.5 d')
     expect(formatMedian(null)).toBe('–')
+  })
+})
+
+describe('totalsByCurrency', () => {
+  test('adds exactly, per currency, and keeps the open-ended count', () => {
+    const totals = totalsByCurrency([
+      row('lead', 'EUR', '0.10', 2, 1),
+      row('proposal', 'EUR', '0.20', 1, 0),
+      row('proposal', 'USD', '12000.00', 1, 0),
+      row('negotiation', 'EUR', '999999999999.99', 1, 0),
+    ])
+    expect(totals).toEqual([
+      { currency: 'EUR', value: '1000000000000.29', count: 4, open_ended: 1 },
+      { currency: 'USD', value: '12000.00', count: 1, open_ended: 0 },
+    ])
+  })
+
+  test('is empty for an empty pipeline', () => {
+    expect(totalsByCurrency([])).toEqual([])
   })
 })

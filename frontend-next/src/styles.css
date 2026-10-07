@@ -449,6 +449,77 @@ a {
   color: var(--color-warning);
 }
 
+/* The headline numbers above today's list (#138): four tiles, each a link
+   into the page that explains it. Two across on a phone. */
+.summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.summary-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-panel);
+  color: var(--color-text);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.summary-tile:hover {
+  border-color: var(--color-border-strong);
+}
+
+.summary-tile:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.summary-when {
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.summary-label {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.summary-value {
+  font-size: 1.15rem;
+  font-weight: 600;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+}
+
+.summary-foot {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.summary-tile[data-tone='warning'] .summary-value {
+  color: var(--color-warning);
+}
+
+.summary-tile .skeleton {
+  margin-top: var(--space-1);
+}
+
+@media (max-width: 960px) {
+  .summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 /* ---------- Numbers ---------- */
 
 /* The dashboard's aggregates (#138). Panels in a single column, ordered by
