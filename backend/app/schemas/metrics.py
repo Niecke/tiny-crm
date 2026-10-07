@@ -175,9 +175,29 @@ class ActivityMetrics(BaseModel):
     tasks_created: int
 
 
+# --- Trends -------------------------------------------------------------------
+
+
+class WeekCount(BaseModel):
+    # Monday of the ISO week, in the operator's timezone.
+    start: date
+    count: int
+    # False for the week still running: its count is so far, not final.
+    complete: bool
+
+
+class TrendMetrics(BaseModel):
+    """A fixed window, independent of `period`: the last WEEKS calendar weeks,
+    oldest first, ending with the current one. Weeks with nothing are zeros,
+    so the series has no gaps a chart would have to guess about."""
+
+    deals_opened_weekly: list[WeekCount]
+
+
 class DashboardMetrics(BaseModel):
     period: PeriodRead
     pipeline: PipelineMetrics
     velocity: VelocityMetrics
     attention: AttentionMetrics
     activity: ActivityMetrics
+    trends: TrendMetrics

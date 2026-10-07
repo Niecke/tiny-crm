@@ -3,6 +3,7 @@ import { Link, type LinkProps, useRouteContext } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import type { MoneyByCurrency } from '../api/types'
 import { formatMedian, metricsQuery, moneyPair, totalsByCurrency } from '../metrics'
+import { WeeklyDeals } from './WeeklyDeals'
 
 // The dashboard's headline numbers (#138): four figures from
 // GET /metrics/dashboard above today's list, each a link into the page that
@@ -110,5 +111,33 @@ function Money({ totals, empty }: { totals: MoneyByCurrency[]; empty: string }) 
         {openEnded > 0 && ` · ${openEnded} open-ended`}
       </span>
     </>
+  )
+}
+
+// New deals per week beside today's list: whether the top of the funnel is
+// being fed, week by week. The same cached request as the tiles.
+export function WeeklyDealsPanel() {
+  const { api } = useRouteContext({ from: '/_authed' })
+  const metrics = useQuery(metricsQuery(api, 'quarter'))
+  if (metrics.error) return null
+  return (
+    <section className="panel" aria-label="New deals per week">
+      <div className="panel-header weekly-header">
+        <h2>New deals per week</h2>
+        <Link to="/deals" search={{ scope: 'all', view: 'list' }} className="small">
+          Deals
+        </Link>
+      </div>
+      <div className="panel-body">
+        {metrics.data ? (
+          <WeeklyDeals weeks={metrics.data.trends.deals_opened_weekly} />
+        ) : (
+          <span className="skeleton" aria-hidden="true">
+            <span className="skeleton-line" style={{ width: '80%' }} />
+            <span className="skeleton-line" style={{ width: '60%' }} />
+          </span>
+        )}
+      </div>
+    </section>
   )
 }

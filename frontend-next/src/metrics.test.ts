@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import type { StageMoney } from './api/types'
-import { byCurrency, conversionRate, formatMedian, largest, moneyPair, share, totalsByCurrency } from './metrics'
+import { byCurrency, conversionRate, formatMedian, largest, moneyPair, share, totalsByCurrency, weeklySummary } from './metrics'
 
 const row = (stage: StageMoney['stage'], currency: string, value: string, count = 1, open_ended = 0): StageMoney => ({
   stage,
@@ -85,5 +85,22 @@ describe('totalsByCurrency', () => {
 
   test('is empty for an empty pipeline', () => {
     expect(totalsByCurrency([])).toEqual([])
+  })
+})
+
+describe('weeklySummary', () => {
+  test('averages the complete weeks only', () => {
+    const summary = weeklySummary([
+      { start: '2026-08-17', count: 2, complete: true },
+      { start: '2026-08-24', count: 1, complete: true },
+      { start: '2026-08-31', count: 0, complete: false },
+    ])
+    expect(summary.current?.count).toBe(0)
+    expect(summary.previous?.start).toBe('2026-08-24')
+    expect(summary.average).toBe(1.5)
+  })
+
+  test('has no average without a complete week', () => {
+    expect(weeklySummary([{ start: '2026-08-31', count: 3, complete: false }]).average).toBeNull()
   })
 })

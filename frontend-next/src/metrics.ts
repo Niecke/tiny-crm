@@ -138,3 +138,25 @@ export function formatMedian(days: number | null | undefined): string {
   if (days == null) return '–'
   return `${Number.isInteger(days) ? days : days.toFixed(1)} d`
 }
+
+export type WeekCount = { start: string; count: number; complete: boolean }
+
+// The figures a weekly series is read by: this week so far, last week, and
+// the average over the complete weeks — the running one would drag it down
+// every Monday.
+export function weeklySummary(weeks: WeekCount[]): {
+  current: WeekCount | undefined
+  previous: WeekCount | undefined
+  average: number | null
+} {
+  const complete = weeks.filter((w) => w.complete)
+  const total = complete.reduce((n, w) => n + w.count, 0)
+  return {
+    current: weeks.find((w) => !w.complete),
+    previous: complete.at(-1),
+    average: complete.length > 0 ? Math.round((total / complete.length) * 10) / 10 : null,
+  }
+}
+
+export const formatWeek = (start: string) =>
+  localDate(start).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })

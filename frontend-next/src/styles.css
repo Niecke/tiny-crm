@@ -520,6 +520,113 @@ a {
   }
 }
 
+.dashboard-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+/* New deals per week: twelve columns on one baseline, the running week
+   lighter, a dashed line at the average of the complete weeks. */
+.weekly {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.weekly-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.weekly-header h2 {
+  font-size: 0.95rem;
+}
+
+.weekly-figures {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.weekly-figures dt {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.weekly-figures dd {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.weekly-figures dd .muted {
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+.weekly-chart {
+  position: relative;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 3px;
+  align-items: end;
+  height: 72px;
+  border-bottom: 1px solid var(--color-border-strong);
+}
+
+.weekly-column {
+  display: flex;
+  align-items: flex-end;
+  height: 100%;
+}
+
+.weekly-bar {
+  display: block;
+  width: 100%;
+  min-height: 2px;
+  background: var(--color-accent);
+  border-radius: 3px 3px 0 0;
+}
+
+.weekly-column[data-partial] .weekly-bar {
+  opacity: 0.4;
+}
+
+.weekly-average {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed var(--color-text-muted);
+  pointer-events: none;
+}
+
+.weekly-axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin-top: calc(-1 * var(--space-2));
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* ---------- Numbers ---------- */
 
 /* The dashboard's aggregates (#138). Panels in a single column, ordered by
@@ -2498,7 +2605,7 @@ textarea.input {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .queues {
+  .dashboard-side {
     order: -1;
   }
 

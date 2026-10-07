@@ -61,7 +61,9 @@ from app.schemas.metrics import (
     StageEntered,
     StageMoney,
     StageVelocity,
+    TrendMetrics,
     VelocityMetrics,
+    WeekCount,
 )
 
 PeriodKind = Literal["week", "month", "quarter", "year"]
@@ -426,4 +428,37 @@ async def activity_metrics(session: AsyncSession, user_id: UUID, period: Period)
         captures_converted=triaged.get("converted", 0),
         captures_dismissed=triaged.get("dismissed", 0),
         tasks_created=tasks_created or 0,
+    )
+
+
+# --- Trends -------------------------------------------------------------------
+
+# How many calendar weeks a weekly series covers: a quarter, enough to tell a
+# slow week from a slowing trend.
+WEEKS = 12
+
+
+async def trend_metrics(
+    session: AsyncSession, user_id: UUID, now: datetime, tz: ZoneInfo
+) -> TrendMetrics:
+    """Deals opened per ISO week, the last WEEKS weeks in the operator's
+    timezone. The week boundaries are Period's, so "this week" here is the
+    same week the dashboard's `period=week` reports."""
+    this_week = Period.containing("week", now, tz)
+    weeks = [this_week.first - timedelta(weeks=n) for n in range(WEEKS - 1, -1, -1)]
+    since = _day(weeks[0], tz).start
+    # date_trunc('week') is ISO: Monday. Truncated in local time, so a deal
+    # opened at 00:30 on a Monday in Berlin is that week's, not the last.
+    week_of = cast(func.date_trunc("week", func.timezone(tz.key, Deal.created_at)), Date)
+    rows = await session.execute(
+        select(week_of, func.count())
+        .where(Deal.user_id == user_id, Deal.created_at >= since, Deal.created_at < this_week.end)
+        .group_by(week_of)
+    )
+    counts: dict[date, int] = {start: n for start, n in rows}
+    return TrendMetrics(
+        deals_opened_weekly=[
+            WeekCount(start=start, count=counts.get(start, 0), complete=start != this_week.first)
+            for start in weeks
+        ]
     )

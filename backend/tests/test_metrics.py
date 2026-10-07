@@ -202,7 +202,7 @@ async def test_groups_that_cannot_be_computed_yet_are_absent(
     client: AsyncClient, alice: Account, pinned_clock: Callable[[datetime], None]
 ) -> None:
     body = await _metrics(client, alice)
-    assert set(body) == {"period", "pipeline", "velocity", "attention", "activity"}
+    assert set(body) == {"period", "pipeline", "velocity", "attention", "activity", "trends"}
 
 
 # --- B · Velocity ------------------------------------------------------------
@@ -502,6 +502,39 @@ async def test_activity_counts_what_happened_in_the_period(
     assert quarter["captures_dismissed"] == 2
     assert quarter["tasks_created"] == 2
     assert {k["kind"]: k["count"] for k in quarter["interactions_by_kind"]}["email"] == 2
+
+
+# --- Trends ------------------------------------------------------------------
+
+
+async def test_deals_opened_per_week_cover_twelve_local_weeks_with_zeros(
+    session_factory: Sessions,
+    client: AsyncClient,
+    alice: Account,
+    pinned_clock: Callable[[datetime], None],
+) -> None:
+    await _seed(
+        session_factory,
+        # This week (Monday 31 August), twice — one at 00:30 local on the
+        # Monday, which is still Sunday in UTC.
+        _deal(alice, "Monday night", since=berlin("2026-08-31T00:30")),
+        _deal(alice, "Wednesday", since=berlin("2026-09-02T10:00")),
+        # Sunday 23:30 local: last week.
+        _deal(alice, "Sunday late", since=berlin("2026-08-30T23:30")),
+        # The oldest week in the window, and the one before it (left out).
+        _deal(alice, "Oldest", since=berlin("2026-06-15T09:00")),
+        _deal(alice, "Too old", since=berlin("2026-06-14T09:00")),
+    )
+
+    # The period does not matter: the series is always the last twelve weeks.
+    weekly = (await _metrics(client, alice, "year"))["trends"]["deals_opened_weekly"]
+
+    assert len(weekly) == 12
+    assert weekly[0] == {"start": "2026-06-15", "count": 1, "complete": True}
+    assert weekly[-2] == {"start": "2026-08-24", "count": 1, "complete": True}
+    assert weekly[-1] == {"start": "2026-08-31", "count": 2, "complete": False}
+    assert sum(w["count"] for w in weekly) == 4
+    assert [w["start"] for w in weekly][1:3] == ["2026-06-22", "2026-06-29"]
 
 
 # --- Tenancy -----------------------------------------------------------------

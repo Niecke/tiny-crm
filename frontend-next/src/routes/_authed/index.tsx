@@ -1,9 +1,9 @@
 import { queryOptions, useQuery } from '@tanstack/react-query'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { type Api, unwrap } from '../../api/client'
 import type { BriefingInteraction, BriefingRead, BriefingTask } from '../../api/types'
-import { NumbersSummary } from '../../components/NumbersSummary'
+import { NumbersSummary, WeeklyDealsPanel } from '../../components/NumbersSummary'
 import { PriorityBadge } from '../../components/PriorityBadge'
 
 // The morning briefing, as data (GET /briefing). The same function builds the
@@ -53,7 +53,10 @@ function Dashboard() {
           </div>
         </section>
 
-        <Queues briefing={briefing.data} />
+        <div className="dashboard-side">
+          <Queues briefing={briefing.data} />
+          <WeeklyDealsPanel />
+        </div>
       </div>
     </div>
   )
@@ -125,7 +128,9 @@ function TaskRow({ task }: { task: BriefingTask }) {
     <li>
       <span className="row-main">
         <span>
-          {task.title}
+          <Link to="/tasks/$taskId" params={{ taskId: task.id }} className="row-link">
+            {task.title}
+          </Link>
           {task.priority > 0 && (
             <>
               {' '}
@@ -164,7 +169,9 @@ function InteractionRow({
   return (
     <li>
       <span className="row-main">
-        <span>{interaction.subject}</span>
+        <Link to="/interactions/$interactionId" params={{ interactionId: interaction.id }} className="row-link">
+          {interaction.subject}
+        </Link>
         <span className="row-meta">{meta}</span>
       </span>
       {late && <span className="row-side late">{late}</span>}
