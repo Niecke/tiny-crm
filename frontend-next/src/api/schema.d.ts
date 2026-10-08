@@ -1263,8 +1263,7 @@ export interface components {
     schemas: {
         /**
          * ActivityMetrics
-         * @description In the period. Outbound vs inbound waits for #135. Tasks completed
-         *     waits for a completion timestamp — `done` says whether, not when.
+         * @description In the period. Outbound vs inbound waits for #135.
          */
         ActivityMetrics: {
             /** Interactions By Kind */
@@ -1277,6 +1276,8 @@ export interface components {
             captures_dismissed: number;
             /** Tasks Created */
             tasks_created: number;
+            /** Tasks Completed */
+            tasks_completed: number;
         };
         /**
          * AttentionMetrics
@@ -1981,6 +1982,7 @@ export interface components {
             period: components["schemas"]["PeriodRead"];
             pipeline: components["schemas"]["PipelineMetrics"];
             velocity: components["schemas"]["VelocityMetrics"];
+            outcomes: components["schemas"]["OutcomeMetrics"];
             attention: components["schemas"]["AttentionMetrics"];
             activity: components["schemas"]["ActivityMetrics"];
             trends: components["schemas"]["TrendMetrics"];
@@ -2530,6 +2532,26 @@ export interface components {
             /** Notes */
             notes?: string | null;
         };
+        /**
+         * OutcomeMetrics
+         * @description In the period: deals that were decided — moved into won or into lost —
+         *     as they stand now, with the value they have now.
+         *
+         *     A deal decided twice counts once, by where it ended up; one reopened since
+         *     is undecided again and in neither list. A draft that was dropped was never
+         *     sent, so it was not lost (#255). Lost reasons and the split by source wait
+         *     for #118.
+         */
+        OutcomeMetrics: {
+            /** Won */
+            won: components["schemas"]["MoneyByCurrency"][];
+            /** Lost */
+            lost: components["schemas"]["MoneyByCurrency"][];
+            /** Win Rate By Count */
+            win_rate_by_count: number | null;
+            /** Win Rate By Value */
+            win_rate_by_value: components["schemas"]["WinRateByValue"][];
+        };
         /** Page[AuditEventRead] */
         Page_AuditEventRead_: {
             /** Items */
@@ -2975,6 +2997,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Completed At */
+            completed_at?: string | null;
             /** Recurrence Parent Id */
             recurrence_parent_id?: string | null;
             /** Contact Name */
@@ -3081,6 +3105,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Completed At */
+            completed_at?: string | null;
             /** Recurrence Parent Id */
             recurrence_parent_id?: string | null;
             /** Contact Name */
@@ -3435,6 +3461,13 @@ export interface components {
             count: number;
             /** Complete */
             complete: boolean;
+        };
+        /** WinRateByValue */
+        WinRateByValue: {
+            /** Currency */
+            currency: string;
+            /** Rate */
+            rate: number | null;
         };
     };
     responses: never;

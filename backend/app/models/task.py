@@ -36,6 +36,10 @@ class Task(Record, Base):
     priority: Mapped[int] = mapped_column(default=0)
     tags: Mapped[list[str]] = mapped_column(ARRAY(String), server_default="{}")
     done: Mapped[bool] = mapped_column(default=False, server_default="false")
+    # When it was ticked off; NULL while open, and again once it is reopened.
+    # `done` says whether, this says when — which is what "tasks completed
+    # this month" counts (#138).
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # One of app.recurrence.RECURRENCE_RULES, or NULL for a one-off task. Free-form
     # in the database, constrained to the known set by the Pydantic schema — same
     # pattern as Interaction.kind.

@@ -203,7 +203,15 @@ async def test_groups_that_cannot_be_computed_yet_are_absent(
     client: AsyncClient, alice: Account, pinned_clock: Callable[[datetime], None]
 ) -> None:
     body = await _metrics(client, alice)
-    assert set(body) == {"period", "pipeline", "velocity", "attention", "activity", "trends"}
+    assert set(body) == {
+        "period",
+        "pipeline",
+        "velocity",
+        "outcomes",
+        "attention",
+        "activity",
+        "trends",
+    }
 
 
 # --- B · Velocity ------------------------------------------------------------
@@ -340,6 +348,113 @@ async def test_an_empty_pipeline_has_no_medians_rather_than_zeros(
     velocity = (await _metrics(client, alice))["velocity"]
     assert velocity["by_stage"] == []
     assert velocity["sales_cycle"] == {"deals": 0, "median_days": None}
+
+
+# --- C · Outcomes ------------------------------------------------------------
+
+
+async def test_outcomes_report_deals_decided_in_the_period_per_currency(
+    session_factory: Sessions,
+    client: AsyncClient,
+    alice: Account,
+    pinned_clock: Callable[[datetime], None],
+) -> None:
+    big = _deal(alice, "Big win", "won", value="30000.00")
+    _event(big, "won", berlin("2026-08-10T10:00"), "negotiation")
+    # Won and already started: one decision, not two.
+    started = _deal(alice, "Started", "running", value="10000.00")
+    _event(started, "won", berlin("2026-07-20T10:00"), "proposal")
+    _event(started, "running", berlin("2026-08-01T10:00"), "won")
+    day_rate = _deal(alice, "Day rate", "won", value=None)
+    _event(day_rate, "won", berlin("2026-09-01T10:00"), "proposal")
+    lost = _deal(alice, "Lost", "lost", value="60000.00")
+    _event(lost, "lost", berlin("2026-08-20T10:00"), "proposal")
+    dollars = _deal(alice, "Dollars", "lost", value="5000.00", currency="USD")
+    _event(dollars, "lost", berlin("2026-09-02T10:00"), "lead")
+    # Won last quarter, and only moved along in this one.
+    earlier = _deal(alice, "Earlier", "running", value="99000.00")
+    _event(earlier, "won", berlin("2026-06-01T10:00"), "proposal")
+    _event(earlier, "running", berlin("2026-07-15T10:00"), "won")
+    await _seed(session_factory, big, started, day_rate, lost, dollars, earlier)
+
+    outcomes = (await _metrics(client, alice))["outcomes"]
+
+    assert outcomes == {
+        "won": [{"currency": "EUR", "count": 3, "value": "40000.00", "open_ended": 1}],
+        "lost": [
+            {"currency": "EUR", "count": 1, "value": "60000.00", "open_ended": 0},
+            {"currency": "USD", "count": 1, "value": "5000.00", "open_ended": 0},
+        ],
+        # Three of five deals, but 40 of 100 thousand euros: the big one got away.
+        "win_rate_by_count": 0.6,
+        "win_rate_by_value": [
+            {"currency": "EUR", "rate": 0.4},
+            {"currency": "USD", "rate": 0.0},
+        ],
+    }
+    # The day rate and the dollars were decided this week; the rest earlier.
+    week = (await _metrics(client, alice, "week"))["outcomes"]
+    assert week["won"] == [{"currency": "EUR", "count": 1, "value": "0.00", "open_ended": 1}]
+    assert week["lost"] == [{"currency": "USD", "count": 1, "value": "5000.00", "open_ended": 0}]
+    # Nothing on the euro side has an amount, so there is no rate to give.
+    assert week["win_rate_by_value"] == [
+        {"currency": "EUR", "rate": None},
+        {"currency": "USD", "rate": 0.0},
+    ]
+
+
+async def test_a_deal_decided_twice_counts_once_by_where_it_ended_up(
+    session_factory: Sessions,
+    client: AsyncClient,
+    alice: Account,
+    pinned_clock: Callable[[datetime], None],
+) -> None:
+    # Lost in July, won after all in August.
+    turned = _deal(alice, "Turned round", "won")
+    _event(turned, "lost", berlin("2026-07-10T10:00"), "proposal")
+    _event(turned, "proposal", berlin("2026-08-01T10:00"), "lost")
+    _event(turned, "won", berlin("2026-08-20T10:00"), "proposal")
+    # Won in July, fell through in August.
+    fell = _deal(alice, "Fell through", "lost")
+    _event(fell, "won", berlin("2026-07-10T10:00"), "proposal")
+    _event(fell, "lost", berlin("2026-08-20T10:00"), "won")
+    # Lost and reopened: back in the pipeline, so neither.
+    reopened = _deal(alice, "Reopened", "proposal")
+    _event(reopened, "lost", berlin("2026-08-01T10:00"), "proposal")
+    _event(reopened, "proposal", berlin("2026-08-05T10:00"), "lost")
+    # A letter never sent was not turned down.
+    dropped = _deal(alice, "Dropped draft", "lost")
+    _event(dropped, "lost", berlin("2026-08-01T10:00"), "draft")
+    # Archived: in no number (#140).
+    archived = _deal(alice, "Archived", "won", archived_at=berlin("2026-09-01T10:00"))
+    _event(archived, "won", berlin("2026-08-01T10:00"), "proposal")
+    await _seed(session_factory, turned, fell, reopened, dropped, archived)
+
+    outcomes = (await _metrics(client, alice))["outcomes"]
+
+    assert outcomes["won"] == [{"currency": "EUR", "count": 1, "value": "1000.00", "open_ended": 0}]
+    assert outcomes["lost"] == [
+        {"currency": "EUR", "count": 1, "value": "1000.00", "open_ended": 0}
+    ]
+    assert outcomes["win_rate_by_count"] == 0.5
+
+
+async def test_a_period_with_nothing_decided_has_no_win_rate_rather_than_zero(
+    session_factory: Sessions,
+    client: AsyncClient,
+    alice: Account,
+    pinned_clock: Callable[[datetime], None],
+) -> None:
+    open_deal = _deal(alice, "Still open", "proposal")
+    _event(open_deal, "proposal", berlin("2026-09-01T10:00"), "lead")
+    await _seed(session_factory, open_deal)
+
+    assert (await _metrics(client, alice))["outcomes"] == {
+        "won": [],
+        "lost": [],
+        "win_rate_by_count": None,
+        "win_rate_by_value": [],
+    }
 
 
 # --- D · Attention -----------------------------------------------------------
@@ -493,7 +608,29 @@ async def test_activity_counts_what_happened_in_the_period(
             triaged_at=berlin("2026-08-03T10:00"),
         ),
         Task(user_id=alice.id, title="This week", created=berlin("2026-09-01T10:00")),
-        Task(user_id=alice.id, title="Older", created=berlin("2026-07-15T10:00")),
+        # Created long ago, finished this week: completed here, created there.
+        Task(
+            user_id=alice.id,
+            title="Older",
+            created=berlin("2026-07-15T10:00"),
+            done=True,
+            completed_at=berlin("2026-09-03T18:00"),
+        ),
+        Task(
+            user_id=alice.id,
+            title="Finished in August",
+            created=berlin("2026-05-01T10:00"),
+            done=True,
+            completed_at=berlin("2026-08-10T10:00"),
+        ),
+        # Finished on Sunday night: last week's.
+        Task(
+            user_id=alice.id,
+            title="Sunday",
+            created=berlin("2026-05-01T10:00"),
+            done=True,
+            completed_at=berlin("2026-08-30T23:45"),
+        ),
     )
 
     week = (await _metrics(client, alice, "week"))["activity"]
@@ -510,12 +647,14 @@ async def test_activity_counts_what_happened_in_the_period(
         "captures_converted": 1,
         "captures_dismissed": 1,
         "tasks_created": 1,
+        "tasks_completed": 1,
     }
 
     quarter = (await _metrics(client, alice, "quarter"))["activity"]
     assert quarter["deals_opened"] == 2
     assert quarter["captures_dismissed"] == 2
     assert quarter["tasks_created"] == 2
+    assert quarter["tasks_completed"] == 3
     assert {k["kind"]: k["count"] for k in quarter["interactions_by_kind"]}["email"] == 2
 
 
@@ -564,9 +703,19 @@ def _everything(account: Account) -> list[Any]:
     _event(deal, "proposal", berlin("2026-09-02T09:00"), "lead")
     won = _deal(account, "Won", "won", created_at=berlin("2026-09-01T08:00"))
     _event(won, "won", berlin("2026-09-02T09:00"))
+    lost = _deal(account, "Lost", "lost")
+    _event(lost, "lost", berlin("2026-09-02T09:00"), "lead")
     return [
         deal,
         won,
+        lost,
+        Task(
+            user_id=account.id,
+            title="Finished",
+            created=berlin("2026-09-01T09:00"),
+            done=True,
+            completed_at=berlin("2026-09-02T09:00"),
+        ),
         _deal(account, "Open-ended", "lead", value=None, currency="USD"),
         Task(
             user_id=account.id,
@@ -620,3 +769,7 @@ async def test_another_users_rows_are_absent_from_every_total(
     assert alice_body["velocity"]["sales_cycle"]["deals"] == 1
     assert alice_body["attention"]["captures_waiting"]["count"] == 1
     assert alice_body["activity"]["captures_converted"] == 1
+    assert alice_body["activity"]["tasks_completed"] == 1
+    assert alice_body["outcomes"]["won"][0]["count"] == 1
+    assert alice_body["outcomes"]["lost"][0]["count"] == 1
+    assert bob_body["outcomes"]["won"][0]["count"] == 2

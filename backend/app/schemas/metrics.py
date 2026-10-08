@@ -3,7 +3,7 @@
 The groups follow DASHBOARD.md. A group that cannot be computed yet is not a
 field here at all, rather than an empty one: an empty `outcomes` would read as
 "nothing came off", which is a different and much worse claim than "not
-measured". `outcomes` (C) and `delivery` (F) arrive with the work they need.
+measured". `delivery` (F) arrives with the work it needs.
 
 Money is `Decimal` and serialises as a string, as on `DealRead`. Every money
 figure carries `open_ended`, the deals with no derivable amount, beside it.
@@ -118,6 +118,37 @@ class VelocityMetrics(BaseModel):
     sales_cycle: SalesCycle
 
 
+# --- C · Did it come off -----------------------------------------------------
+
+
+class WinRateByValue(BaseModel):
+    currency: str
+    # Won value over won plus lost value, 0 to 1. Open-ended deals have no
+    # amount and are on neither side. Null when no decided deal has one.
+    rate: float | None
+
+
+class OutcomeMetrics(BaseModel):
+    """In the period: deals that were decided — moved into won or into lost —
+    as they stand now, with the value they have now.
+
+    A deal decided twice counts once, by where it ended up; one reopened since
+    is undecided again and in neither list. A draft that was dropped was never
+    sent, so it was not lost (#255). Lost reasons and the split by source wait
+    for #118.
+    """
+
+    # One row per currency; a currency with no deal on that side has no row.
+    won: list[MoneyByCurrency]
+    lost: list[MoneyByCurrency]
+    # Won deals over won plus lost, 0 to 1, across currencies: deals can be
+    # counted together where their amounts cannot be added. Null when nothing
+    # was decided — no rate is not a bad rate.
+    win_rate_by_count: float | None
+    # One row per currency that has a decided deal.
+    win_rate_by_value: list[WinRateByValue]
+
+
 # --- D · What is rotting -----------------------------------------------------
 
 
@@ -164,8 +195,7 @@ class InteractionKindCount(BaseModel):
 
 
 class ActivityMetrics(BaseModel):
-    """In the period. Outbound vs inbound waits for #135. Tasks completed
-    waits for a completion timestamp — `done` says whether, not when."""
+    """In the period. Outbound vs inbound waits for #135."""
 
     # Interactions that happened in the period, every kind, zeros included.
     interactions_by_kind: list[InteractionKindCount]
@@ -174,6 +204,9 @@ class ActivityMetrics(BaseModel):
     captures_converted: int
     captures_dismissed: int
     tasks_created: int
+    # Ticked off in the period and still done. Beside `tasks_created`, so a
+    # backlog that grows shows as the gap between the two.
+    tasks_completed: int
 
 
 # --- Trends -------------------------------------------------------------------
@@ -199,6 +232,7 @@ class DashboardMetrics(BaseModel):
     period: PeriodRead
     pipeline: PipelineMetrics
     velocity: VelocityMetrics
+    outcomes: OutcomeMetrics
     attention: AttentionMetrics
     activity: ActivityMetrics
     trends: TrendMetrics

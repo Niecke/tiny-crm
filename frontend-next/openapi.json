@@ -5213,6 +5213,10 @@
           "tasks_created": {
             "type": "integer",
             "title": "Tasks Created"
+          },
+          "tasks_completed": {
+            "type": "integer",
+            "title": "Tasks Completed"
           }
         },
         "type": "object",
@@ -5221,10 +5225,11 @@
           "deals_opened",
           "captures_converted",
           "captures_dismissed",
-          "tasks_created"
+          "tasks_created",
+          "tasks_completed"
         ],
         "title": "ActivityMetrics",
-        "description": "In the period. Outbound vs inbound waits for #135. Tasks completed\nwaits for a completion timestamp — `done` says whether, not when."
+        "description": "In the period. Outbound vs inbound waits for #135."
       },
       "AttentionMetrics": {
         "properties": {
@@ -7584,6 +7589,9 @@
           "velocity": {
             "$ref": "#/components/schemas/VelocityMetrics"
           },
+          "outcomes": {
+            "$ref": "#/components/schemas/OutcomeMetrics"
+          },
           "attention": {
             "$ref": "#/components/schemas/AttentionMetrics"
           },
@@ -7599,6 +7607,7 @@
           "period",
           "pipeline",
           "velocity",
+          "outcomes",
           "attention",
           "activity",
           "trends"
@@ -9490,6 +9499,51 @@
         "type": "object",
         "title": "OrganizationUpdate"
       },
+      "OutcomeMetrics": {
+        "properties": {
+          "won": {
+            "items": {
+              "$ref": "#/components/schemas/MoneyByCurrency"
+            },
+            "type": "array",
+            "title": "Won"
+          },
+          "lost": {
+            "items": {
+              "$ref": "#/components/schemas/MoneyByCurrency"
+            },
+            "type": "array",
+            "title": "Lost"
+          },
+          "win_rate_by_count": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Win Rate By Count"
+          },
+          "win_rate_by_value": {
+            "items": {
+              "$ref": "#/components/schemas/WinRateByValue"
+            },
+            "type": "array",
+            "title": "Win Rate By Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "won",
+          "lost",
+          "win_rate_by_count",
+          "win_rate_by_value"
+        ],
+        "title": "OutcomeMetrics",
+        "description": "In the period: deals that were decided — moved into won or into lost —\nas they stand now, with the value they have now.\n\nA deal decided twice counts once, by where it ended up; one reopened since\nis undecided again and in neither list. A draft that was dropped was never\nsent, so it was not lost (#255). Lost reasons and the split by source wait\nfor #118."
+      },
       "Page_AuditEventRead_": {
         "properties": {
           "items": {
@@ -10701,6 +10755,18 @@
             "format": "uuid",
             "title": "Id"
           },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
           "recurrence_parent_id": {
             "anyOf": [
               {
@@ -11043,6 +11109,18 @@
             "type": "string",
             "format": "uuid",
             "title": "Id"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
           },
           "recurrence_parent_id": {
             "anyOf": [
@@ -12129,6 +12207,31 @@
           "complete"
         ],
         "title": "WeekCount"
+      },
+      "WinRateByValue": {
+        "properties": {
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "currency",
+          "rate"
+        ],
+        "title": "WinRateByValue"
       }
     },
     "securitySchemes": {
