@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.2.0](https://github.com/Niecke/tiny-crm/compare/v0.1.0...v0.2.0) (2026-10-08)
+
+
+### Features
+
+* add a draft stage before lead in the deal pipeline ([#265](https://github.com/Niecke/tiny-crm/issues/265)) ([2cabae5](https://github.com/Niecke/tiny-crm/commit/2cabae5a70a24b29c0b0b3cd3b6b4655b5035b06))
+* add app-wide search across all tables ([#243](https://github.com/Niecke/tiny-crm/issues/243)) ([d2197eb](https://github.com/Niecke/tiny-crm/commit/d2197ebfa4081dcc04f011b85e4d32156d31ef1d))
+* add change history and optimistic concurrency control ([#142](https://github.com/Niecke/tiny-crm/issues/142)) ([#268](https://github.com/Niecke/tiny-crm/issues/268)) ([d93492d](https://github.com/Niecke/tiny-crm/commit/d93492d2acfbd422c74abc4f0d2554cb72b86db0))
+* add Content-Security-Policy and security headers ([#235](https://github.com/Niecke/tiny-crm/issues/235)) ([833d375](https://github.com/Niecke/tiny-crm/commit/833d3759d9ca52d2e3cc255d5c5b90308627fcb5))
+* add GET /metrics/dashboard with phase 0 and phase 1 numbers ([#138](https://github.com/Niecke/tiny-crm/issues/138)) ([#249](https://github.com/Niecke/tiny-crm/issues/249)) ([5aa993d](https://github.com/Niecke/tiny-crm/commit/5aa993d62f26cc50bf8c238250f8f731dca6c04c))
+* add per-account login backoff and reset-mail cooldown ([#246](https://github.com/Niecke/tiny-crm/issues/246)) ([bc03a90](https://github.com/Niecke/tiny-crm/commit/bc03a90a1e7a34d36bc99cb5374e94be50f56c23))
+* add won/lost outcomes and tasks completed to the dashboard numbers ([#138](https://github.com/Niecke/tiny-crm/issues/138)) ([#272](https://github.com/Niecke/tiny-crm/issues/272)) ([b691211](https://github.com/Niecke/tiny-crm/commit/b6912118d22665b1601875dfcae9143a2689b298))
+* archive instead of delete ([#140](https://github.com/Niecke/tiny-crm/issues/140)) ([#258](https://github.com/Niecke/tiny-crm/issues/258)) ([4739353](https://github.com/Niecke/tiny-crm/commit/4739353f0ccc859803fa31131ca91392536932f1))
+* fix release.yml ([#233](https://github.com/Niecke/tiny-crm/issues/233)) ([a3bd300](https://github.com/Niecke/tiny-crm/commit/a3bd30017d976919cd72497eda06b5ee71bdeaf7)), closes [#114](https://github.com/Niecke/tiny-crm/issues/114)
+* **frontend:** show the number of due tasks in the nav ([#260](https://github.com/Niecke/tiny-crm/issues/260)) ([e6f87bb](https://github.com/Niecke/tiny-crm/commit/e6f87bb2839bd1693697e4ba6463754966935515))
+* headline numbers and new deals per week on the dashboard ([#138](https://github.com/Niecke/tiny-crm/issues/138)) ([#261](https://github.com/Niecke/tiny-crm/issues/261)) ([202bed9](https://github.com/Niecke/tiny-crm/commit/202bed990852ef10e177ba7a7b8bcf9c192e1cdd))
+* list deals past their expected close date in the morning briefing ([#117](https://github.com/Niecke/tiny-crm/issues/117)) ([#267](https://github.com/Niecke/tiny-crm/issues/267)) ([6a368f8](https://github.com/Niecke/tiny-crm/commit/6a368f83fe45b6cf0117d8c3c95bcfe57a8450ce))
+
+
+### Bug Fixes
+
+* **deps:** update caddy:alpine docker digest to 881bbc6 ([#231](https://github.com/Niecke/tiny-crm/issues/231)) ([81f0f82](https://github.com/Niecke/tiny-crm/commit/81f0f8237461fbdf616e0d8bbe59875d7db847da))
+* **deps:** update caddy:alpine docker digest to d44355d ([#242](https://github.com/Niecke/tiny-crm/issues/242)) ([7392984](https://github.com/Niecke/tiny-crm/commit/73929846575139c369253bf02359351301736b04))
+* **deps:** update caddy:alpine docker digest to d8542f4 ([#251](https://github.com/Niecke/tiny-crm/issues/251)) ([f5eccd1](https://github.com/Niecke/tiny-crm/commit/f5eccd15e78dbcdf7ef9f55ddbd89b2a714dd62d))
+* **deps:** update docker.io/library/python:3.14-slim docker digest to c3e521d ([#227](https://github.com/Niecke/tiny-crm/issues/227)) ([fba9240](https://github.com/Niecke/tiny-crm/commit/fba924062768449b6ae2921b44a4fd8557a35b7c))
+* **deps:** update docker.io/library/python:3.14-slim docker digest to f85c569 ([#252](https://github.com/Niecke/tiny-crm/issues/252)) ([a532a75](https://github.com/Niecke/tiny-crm/commit/a532a75b4da2630c1a51b55b026b42013f55edf3))
+* **deps:** update ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie docker digest to 3e89ea9 ([#244](https://github.com/Niecke/tiny-crm/issues/244)) ([9f9c4bc](https://github.com/Niecke/tiny-crm/commit/9f9c4bc1579e733cf6f3cd3a386e067670abcb8d))
+* **frontend:** highlight today's date in calendar date picker ([#263](https://github.com/Niecke/tiny-crm/issues/263)) ([07c1064](https://github.com/Niecke/tiny-crm/commit/07c10642a809eaf91071b135830cef1e02fcd41e)), closes [#256](https://github.com/Niecke/tiny-crm/issues/256)
+* offer 50 records in picker dropdowns and say when more exist ([#270](https://github.com/Niecke/tiny-crm/issues/270)) ([a656fd3](https://github.com/Niecke/tiny-crm/commit/a656fd36942e9a3d473efecfdeef3fb05bf2b3b7))
+
 ## 0.1.0 (2026-10-01)
 
 
