@@ -5565,6 +5565,76 @@
         ],
         "title": "BriefingInteraction"
       },
+      "BriefingOverdueDeal": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "stage": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "lead",
+              "qualified",
+              "proposal",
+              "negotiation",
+              "won",
+              "running",
+              "completed",
+              "lost"
+            ],
+            "title": "Stage"
+          },
+          "contact_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Name"
+          },
+          "organization_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Name"
+          },
+          "expected_close_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Expected Close Date"
+          },
+          "days_overdue": {
+            "type": "integer",
+            "title": "Days Overdue"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "stage",
+          "contact_name",
+          "organization_name",
+          "expected_close_date",
+          "days_overdue"
+        ],
+        "title": "BriefingOverdueDeal"
+      },
       "BriefingRead": {
         "properties": {
           "date": {
@@ -5624,6 +5694,13 @@
             },
             "type": "array",
             "title": "Stalled Deals"
+          },
+          "overdue_deals": {
+            "items": {
+              "$ref": "#/components/schemas/BriefingOverdueDeal"
+            },
+            "type": "array",
+            "title": "Overdue Deals"
           }
         },
         "type": "object",
@@ -5636,7 +5713,8 @@
           "unconfirmed_interactions",
           "watches_due",
           "captures_waiting",
-          "stalled_deals"
+          "stalled_deals",
+          "overdue_deals"
         ],
         "title": "BriefingRead"
       },
