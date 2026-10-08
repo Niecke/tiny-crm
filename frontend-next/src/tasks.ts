@@ -2,7 +2,7 @@ import { keepPreviousData, type QueryClient, queryOptions, useMutation, useQuery
 import { useState } from 'react'
 import { type Api, unwrap } from './api/client'
 import type { TaskCreate, TaskRead, TaskUpdate } from './api/types'
-import { PAGE_SIZE } from './contacts'
+import { PAGE_SIZE, PICKER_LIMIT } from './contacts'
 
 // Priority is 0–2 on the model. Low is the default and says nothing, so only
 // Medium and High get a badge (PriorityBadge); the text is always there, since
@@ -146,6 +146,6 @@ export function useToggleDone(api: Api) {
 export const taskOptionsQuery = (api: Api, search: string) =>
   queryOptions({
     queryKey: ['tasks', 'options', search],
-    queryFn: () => unwrap(api.GET('/tasks/', { params: { query: { search: search || undefined, limit: 10 } } })),
+    queryFn: () => unwrap(api.GET('/tasks/', { params: { query: { search: search || undefined, limit: PICKER_LIMIT } } })),
     placeholderData: keepPreviousData,
   })

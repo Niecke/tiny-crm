@@ -14,7 +14,9 @@ export type PickerOption = { id: string; label: string; description?: string | n
 // Pick one record by typing part of its name: React Aria's ComboBox with the
 // suggestions coming from the server. Passing `items` switches off React
 // Aria's own filtering, so the caller's search is the only filter; the caller
-// owns the typed text (to query with) and the chosen id (to submit).
+// owns the typed text (to query with) and the chosen id (to submit). `more`
+// is how many matches the server left out of `options`: the list says so, or
+// a record past the limit looks like one that does not exist (#228).
 export function SearchPicker({
   label,
   options,
@@ -24,6 +26,7 @@ export function SearchPicker({
   onInputChange,
   placeholder,
   emptyText = 'No matches.',
+  more = 0,
   errorMessage,
 }: {
   label: string
@@ -34,6 +37,7 @@ export function SearchPicker({
   onInputChange: (text: string) => void
   placeholder?: string
   emptyText?: string
+  more?: number
   errorMessage?: string
 }) {
   return (
@@ -66,6 +70,7 @@ export function SearchPicker({
             </ListBoxItem>
           )}
         </ListBox>
+        {more > 0 && <div className="listbox-more">{more} more not shown. Type to narrow the list.</div>}
       </Popover>
     </ComboBox>
   )

@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useRouteContext } from '@tanstack/react-router'
 import { useRef, useState } from 'react'
-import { contactOptionsQuery } from '../contacts'
+import { contactOptionsQuery, notShown } from '../contacts'
 import { documentOptionsQuery } from '../documents'
 import { taskOptionsQuery } from '../tasks'
 import { useDebounced } from '../useDebounced'
@@ -37,6 +37,7 @@ export function AddLinkPicker({
         ? (tasks.data?.items ?? []).map((t) => ({ id: t.id, label: t.title, description: t.contact_name }))
         : (documents.data?.items ?? []).map((d) => ({ id: d.id, label: d.title, description: d.format }))
   ).filter((o) => !exclude.includes(o.id))
+  const page = kind === 'contact' ? contacts.data : kind === 'task' ? tasks.data : documents.data
   // The combobox writes the chosen label into the field right after the
   // choice; the field is for finding the next one, so that write is swallowed.
   const added = useRef<string | null>(null)
@@ -48,6 +49,7 @@ export function AddLinkPicker({
         label={`Link a ${noun}`}
         placeholder={`Search ${noun}s to link`}
         options={options}
+        more={notShown(page)}
         value={null}
         onChange={(id) => {
           if (id && !isDisabled) {

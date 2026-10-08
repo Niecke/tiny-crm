@@ -1452,6 +1452,18 @@ a {
   color: var(--color-text-muted);
 }
 
+/* Stays at the foot of the scrolling list: it is the reason to stop scrolling
+   and type instead. */
+.listbox-more {
+  position: sticky;
+  bottom: 0;
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
 .checkbox {
   display: flex;
   align-items: flex-start;

@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useRouteContext } from '@tanstack/react-router'
 import { useState } from 'react'
-import { contactOptionsQuery } from '../contacts'
+import { contactOptionsQuery, notShown } from '../contacts'
 import { dealOptionsQuery } from '../deals'
 import { organizationOptionsQuery } from '../organizations'
 import { useDebounced } from '../useDebounced'
@@ -45,6 +45,7 @@ export function ContactPicker({
       label={label}
       placeholder={placeholder}
       options={options}
+      more={notShown(data)}
       value={value}
       onChange={onChange}
       inputValue={text}
@@ -79,6 +80,7 @@ export function OrganizationPicker({
       label={label}
       placeholder={placeholder}
       options={options}
+      more={notShown(data)}
       value={value}
       onChange={onChange}
       inputValue={text}
@@ -115,6 +117,7 @@ export function DealPicker({
       label={label}
       placeholder={placeholder}
       options={options}
+      more={notShown(data)}
       value={value}
       onChange={onChange}
       inputValue={text}

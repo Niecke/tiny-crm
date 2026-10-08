@@ -1,6 +1,7 @@
 import { keepPreviousData, queryOptions } from '@tanstack/react-query'
 import { type Api, unwrap } from './api/client'
 import type { OrganizationCreate } from './api/types'
+import { PICKER_LIMIT } from './contacts'
 
 // The API caps a page at 200. A list this long is past scanning anyway, so the
 // screen says how many it is not showing instead of paging through the rest.
@@ -59,12 +60,11 @@ export const orgContactsQuery = (api: Api, id: string) =>
     queryFn: () => unwrap(api.GET('/contacts/', linked(id))),
   })
 
-// Suggestions for an organization picker, by name or domain. Ten is plenty for
-// a dropdown.
+// Suggestions for an organization picker, by name or domain.
 export const organizationOptionsQuery = (api: Api, search: string) =>
   queryOptions({
     queryKey: ['organizations', 'options', search],
     queryFn: () =>
-      unwrap(api.GET('/organizations/', { params: { query: { search: search || undefined, limit: 10 } } })),
+      unwrap(api.GET('/organizations/', { params: { query: { search: search || undefined, limit: PICKER_LIMIT } } })),
     placeholderData: keepPreviousData,
   })

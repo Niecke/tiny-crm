@@ -1,7 +1,7 @@
 import { keepPreviousData, type QueryClient, queryOptions } from '@tanstack/react-query'
 import { type Api, unwrap } from './api/client'
 import type { ProjectCreate, ProjectRead, ProjectUpdate } from './api/types'
-import { PAGE_SIZE } from './contacts'
+import { PAGE_SIZE, PICKER_LIMIT } from './contacts'
 
 // Where a project stands, from its dates alone: finished once the end date
 // has passed, upcoming until the start date, running in between.
@@ -56,7 +56,7 @@ export const projectQuery = (api: Api, id: string) =>
 export const projectOptionsQuery = (api: Api, search: string) =>
   queryOptions({
     queryKey: ['projects', 'options', search],
-    queryFn: () => unwrap(api.GET('/projects/', { params: { query: { search: search || undefined, limit: 10 } } })),
+    queryFn: () => unwrap(api.GET('/projects/', { params: { query: { search: search || undefined, limit: PICKER_LIMIT } } })),
     placeholderData: keepPreviousData,
   })
 

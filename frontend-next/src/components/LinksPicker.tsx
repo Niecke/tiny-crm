@@ -1,13 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
 import { useRouteContext } from '@tanstack/react-router'
 import { useRef, useState } from 'react'
-import { contactOptionsQuery, contactQuery } from '../contacts'
+import { contactOptionsQuery, contactQuery, notShown } from '../contacts'
 import { dealOptionsQuery, dealQuery } from '../deals'
 import { organizationOptionsQuery, organizationQuery } from '../organizations'
 import { projectOptionsQuery, projectQuery } from '../projects'
 import { useDebounced } from '../useDebounced'
 import { Button } from './ui/Button'
-import { SearchPicker } from './ui/SearchPicker'
+import { type PickerOption, SearchPicker } from './ui/SearchPicker'
 
 // Many records of one type, attached to an interaction or a document: the
 // chosen ones as removable chips, and a search to add another. Records only
@@ -44,19 +44,32 @@ export function RecordName({ kind, id }: { kind: LinkKind; id: string }) {
   return <>{useRecordName(kind, id) ?? '…'}</>
 }
 
-function useOptions(kind: LinkKind, search: string) {
+// The suggestions, and how many more the server has than it sent.
+function useOptions(kind: LinkKind, search: string): { options: PickerOption[]; more: number } {
   const { api } = useRouteContext({ from: '/_authed' })
   const contacts = useQuery({ ...contactOptionsQuery(api, search), enabled: kind === 'contact' })
   const organizations = useQuery({ ...organizationOptionsQuery(api, search), enabled: kind === 'organization' })
   const deals = useQuery({ ...dealOptionsQuery(api, search), enabled: kind === 'deal' })
   const projects = useQuery({ ...projectOptionsQuery(api, search), enabled: kind === 'project' })
   if (kind === 'contact')
-    return (contacts.data?.items ?? []).map((c) => ({ id: c.id, label: c.name, description: c.organization_name }))
+    return {
+      options: (contacts.data?.items ?? []).map((c) => ({ id: c.id, label: c.name, description: c.organization_name })),
+      more: notShown(contacts.data),
+    }
   if (kind === 'organization')
-    return (organizations.data?.items ?? []).map((o) => ({ id: o.id, label: o.name, description: o.domain }))
+    return {
+      options: (organizations.data?.items ?? []).map((o) => ({ id: o.id, label: o.name, description: o.domain })),
+      more: notShown(organizations.data),
+    }
   if (kind === 'deal')
-    return (deals.data?.items ?? []).map((d) => ({ id: d.id, label: d.title, description: d.organization_name }))
-  return (projects.data?.items ?? []).map((p) => ({ id: p.id, label: p.name, description: null }))
+    return {
+      options: (deals.data?.items ?? []).map((d) => ({ id: d.id, label: d.title, description: d.organization_name })),
+      more: notShown(deals.data),
+    }
+  return {
+    options: (projects.data?.items ?? []).map((p) => ({ id: p.id, label: p.name, description: null })),
+    more: notShown(projects.data),
+  }
 }
 
 export function LinksPicker({
@@ -71,7 +84,8 @@ export function LinksPicker({
   const [one, many] = nouns[kind]
   const [text, setText] = useState('')
   const search = useDebounced(text.trim())
-  const options = useOptions(kind, search).filter((o) => !value.includes(o.id))
+  const found = useOptions(kind, search)
+  const options = found.options.filter((o) => !value.includes(o.id))
   // Choosing an option makes the combobox write its label into the field
   // right after the choice; the field is for finding the next one, so that
   // write is swallowed.
@@ -83,6 +97,7 @@ export function LinksPicker({
         label={many[0].toUpperCase() + many.slice(1)}
         placeholder={`Link a ${one}`}
         options={options}
+        more={found.more}
         value={null}
         onChange={(id) => {
           if (id && !value.includes(id)) {

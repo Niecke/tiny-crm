@@ -5,6 +5,15 @@ import type { ContactCreate } from './api/types'
 // Rows per page on every paged list (FRONTEND.md, "Paging").
 export const PAGE_SIZE = 25
 
+// Rows a picker's dropdown asks for. The list scrolls, so this is more than
+// anyone reads through; past it the dropdown says how many it left out rather
+// than looking complete (#228).
+export const PICKER_LIMIT = 50
+
+// How many matches a picker's page did not bring along.
+export const notShown = (page: { total: number; items: unknown[] } | undefined) =>
+  page ? Math.max(0, page.total - page.items.length) : 0
+
 // The fixed vocabularies, in the order the Flutter app offers them. The values
 // are the API's; the schema types them, so a value the backend does not have
 // is a compile error.
@@ -84,11 +93,11 @@ export const contactQuery = (api: Api, id: string) =>
     queryFn: () => unwrap(api.GET('/contacts/{contact_id}', { params: { path: { contact_id: id } } })),
   })
 
-// Suggestions for a contact picker, by name. Ten is plenty for a dropdown.
+// Suggestions for a contact picker, by name.
 export const contactOptionsQuery = (api: Api, search: string) =>
   queryOptions({
     queryKey: ['contacts', 'options', search],
-    queryFn: () => unwrap(api.GET('/contacts/', { params: { query: { search: search || undefined, limit: 10 } } })),
+    queryFn: () => unwrap(api.GET('/contacts/', { params: { query: { search: search || undefined, limit: PICKER_LIMIT } } })),
     placeholderData: keepPreviousData,
   })
 

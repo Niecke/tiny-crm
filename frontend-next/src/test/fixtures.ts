@@ -1,4 +1,4 @@
-import type { DealRead, WatchRead } from '../api/types'
+import type { ContactRead, DealRead, WatchRead } from '../api/types'
 
 // Complete records as the API returns them, with only the fields a test is
 // about overridden. Typed against the generated schema, so a field the
@@ -52,6 +52,16 @@ export const watch = (overrides: Partial<WatchRead> = {}): WatchRead => ({
   active: true,
   found_count: 0,
   check_count: 1,
+  created_at: '2026-09-01T08:00:00Z',
+  updated_at: '2026-09-01T08:00:00Z',
+  version: 1,
+  ...overrides,
+})
+
+export const contact = (overrides: Partial<ContactRead> = {}): ContactRead => ({
+  id: 'contact-1',
+  name: 'Maria Huber',
+  tags: [],
   created_at: '2026-09-01T08:00:00Z',
   updated_at: '2026-09-01T08:00:00Z',
   version: 1,

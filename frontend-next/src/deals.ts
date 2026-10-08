@@ -1,7 +1,7 @@
 import { keepPreviousData, type QueryClient, queryOptions } from '@tanstack/react-query'
 import { type Api, unwrap } from './api/client'
 import type { DealCreate, DealRead, DealUpdate } from './api/types'
-import { PAGE_SIZE } from './contacts'
+import { PAGE_SIZE, PICKER_LIMIT } from './contacts'
 
 export type Stage = DealRead['stage']
 type Status = 'open' | 'active' | 'won' | 'finished'
@@ -157,7 +157,7 @@ export const dealQuery = (api: Api, id: string) =>
 export const dealOptionsQuery = (api: Api, search: string) =>
   queryOptions({
     queryKey: ['deals', 'options', search],
-    queryFn: () => unwrap(api.GET('/deals/', { params: { query: { search: search || undefined, limit: 10 } } })),
+    queryFn: () => unwrap(api.GET('/deals/', { params: { query: { search: search || undefined, limit: PICKER_LIMIT } } })),
     placeholderData: keepPreviousData,
   })
 
