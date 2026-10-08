@@ -45,6 +45,38 @@ async def test_done_tasks_are_hidden_unless_asked_for(client: AsyncClient, alice
     assert with_done.json()["total"] == 2
 
 
+async def test_completing_a_task_records_when_and_reopening_it_forgets(
+    client: AsyncClient, alice: Account
+) -> None:
+    task = await create_resource(client, alice, "/tasks/", {"title": "File the return"})
+    assert task["completed_at"] is None
+
+    async def patch(body: dict[str, object]) -> dict[str, object]:
+        response = await client.patch(f"/tasks/{task['id']}", json=body, headers=alice.headers)
+        assert response.status_code == 200, response.text
+        saved: dict[str, object] = response.json()
+        return saved
+
+    completed_at = (await patch({"done": True}))["completed_at"]
+    assert completed_at is not None
+
+    # A form sends `done` with every save: editing a finished task keeps the
+    # moment it was finished.
+    assert (await patch({"title": "File the tax return", "done": True}))[
+        "completed_at"
+    ] == completed_at
+
+    assert (await patch({"done": False}))["completed_at"] is None
+
+
+async def test_a_task_entered_as_done_is_completed_then(
+    client: AsyncClient, alice: Account
+) -> None:
+    task = await create_resource(client, alice, "/tasks/", {"title": "Already sent", "done": True})
+
+    assert task["completed_at"] is not None
+
+
 async def test_tasks_without_a_due_date_sort_last(client: AsyncClient, alice: Account) -> None:
     await create_resource(client, alice, "/tasks/", {"title": "Someday"})
     await create_resource(
