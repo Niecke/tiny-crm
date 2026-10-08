@@ -5,6 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from app.recurrence import MAX_RECURRENCE_INTERVAL, RecurrenceRule
+from app.schemas.common import VersionedUpdate
 
 WatchKind = Literal["job_board", "careers_page", "tender_portal", "other"]
 CheckOutcome = Literal["nothing", "found"]
@@ -27,7 +28,7 @@ class WatchCreate(BaseModel):
     next_due_at: datetime | None = None
 
 
-class WatchUpdate(BaseModel):
+class WatchUpdate(VersionedUpdate):
     name: str | None = None
     url: str | None = None
     kind: WatchKind | None = None
@@ -64,6 +65,9 @@ class WatchRead(BaseModel):
     # Set once the record has been archived: out of every list, read-only, and
     # still reachable by its id. NULL for everything in use.
     archived_at: datetime | None = None
+    # Goes up by one on every save. Send it back on PATCH to have the save
+    # refused if someone else saved first; see VersionedUpdate.
+    version: int
 
     model_config = {"from_attributes": True}
 

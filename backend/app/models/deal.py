@@ -16,7 +16,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, WriteOnlyMapped, mapped_column, relationship
 
-from app.archive import Archivable
+from app.archive import Record
 from app.db import Base
 from app.models.contact import Contact
 from app.models.organization import Organization
@@ -74,7 +74,7 @@ END
 """
 
 
-class Deal(Archivable, Base):
+class Deal(Record, Base):
     """An opportunity: a conversation that might become money.
 
     The hole the CRM had until now — a contact and a pile of interactions could

@@ -5,14 +5,14 @@ from sqlalchemy import DateTime, ForeignKey, String, func
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.archive import Archivable
+from app.archive import Record
 from app.db import Base
 from app.models.contact import Contact
 from app.models.deal import Deal
 from app.models.interaction import Interaction
 
 
-class Task(Archivable, Base):
+class Task(Record, Base):
     """A to-do, optionally repeating, optionally about someone.
 
     A recurring task is not rescheduled in place: completing one creates the

@@ -9,6 +9,8 @@ import { TaskForm, type TaskFields } from '../../../components/TaskForm'
 import { Button } from '../../../components/ui/Button'
 import { formatDay, localDay } from '../../../format'
 import { archiveTask, deleteTask, invalidateTasks, restoreTask, taskQuery, updateTask } from '../../../tasks'
+import { StaleSaveNotice } from '../../../components/StaleSaveNotice'
+import { formError } from '../../../useEditVersion'
 
 // A task is small enough that its page is its form: open it to read it,
 // change it, or archive it.
@@ -26,8 +28,10 @@ function EditTask() {
 
   const leave = useLeave({ to: '/tasks', search: filters })
 
+  // The form below is remounted whenever the task changes, so the version on
+  // screen is always the one it was filled from (#142, see useEditVersion).
   const save = useMutation({
-    mutationFn: (body: TaskFields) => updateTask(api, taskId, body),
+    mutationFn: (body: TaskFields) => updateTask(api, taskId, body, task.data?.version),
     onSuccess: async (saved) => {
       queryClient.setQueryData(taskQuery(api, taskId).queryKey, saved)
       await invalidateTasks(queryClient)
@@ -67,6 +71,7 @@ function EditTask() {
           </Button>
         )}
       </header>
+      <StaleSaveNotice error={save.error} onReload={() => void task.refetch().then(() => save.reset())} />
       {task.data && <ArchivedNotice record={task.data} noun="task" name={task.data.title} archiving={archiving} />}
       {task.data?.done && <p className="notice">Done.</p>}
       {repeated && <p className="notice" role="status">Repeated: the next one is due {formatDay(localDay(repeated))}.</p>}
@@ -89,7 +94,7 @@ function EditTask() {
             onSubmit={(body) => save.mutate(body)}
             submitLabel="Save changes"
             pending={save.isPending}
-            error={save.error}
+            error={formError(save.error)}
             cancel={
               <Button variant="quiet" onPress={() => void leave()}>
                 Cancel

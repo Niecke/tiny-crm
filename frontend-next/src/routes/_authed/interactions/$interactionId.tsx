@@ -15,6 +15,8 @@ import {
   restoreInteraction,
   updateInteraction,
 } from '../../../interactions'
+import { StaleSaveNotice } from '../../../components/StaleSaveNotice'
+import { formError } from '../../../useEditVersion'
 
 // An interaction's page is its form: read it, change it, archive it, or turn
 // it into a follow-up task.
@@ -30,8 +32,10 @@ function EditInteraction() {
   const interaction = useQuery(interactionQuery(api, interactionId))
   const leave = useLeave({ to: '/interactions', search: filters })
 
+  // The form below is remounted whenever the interaction changes, so the version on
+  // screen is always the one it was filled from (#142, see useEditVersion).
   const save = useMutation({
-    mutationFn: (body: InteractionCreate) => updateInteraction(api, interactionId, body),
+    mutationFn: (body: InteractionCreate) => updateInteraction(api, interactionId, body, interaction.data?.version),
     onSuccess: async (saved) => {
       queryClient.setQueryData(interactionQuery(api, interactionId).queryKey, saved)
       await invalidateInteractions(queryClient)
@@ -66,6 +70,7 @@ function EditInteraction() {
           </Link>
         )}
       </header>
+      <StaleSaveNotice error={save.error} onReload={() => void interaction.refetch().then(() => save.reset())} />
       {i && (
         <ArchivedNotice record={i} noun="interaction" name={i.subject} archiving={archiving}>
           Tasks following up on it are kept.
@@ -88,7 +93,7 @@ function EditInteraction() {
             onSubmit={(body) => save.mutate(body)}
             submitLabel="Save changes"
             pending={save.isPending}
-            error={save.error}
+            error={formError(save.error)}
             cancel={
               <Button variant="quiet" onPress={() => void leave()}>
                 Cancel

@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.archive import archived_is, require_archived, require_live, set_archived
+from app.audit import check_version, erase_history, record_update, snapshot
 from app.auth import current_active_user
 from app.auth.users import User
 from app.db import contains, count_rows, get_session
@@ -160,11 +161,14 @@ async def update_interaction(
     interaction = await _get_owned(session, interaction_id, user)
     require_live(interaction, "Interaction")
     updates = body.model_dump(exclude_unset=True)
+    check_version(interaction, updates.pop("version", None), "Interaction")
+    before = snapshot(interaction)
     await _apply_links(session, interaction, updates, user.id)
     for field, value in updates.items():
         # The link lists are handled above; setattr would assign raw ids.
         if not field.endswith("_ids"):
             setattr(interaction, field, value)
+    record_update(session, user, interaction, before)
     await session.commit()
     await session.refresh(interaction)
     return InteractionRead.model_validate(interaction)
@@ -178,7 +182,7 @@ async def archive_interaction(
 ) -> InteractionRead:
     """Put the entry away: off every timeline, and out of the briefing if planned."""
     interaction = await _get_owned(session, interaction_id, user)
-    await set_archived(session, interaction, True)
+    await set_archived(session, interaction, True, user)
     return InteractionRead.model_validate(interaction)
 
 
@@ -190,7 +194,7 @@ async def restore_interaction(
 ) -> InteractionRead:
     """Bring an archived entry back onto the timelines it was on."""
     interaction = await _get_owned(session, interaction_id, user)
-    await set_archived(session, interaction, False)
+    await set_archived(session, interaction, False, user)
     return InteractionRead.model_validate(interaction)
 
 
@@ -203,5 +207,6 @@ async def delete_interaction(
     """Erase the entry for good. Only once it has been archived."""
     interaction = await _get_owned(session, interaction_id, user)
     require_archived(interaction, "Interaction")
+    await erase_history(session, interaction)
     await session.delete(interaction)
     await session.commit()

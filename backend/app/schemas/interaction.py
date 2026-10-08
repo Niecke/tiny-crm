@@ -4,6 +4,8 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
+from app.schemas.common import VersionedUpdate
+
 InteractionKind = Literal["call", "meeting", "event", "email", "note", "other"]
 
 
@@ -32,7 +34,7 @@ class InteractionCreate(InteractionLinks):
     tags: list[str] = []
 
 
-class InteractionUpdate(BaseModel):
+class InteractionUpdate(VersionedUpdate):
     kind: InteractionKind | None = None
     subject: str | None = None
     notes: str | None = None
@@ -61,5 +63,8 @@ class InteractionRead(InteractionLinks):
     # Set once the record has been archived: out of every list, read-only, and
     # still reachable by its id. NULL for everything in use.
     archived_at: datetime | None = None
+    # Goes up by one on every save. Send it back on PATCH to have the save
+    # refused if someone else saved first; see VersionedUpdate.
+    version: int
 
     model_config = {"from_attributes": True}

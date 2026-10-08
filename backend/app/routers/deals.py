@@ -9,6 +9,7 @@ from sqlalchemy import not_, nulls_last, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.archive import archived_is, require_archived, require_live, set_archived
+from app.audit import check_version, erase_history, record_update, snapshot
 from app.auth import current_active_user
 from app.auth.users import User
 from app.briefing import DayWindow
@@ -315,6 +316,7 @@ async def update_deal(
 
     # exclude_unset=True — only update fields the caller actually sent
     updates = body.model_dump(exclude_unset=True)
+    check_version(deal, updates.pop("version", None), "Deal")
     if "contact_id" in updates or "organization_id" in updates:
         await _check_links(
             session,
@@ -337,11 +339,13 @@ async def update_deal(
     else:
         lost_reason = deal.lost_reason
 
+    before = snapshot(deal)
     for field, value in updates.items():
         setattr(deal, field, value)
     # Runs last, so a probability sent alongside a close is overridden by the
     # 100/0 the decided stage implies rather than the other way round.
     apply_stage(deal, stage, lost_reason)
+    record_update(session, user, deal, before)
 
     await session.commit()
     await session.refresh(deal)
@@ -390,7 +394,9 @@ async def change_stage(
     require_live(deal, "Deal")
 
     _reject_orphan_lost_reason(body.stage, body.lost_reason)
+    before = snapshot(deal)
     apply_stage(deal, body.stage, body.lost_reason)
+    record_update(session, user, deal, before)
 
     await session.commit()
     await session.refresh(deal)
@@ -410,7 +416,7 @@ async def archive_deal(
     counted at all, and comes back with its stage and its history untouched.
     """
     deal = await _get_owned(session, deal_id, user)
-    await set_archived(session, deal, True)
+    await set_archived(session, deal, True, user)
     return deal
 
 
@@ -422,7 +428,7 @@ async def restore_deal(
 ) -> Deal:
     """Bring an archived deal back, in the stage it was put away in."""
     deal = await _get_owned(session, deal_id, user)
-    await set_archived(session, deal, False)
+    await set_archived(session, deal, False, user)
     return deal
 
 
@@ -435,5 +441,6 @@ async def delete_deal(
     """Erase the deal for good. Only once it has been archived."""
     deal = await _get_owned(session, deal_id, user)
     require_archived(deal, "Deal")
+    await erase_history(session, deal)
     await session.delete(deal)
     await session.commit()

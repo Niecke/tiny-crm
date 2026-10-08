@@ -406,6 +406,43 @@ tab in the inbox).
 
 ---
 
+## Change history
+
+Every record used to keep only `updated_at`: nothing said who changed what, and
+two tabs editing the same contact silently kept whichever saved last (#142).
+
+**Every save is recorded.** `audit_events` is append-only: one row per write
+that changed something, holding only the fields that differ, as
+`{field: {old, new}}`. The diff is taken from the row, not the request — the
+edit forms send every field on every save, and a change the server makes
+alongside (a won deal pinning its probability, a cleared rate taking its
+currency) belongs in the record too. A save that changes nothing leaves no
+entry. Archive and restore are entries of their own. Link lists
+(`contact_ids`, …) are diffed like fields. Amounts stay strings and dates
+ISO 8601, as everywhere else in the API.
+
+**Read it back** with `GET /history/{entity_type}/{entity_id}` — newest first,
+paged, 404 for a record that is not the caller's. It feeds the field-change
+entries of the unified timeline (T15). Each entry names its `actor_id`; with
+one user per tenant that is the owner, and a second user (T25) needs no
+migration.
+
+**Stale saves are refused.** Every record carries a `version` that goes up by
+one on every write. A PATCH that sends the `version` it was edited from gets
+**409** if someone else saved in between, instead of overwriting them. The
+check is also in the UPDATE itself (`WHERE version = …`), so two saves racing
+each other cannot both win. `version` is optional: a one-field toggle like
+"done" sends none, and the newest value wins as before. The edit forms send the
+version they were opened from — not the one a background refetch brought in —
+and answer a 409 with **Load latest version**, which discards the edits.
+
+**Erasing erases the history.** `DELETE` removes the record's entries with it:
+a log that kept every old address of a contact who asked to be forgotten would
+be the copy that was not erased (#143). Nothing was backfilled — the past was
+never recorded.
+
+---
+
 ## Cross-cutting rules
 
 **Tenant scoping.** Every list, read, write and link is filtered by

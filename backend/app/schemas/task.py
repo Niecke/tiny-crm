@@ -5,6 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field, model_validator
 
 from app.recurrence import MAX_RECURRENCE_INTERVAL, RecurrenceRule
+from app.schemas.common import VersionedUpdate
 
 
 def validate_recurrence(
@@ -63,7 +64,7 @@ class TaskCreate(TaskLinks):
         return self
 
 
-class TaskUpdate(TaskLinks):
+class TaskUpdate(VersionedUpdate, TaskLinks):
     title: str | None = None
     description: str | None = None
     due_date: datetime | None = None
@@ -90,6 +91,9 @@ class TaskRead(TaskCreate):
     # Set once the record has been archived: out of every list, read-only, and
     # still reachable by its id. NULL for everything in use.
     archived_at: datetime | None = None
+    # Goes up by one on every save. Send it back on PATCH to have the save
+    # refused if someone else saved first; see VersionedUpdate.
+    version: int
 
     model_config = {"from_attributes": True}
 

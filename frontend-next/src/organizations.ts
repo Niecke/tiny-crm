@@ -34,8 +34,9 @@ export const createOrganization = (api: Api, body: OrganizationCreate) =>
 
 // Every field is sent, so a field emptied in the form is cleared (null) rather
 // than left as it was.
-export const updateOrganization = (api: Api, id: string, body: OrganizationCreate) =>
-  unwrap(api.PATCH('/organizations/{organization_id}', { params: { path: { organization_id: id } }, body }))
+// `version` makes the save conditional — see useEditVersion (#142).
+export const updateOrganization = (api: Api, id: string, body: OrganizationCreate, version?: number) =>
+  unwrap(api.PATCH('/organizations/{organization_id}', { params: { path: { organization_id: id } }, body: { ...body, version } }))
 
 // Only once archived; the people filed under it stay, with no company.
 export const deleteOrganization = (api: Api, id: string) =>

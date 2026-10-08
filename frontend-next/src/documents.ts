@@ -116,8 +116,9 @@ export function replaceContent(api: Api, id: string, file: File) {
 }
 
 // Link lists are sent whole: they replace what is stored.
-export const updateDocument = (api: Api, id: string, body: DocumentUpdate) =>
-  unwrap(api.PATCH('/documents/{document_id}', { params: { path: { document_id: id } }, body }))
+// `version` makes the save conditional — see useEditVersion (#142).
+export const updateDocument = (api: Api, id: string, body: DocumentUpdate, version?: number) =>
+  unwrap(api.PATCH('/documents/{document_id}', { params: { path: { document_id: id } }, body: { ...body, version } }))
 
 export const deleteDocument = (api: Api, id: string) =>
   unwrap(api.DELETE('/documents/{document_id}', { params: { path: { document_id: id } } }))

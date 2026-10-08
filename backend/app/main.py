@@ -4,10 +4,12 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import TypedDict
 
-from fastapi import Depends, FastAPI, Response
+from fastapi import Depends, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.exc import StaleDataError
 
 from app.auth import fastapi_users
 from app.config import Environment, settings
@@ -21,6 +23,7 @@ from app.routers import (
     contacts,
     deals,
     documents,
+    history,
     interactions,
     metrics,
     organizations,
@@ -118,6 +121,23 @@ app.add_middleware(
 # were accepted.
 app.middleware("http")(count_failed_logins)
 
+
+@app.exception_handler(StaleDataError)
+async def stale_write(request: Request, exc: StaleDataError) -> JSONResponse:
+    """Two saves of the same record raced, and this one lost (#142).
+
+    Both loaded the same version; the other committed first, so this UPDATE
+    matched no row. The same 409 check_version gives a stale form, reached by a
+    narrower window: nothing was written, and reloading shows what won.
+    """
+    return JSONResponse(
+        status_code=409,
+        content={
+            "detail": "This record was changed elsewhere at the same time — reload and try again"
+        },
+    )
+
+
 app.include_router(contacts.router)
 app.include_router(captures.router)
 app.include_router(organizations.router)
@@ -127,6 +147,7 @@ app.include_router(documents.router)
 app.include_router(projects.router)
 app.include_router(interactions.router)
 app.include_router(watches.router)
+app.include_router(history.router)
 app.include_router(search.router)
 app.include_router(briefing.router)
 app.include_router(metrics.router)

@@ -95,8 +95,9 @@ export const contactOptionsQuery = (api: Api, search: string) =>
 export const createContact = (api: Api, body: ContactCreate) => unwrap(api.POST('/contacts/', { body }))
 
 // Every field is sent, so a field emptied in the form is cleared (null).
-export const updateContact = (api: Api, id: string, body: ContactCreate) =>
-  unwrap(api.PATCH('/contacts/{contact_id}', { params: { path: { contact_id: id } }, body }))
+// `version` makes the save conditional — see useEditVersion (#142).
+export const updateContact = (api: Api, id: string, body: ContactCreate, version?: number) =>
+  unwrap(api.PATCH('/contacts/{contact_id}', { params: { path: { contact_id: id } }, body: { ...body, version } }))
 
 export const deleteContact = (api: Api, id: string) =>
   unwrap(api.DELETE('/contacts/{contact_id}', { params: { path: { contact_id: id } } }))

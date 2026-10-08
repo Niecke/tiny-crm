@@ -32,6 +32,7 @@ export const deal = (overrides: Partial<DealRead> = {}): DealRead => ({
   has_next_step: false,
   created_at: '2026-09-01T08:00:00Z',
   updated_at: '2026-09-01T08:00:00Z',
+  version: 1,
   ...overrides,
 })
 
@@ -53,5 +54,6 @@ export const watch = (overrides: Partial<WatchRead> = {}): WatchRead => ({
   check_count: 1,
   created_at: '2026-09-01T08:00:00Z',
   updated_at: '2026-09-01T08:00:00Z',
+  version: 1,
   ...overrides,
 })

@@ -99,8 +99,9 @@ export const linkedTasksQuery = (
 export const createTask = (api: Api, body: Omit<TaskCreate, 'done'>) =>
   unwrap(api.POST('/tasks/', { body: { ...body, done: false } }))
 
-export const updateTask = (api: Api, id: string, body: TaskUpdate) =>
-  unwrap(api.PATCH('/tasks/{task_id}', { params: { path: { task_id: id } }, body }))
+// `version` makes the save conditional — see useEditVersion (#142).
+export const updateTask = (api: Api, id: string, body: TaskUpdate, version?: number) =>
+  unwrap(api.PATCH('/tasks/{task_id}', { params: { path: { task_id: id } }, body: { ...body, version } }))
 
 export const deleteTask = (api: Api, id: string) =>
   unwrap(api.DELETE('/tasks/{task_id}', { params: { path: { task_id: id } } }))

@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.archive import archived_is, require_archived, require_live, set_archived
+from app.audit import check_version, erase_history, record_update, snapshot
 from app.auth import current_active_user
 from app.auth.users import User
 from app.db import contains, count_rows, get_session
@@ -290,6 +291,7 @@ async def replace_document_content(
     if fmt is None:
         raise HTTPException(status_code=422, detail="Unsupported file type — use pdf, md, or txt")
 
+    before = snapshot(doc)
     # Put under the same key — versioned bucket keeps the old version
     await file.seek(0)
     await put_object_stream(doc.storage_key, file.file, _content_type(fmt))
@@ -304,6 +306,7 @@ async def replace_document_content(
 
     doc.format = fmt
     doc.size = size
+    record_update(session, user, doc, before)
     await session.commit()
     await session.refresh(doc)
     return doc
@@ -319,11 +322,14 @@ async def update_document(
     doc = await _get_owned(session, document_id, user)
     require_live(doc, "Document")
     updates = body.model_dump(exclude_unset=True)
+    check_version(doc, updates.pop("version", None), "Document")
+    before = snapshot(doc)
     await _apply_links(session, doc, updates, user.id)
     for field, value in updates.items():
         # The link lists are handled above; setattr would assign raw ids.
         if not field.endswith("_ids"):
             setattr(doc, field, value)
+    record_update(session, user, doc, before)
     await session.commit()
     await session.refresh(doc)
     return doc
@@ -341,7 +347,7 @@ async def archive_document(
     restoring is the same file under the same key.
     """
     doc = await _get_owned(session, document_id, user)
-    await set_archived(session, doc, True)
+    await set_archived(session, doc, True, user)
     return doc
 
 
@@ -353,7 +359,7 @@ async def restore_document(
 ) -> Document:
     """Bring an archived document back, still filed where it was."""
     doc = await _get_owned(session, document_id, user)
-    await set_archived(session, doc, False)
+    await set_archived(session, doc, False, user)
     return doc
 
 
@@ -373,5 +379,6 @@ async def delete_document(
     await delete_object(doc.storage_key)
     if doc.preview_key:
         await delete_object(doc.preview_key)
+    await erase_history(session, doc)
     await session.delete(doc)
     await session.commit()

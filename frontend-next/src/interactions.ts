@@ -71,8 +71,9 @@ export const linkedInteractionsQuery = (api: Api, link: InteractionLink, page = 
 export const createInteraction = (api: Api, body: InteractionCreate) => unwrap(api.POST('/interactions/', { body }))
 
 // The link lists are sent whole: they replace what is stored.
-export const updateInteraction = (api: Api, id: string, body: InteractionCreate) =>
-  unwrap(api.PATCH('/interactions/{interaction_id}', { params: { path: { interaction_id: id } }, body }))
+// `version` makes the save conditional — see useEditVersion (#142).
+export const updateInteraction = (api: Api, id: string, body: InteractionCreate, version?: number) =>
+  unwrap(api.PATCH('/interactions/{interaction_id}', { params: { path: { interaction_id: id } }, body: { ...body, version } }))
 
 export const deleteInteraction = (api: Api, id: string) =>
   unwrap(api.DELETE('/interactions/{interaction_id}', { params: { path: { interaction_id: id } } }))

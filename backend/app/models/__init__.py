@@ -17,6 +17,7 @@ instead, and gets the whole registry from one import.
 
 # Attaches Deal.has_next_step, which needs Task and Interaction and so cannot
 # live in deal.py. Imported for that side effect; see the module.
+from app.audit import AuditEvent
 from app.models import next_step  # noqa: F401
 from app.models.capture import Capture
 from app.models.contact import Contact
@@ -32,6 +33,7 @@ from app.models.task import Task
 from app.models.watch import Watch, WatchCheck
 
 __all__ = [
+    "AuditEvent",
     "Capture",
     "Contact",
     "Deal",
