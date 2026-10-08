@@ -130,6 +130,18 @@ export function conversionRate(entered: number, advanced: number): number | null
   return entered > 0 ? Math.round((advanced / entered) * 100) : null
 }
 
+// A 0 to 1 share from the API, as a whole percent. Null stays null, for the
+// same reason: nothing decided is not a win rate of 0%.
+export function percent(rate: number | null | undefined): number | null {
+  return rate == null ? null : Math.round(rate * 100)
+}
+
+// Deals on one side of the outcomes, across currencies. Deals can be counted
+// together where their amounts cannot be added.
+export const dealCount = (rows: MoneyByCurrency[]) => rows.reduce((n, r) => n + r.count, 0)
+
+export const dealsText = (n: number) => (n === 1 ? '1 deal' : `${n} deals`)
+
 export function daysText(days: number): string {
   return days === 1 ? '1 day' : `${days} days`
 }

@@ -1,6 +1,18 @@
 import { describe, expect, test } from 'vitest'
 import type { StageMoney } from './api/types'
-import { byCurrency, conversionRate, formatMedian, largest, moneyPair, share, totalsByCurrency, weeklySummary } from './metrics'
+import {
+  byCurrency,
+  conversionRate,
+  dealCount,
+  dealsText,
+  formatMedian,
+  largest,
+  moneyPair,
+  percent,
+  share,
+  totalsByCurrency,
+  weeklySummary,
+} from './metrics'
 
 const row = (stage: StageMoney['stage'], currency: string, value: string, count = 1, open_ended = 0): StageMoney => ({
   stage,
@@ -58,6 +70,31 @@ describe('conversionRate', () => {
 
   test('is no rate, not 0%, when nothing entered', () => {
     expect(conversionRate(0, 0)).toBeNull()
+  })
+})
+
+describe('percent', () => {
+  test('turns the API share into a whole percent', () => {
+    expect(percent(0.4)).toBe(40)
+    expect(percent(0.667)).toBe(67)
+    expect(percent(0)).toBe(0)
+  })
+
+  test('is no rate, not 0%, when nothing was decided', () => {
+    expect(percent(null)).toBeNull()
+  })
+})
+
+describe('dealCount', () => {
+  test('counts deals across currencies, where amounts could not be added', () => {
+    const rows = [
+      { currency: 'EUR', count: 3, value: '40000.00', open_ended: 1 },
+      { currency: 'USD', count: 1, value: '5000.00', open_ended: 0 },
+    ]
+    expect(dealCount(rows)).toBe(4)
+    expect(dealCount([])).toBe(0)
+    expect(dealsText(1)).toBe('1 deal')
+    expect(dealsText(4)).toBe('4 deals')
   })
 })
 

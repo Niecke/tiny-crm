@@ -45,6 +45,7 @@ from sqlalchemy import (
     distinct,
     func,
     literal,
+    or_,
     select,
     type_coerce,
 )
@@ -54,7 +55,7 @@ from app.archive import live
 from app.briefing import DayWindow, briefing_queries
 from app.db import count_rows
 from app.models import Capture, Deal, DealStageEvent, Interaction, Task
-from app.models.deal import IN_PLAY_STAGES, OPEN_STAGES, WON_STAGES
+from app.models.deal import DECIDED_STAGES, IN_PLAY_STAGES, OPEN_STAGES, WON_STAGES
 from app.schemas.interaction import InteractionKind
 from app.schemas.metrics import (
     ActivityMetrics,
@@ -64,6 +65,7 @@ from app.schemas.metrics import (
     ListQuery,
     MoneyByCurrency,
     OldestDeal,
+    OutcomeMetrics,
     PipelineMetrics,
     SalesCycle,
     StageConversion,
@@ -73,6 +75,7 @@ from app.schemas.metrics import (
     TrendMetrics,
     VelocityMetrics,
     WeekCount,
+    WinRateByValue,
 )
 
 PeriodKind = Literal["week", "month", "quarter", "year"]
@@ -355,6 +358,86 @@ async def _sales_cycle(session: AsyncSession, user_id: UUID, period: Period) -> 
     return SalesCycle(deals=n, median_days=_median(median))
 
 
+# --- C · Did it come off -----------------------------------------------------
+
+
+def _rate(won: Decimal | int, lost: Decimal | int) -> float | None:
+    """Won over won plus lost. None, not 0, when there is nothing to divide by."""
+    total = won + lost
+    return round(float(won / total), 3) if total else None
+
+
+async def outcome_metrics(session: AsyncSession, user_id: UUID, period: Period) -> OutcomeMetrics:
+    """Deals decided in the period, by how they stand now.
+
+    Decided is read from the stage log, not from `closed_at`, which moves when
+    a lost deal is won after all. A deal was decided when it crossed into the
+    won stages from outside them — won to running is the same decision, not a
+    second one — or moved to lost. Dropping a draft is not losing: the letter
+    was never sent, so nobody turned it down (#255).
+
+    Which side a deal is on is its stage today. One lost in March and won in
+    May is a win for the year and for May; one that was reopened and is back
+    in the pipeline is on neither side, until it is decided again.
+    """
+    won = and_(
+        DealStageEvent.to_stage.in_(WON_STAGES),
+        or_(DealStageEvent.from_stage.is_(None), DealStageEvent.from_stage.not_in(WON_STAGES)),
+    )
+    lost = and_(
+        DealStageEvent.to_stage == "lost",
+        DealStageEvent.from_stage.is_distinct_from("draft"),
+    )
+    decided = select(DealStageEvent.deal_id).where(
+        period.contains(DealStageEvent.changed_at), or_(won, lost)
+    )
+    is_won = Deal.stage.in_(WON_STAGES)
+    rows = (
+        await session.execute(
+            select(
+                is_won,
+                Deal.currency,
+                func.count(),
+                func.sum(Deal.expected_value),
+                func.count().filter(Deal.expected_value.is_(None)),
+            )
+            .where(
+                Deal.user_id == user_id,
+                live(Deal),
+                Deal.stage.in_(DECIDED_STAGES),
+                Deal.id.in_(decided),
+            )
+            .group_by(is_won, Deal.currency)
+            .order_by(Deal.currency)
+        )
+    ).all()
+
+    def side(won_side: bool) -> list[MoneyByCurrency]:
+        return [
+            MoneyByCurrency(currency=currency, count=n, value=_money(total), open_ended=oe)
+            for deal_won, currency, n, total, oe in rows
+            if deal_won is won_side
+        ]
+
+    won_rows, lost_rows = side(True), side(False)
+    won_value = {m.currency: m.value for m in won_rows}
+    lost_value = {m.currency: m.value for m in lost_rows}
+    return OutcomeMetrics(
+        won=won_rows,
+        lost=lost_rows,
+        win_rate_by_count=_rate(sum(m.count for m in won_rows), sum(m.count for m in lost_rows)),
+        win_rate_by_value=[
+            WinRateByValue(
+                currency=currency,
+                rate=_rate(
+                    won_value.get(currency, Decimal(0)), lost_value.get(currency, Decimal(0))
+                ),
+            )
+            for currency in sorted(won_value.keys() | lost_value.keys())
+        ],
+    )
+
+
 # --- D · What is rotting -----------------------------------------------------
 
 
@@ -431,6 +514,16 @@ async def activity_metrics(session: AsyncSession, user_id: UUID, period: Period)
             Task.user_id == user_id, period.contains(Task.created), live(Task)
         )
     )
+    # `done` beside the timestamp: a task reopened by a release that did not
+    # know the column yet would still carry one.
+    tasks_completed = await session.scalar(
+        select(func.count()).where(
+            Task.user_id == user_id,
+            Task.done.is_(True),
+            period.contains(Task.completed_at),
+            live(Task),
+        )
+    )
     return ActivityMetrics(
         # Every kind, zeros included, so the shape does not change with the data.
         interactions_by_kind=[
@@ -441,6 +534,7 @@ async def activity_metrics(session: AsyncSession, user_id: UUID, period: Period)
         captures_converted=triaged.get("converted", 0),
         captures_dismissed=triaged.get("dismissed", 0),
         tasks_created=tasks_created or 0,
+        tasks_completed=tasks_completed or 0,
     )
 
 

@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link, type LinkProps } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { z } from 'zod'
-import type { AttentionRow, DashboardMetrics } from '../../api/types'
+import type { AttentionRow, DashboardMetrics, MoneyByCurrency } from '../../api/types'
 import { Segmented } from '../../components/ui/Segmented'
 import { WeeklyDeals } from '../../components/WeeklyDeals'
 import { IN_PLAY, stageLabel } from '../../deals'
@@ -10,6 +10,8 @@ import {
   byCurrency,
   conversionRate,
   daysText,
+  dealCount,
+  dealsText,
   formatMedian,
   formatPeriod,
   issueUrl,
@@ -17,6 +19,7 @@ import {
   metricsQuery,
   moneyPair,
   type PeriodKind,
+  percent,
   periodLabel,
   periodOptions,
   share,
@@ -75,7 +78,7 @@ function Numbers() {
           <Pipeline data={data!} />
           <Velocity data={data!} />
           <div className="numbers-pair">
-            <Outcomes />
+            <Outcomes data={data!} />
             <Attention data={data!} />
           </div>
           <Activity data={data!} />
@@ -240,6 +243,8 @@ function Velocity({ data }: { data: DashboardMetrics }) {
   const entered = (stage: string) => velocity.entered.find((e) => e.stage === stage)?.count ?? 0
   const cycle = velocity.sales_cycle
 
+  // Won and lost are not rows here: "Did it come off" has them, with their
+  // value, and two counts of the same thing would sooner or later disagree.
   return (
     <Panel title="Is it moving" when={`Now · ${label}`}>
       <div className="numbers-scroll">
@@ -301,14 +306,6 @@ function Velocity({ data }: { data: DashboardMetrics }) {
       </div>
       <ul className="rows">
         <li>
-          <span className="label">Won · {label.toLowerCase()}</span>
-          <span className="row-side">{entered('won')}</span>
-        </li>
-        <li>
-          <span className="label">Lost · {label.toLowerCase()}</span>
-          <span className="row-side">{entered('lost')}</span>
-        </li>
-        <li>
           <span className="label">Median days from opening a deal to winning it</span>
           <span className="row-side">
             {cycle.median_days == null ? (
@@ -334,21 +331,90 @@ function Velocity({ data }: { data: DashboardMetrics }) {
 
 // --- C · Did it come off ------------------------------------------------------
 
-function Outcomes() {
+function Outcomes({ data }: { data: DashboardMetrics }) {
+  const { outcomes } = data
+  const label = periodLabel(data.period.kind)
+  const won = dealCount(outcomes.won)
+  const decided = won + dealCount(outcomes.lost)
+  const byCount = percent(outcomes.win_rate_by_count)
+
   return (
-    <Panel title="Did it come off" when="Not measured yet" pending>
-      <Pending
-        what="Won and lost value, win rate by count and by value"
-        why="Planned with the lost categories, so the reasons can be ranked beside them."
-        issue={118}
-        lines={3}
-      />
+    <Panel title="Did it come off" when={label}>
+      <ul className="rows">
+        <li>
+          <span className="label">Won</span>
+          <span className="row-side">
+            <OutcomeSide rows={outcomes.won} />
+          </span>
+        </li>
+        <li>
+          <span className="label">Lost</span>
+          <span className="row-side">
+            <OutcomeSide rows={outcomes.lost} />
+          </span>
+        </li>
+        <li>
+          <span className="label">Win rate by count</span>
+          <span className="row-side">
+            {byCount == null ? (
+              <span className="muted">nothing decided {label.toLowerCase()}</span>
+            ) : (
+              <>
+                {byCount}%{' '}
+                <span className="muted">
+                  {won} of {dealsText(decided)}
+                </span>
+              </>
+            )}
+          </span>
+        </li>
+        <li>
+          <span className="label">Win rate by value</span>
+          <span className="row-side">
+            {outcomes.win_rate_by_value.length === 0 ? (
+              <span className="muted">nothing decided {label.toLowerCase()}</span>
+            ) : (
+              outcomes.win_rate_by_value.map((r) => {
+                const rate = percent(r.rate)
+                return (
+                  <span key={r.currency} className="numbers-money">
+                    {rate == null ? <span className="muted">no amounts in {r.currency}</span> : `${rate}% ${r.currency}`}
+                  </span>
+                )
+              })
+            )}
+          </span>
+        </li>
+      </ul>
+      <p className="muted small">
+        Deals decided in the period, as they stand now: one lost and then won after all is a win, one reopened is in
+        neither. The two rates differ when the big deals are the lost ones. Open-ended deals count, and have no amount
+        to weigh.
+      </p>
       <Pending
         what="Lost reasons, win rate by source"
         why="Free-text reasons cannot be grouped, and a deal has no source yet."
         issue={118}
       />
     </Panel>
+  )
+}
+
+// One side of the outcomes: per currency the deals and what they were worth.
+function OutcomeSide({ rows }: { rows: MoneyByCurrency[] }) {
+  if (rows.length === 0) return <span className="muted">none</span>
+  return (
+    <>
+      {rows.map((m) => {
+        const pair = moneyPair(m)
+        return (
+          <span key={m.currency} className="numbers-money">
+            {dealsText(m.count)} <span className="muted">·</span> {pair.amount}
+            {pair.openEnded && <span className="muted"> · {pair.openEnded}</span>}
+          </span>
+        )
+      })}
+    </>
   )
 }
 
@@ -399,7 +465,7 @@ function Attention({ data }: { data: DashboardMetrics }) {
       <Pending
         what="Contacts untouched for 90 days"
         why="Waits on deciding which contacts are worth touching."
-        issue={138}
+        issue={271}
         lines={1}
       />
     </Panel>
@@ -480,13 +546,11 @@ function Activity({ data }: { data: DashboardMetrics }) {
               <span className="label">Tasks created</span>
               <span className="row-side">{activity.tasks_created}</span>
             </li>
+            <li>
+              <span className="label">Tasks completed</span>
+              <span className="row-side">{activity.tasks_completed}</span>
+            </li>
           </ul>
-          <Pending
-            what="Tasks completed"
-            why="A task records whether it is done, not when."
-            issue={138}
-            lines={1}
-          />
         </div>
       </div>
       <div className="numbers-activity-col">

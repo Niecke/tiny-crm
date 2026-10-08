@@ -145,7 +145,9 @@ the briefing has it).
 
 `GET|POST /tasks/` · `GET|PATCH|DELETE /tasks/{id}`
 
-title, description (markdown), due_date, priority 0–2, done, tags.
+title, description (markdown), due_date, priority 0–2, done, tags. Reads carry
+`completed_at`: stamped by the server when `done` turns true, cleared when it
+turns back, and left alone by any other edit.
 
 **Three independent links** — `contact_id`, `deal_id`, `interaction_id`, all
 nullable and orthogonal. Reads carry `contact_name` / `deal_title` /
@@ -582,16 +584,17 @@ resolved. One response, one model per group from [DASHBOARD.md](DASHBOARD.md)
 |---|---|---|
 | `pipeline` (A) | now | deals in play (`lead` to `negotiation`, never `draft`) per stage and currency: count, value, open-ended count; won + running per currency |
 | `velocity` (B) | both | per stage in play the median calendar days in stage and the oldest deal; deals entering each stage in the period (`draft` included); all-time conversion to a later stage; median days from opening to first win for deals won in the period |
+| `outcomes` (C) | period | deals decided in the period — moved into won or into lost — as they stand now, per currency: count, value, open-ended count; win rate by count across currencies and by value per currency, null when nothing was decided |
 | `attention` (D) | now | stalled deals, overdue deals, overdue tasks, unconfirmed interactions, waiting captures (with the oldest's age), each with the list request behind it |
-| `activity` (E) | period | interactions that happened, by kind; deals opened; captures converted and dismissed; tasks created |
+| `activity` (E) | period | interactions that happened, by kind; deals opened; captures converted and dismissed; tasks created and tasks completed |
 | `trends` | last 10 weeks | deals opened per ISO week in local time, oldest first, zeros included; the running week is marked `complete: false` |
 
 **Money is a pair and never crosses currencies:** every amount is a `Decimal`
 string beside the count of deals with no derivable amount, grouped by
 currency. **A group that cannot be computed yet is absent, not zero** —
-`outcomes` (C) and `delivery` (F), and within the groups the weighted pipeline
-(#120), revisits (#118), reply direction (#135) and tasks completed (no
-completion timestamp). The attention counts run the briefing's own queries
+`delivery` (F), and within the groups the weighted pipeline (#120), lost
+reasons, win rate by source and revisits (#118) and reply direction (#135).
+The attention counts run the briefing's own queries
 (`briefing_queries`), so the two cannot disagree about what is late. **Nothing
 archived is counted**, in any group: every number links to a list, and no list
 shows an archived row.

@@ -82,8 +82,8 @@ The group that does not exist today at all, and the reason #115 is P0.
 
 | Metric | How |
 |---|---|
-| Won this period | Count and value, from `deal_stage_events` entering `won` within the window. Not `closed_at`, which moves when a deal flips from lost to won |
-| Lost this period | Count and value, same source |
+| Won this period | Count and value, from `deal_stage_events` entering `won` within the window. Not `closed_at`, which moves when a deal flips from lost to won. Won to running is the same decision, not a second one |
+| Lost this period | Count and value, same source. A deal counts once, on the side it stands on now: lost and then won after all is a win, reopened is neither. A dropped draft was never sent, so it was not lost (#255) |
 | Win rate by count, and by value | Two numbers, deliberately. They diverge when the big deals are the lost ones, and the divergence is the finding |
 | Lost reasons, ranked | `GROUP BY lost_category`. **Needs #118** — free text cannot be grouped |
 | Win rate and won value by source | `GROUP BY source`. **Needs #118** — `Deal` has no `source` today, though `Capture` and `Contact` both do. The single most decision-changing number on this page: it is what says whether the watch sweeps, the meetup, or the referrals are worth the evening |
@@ -115,7 +115,7 @@ the cause was three months ago.
 | Outbound vs inbound | **Needs #135** |
 | New deals opened this period | By `created_at` |
 | Captures converted vs dismissed | Triage throughput — whether the inbox is worked or merely filled |
-| Tasks completed this period | Against tasks created, so a rising backlog is visible as a trend rather than as a number |
+| Tasks completed this period | Against tasks created, so a rising backlog is visible as a trend rather than as a number. From `Task.completed_at`, stamped when `done` turns true and cleared when it turns back |
 
 ### F · Delivery
 
@@ -207,10 +207,13 @@ Win rate by source is the number to build the page around once it exists.
 **Status.** Phase 0 and the schema-free part of phase 1 are built
 (`app/metrics.py`, `GET /metrics/dashboard`): groups A and E as above, all of B,
 and D's stalled and overdue deals alongside the briefing's rows — #117's
-`?overdue=true` filter came with it. Still open from phase 1, because each
-needs a decision or a column first: contacts untouched for 90 days (which
-contacts are worth touching) and tasks completed per period (`Task` records
-*whether* it is done, not *when*).
+`?overdue=true` filter came with it. From group C, the part the stage log
+already answers: won and lost in the period with their value, and the win rate
+by count and by value. Lost reasons and the split by source still wait for
+#118. Tasks completed per period came with `Task.completed_at`; tasks finished
+before that column existed carry their last write as the completion time.
+Still open from phase 1, because it needs a decision first: contacts untouched
+for 90 days (which contacts are worth touching).
 
 The React client renders it at `/numbers`. Every metric above that is not in
 the response yet shows there as a skeleton linking the issue it waits on, so

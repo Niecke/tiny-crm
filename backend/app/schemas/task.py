@@ -78,6 +78,8 @@ class TaskUpdate(VersionedUpdate, TaskLinks):
 
 class TaskRead(TaskCreate):
     id: UUID
+    # Stamped by the server when `done` turns true, cleared when it turns back.
+    completed_at: datetime | None = None
     # The instance this one was spawned from, walking the series back through
     # its history. NULL for the first task of a series and for one-offs.
     recurrence_parent_id: UUID | None = None

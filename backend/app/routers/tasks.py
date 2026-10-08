@@ -204,6 +204,9 @@ async def create_task(
 ) -> Task:
     await _check_links(session, body.model_dump(), user)
     task = Task(**body.model_dump(), user_id=user.id)
+    # Entered as already done: it was completed as far as anyone can say now.
+    if task.done:
+        task.completed_at = datetime.now(UTC)
     session.add(task)
     await session.commit()
     await session.refresh(task)
@@ -243,6 +246,12 @@ async def update_task(
     before = snapshot(task)
     for field, value in updates.items():
         setattr(task, field, value)
+    # Only on the change itself: a form sends `done` with every save, and
+    # renaming a finished task must not move the day it was finished.
+    if task.done and not was_done:
+        task.completed_at = datetime.now(UTC)
+    elif was_done and not task.done:
+        task.completed_at = None
     record_update(session, user, task, before)
 
     successor = None

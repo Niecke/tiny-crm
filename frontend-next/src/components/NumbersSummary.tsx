@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, type LinkProps, useRouteContext } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import type { MoneyByCurrency } from '../api/types'
-import { formatMedian, metricsQuery, moneyPair, totalsByCurrency } from '../metrics'
+import { dealCount, dealsText, formatMedian, metricsQuery, moneyPair, totalsByCurrency } from '../metrics'
 import { WeeklyDeals } from './WeeklyDeals'
 
 // The dashboard's headline numbers (#138): four figures from
@@ -22,8 +22,9 @@ export function NumbersSummary() {
   }
 
   const data = metrics.data
-  const won = data?.velocity.entered.find((e) => e.stage === 'won')?.count ?? 0
-  const lost = data?.velocity.entered.find((e) => e.stage === 'lost')?.count ?? 0
+  // The same count the Numbers page shows under "Did it come off".
+  const won = dealCount(data?.outcomes.won ?? [])
+  const lost = dealCount(data?.outcomes.lost ?? [])
   const stalled = data?.attention.stalled_deals.count ?? 0
   const overdue = data?.attention.overdue_deals.count ?? 0
   const cycle = data?.velocity.sales_cycle
@@ -39,9 +40,7 @@ export function NumbersSummary() {
       </Tile>
 
       <Tile label="Won" when="This quarter" link={{ to: '/numbers' }} loading={!data}>
-        <span className="summary-value">
-          {won} {won === 1 ? 'deal' : 'deals'}
-        </span>
+        <span className="summary-value">{dealsText(won)}</span>
         <span className="summary-foot">
           {lost} lost
           {cycle?.median_days != null && ` · median ${formatMedian(cycle.median_days)} to win`}
