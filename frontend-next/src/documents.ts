@@ -1,7 +1,7 @@
 import { keepPreviousData, type QueryClient, queryOptions } from '@tanstack/react-query'
 import { type Api, unwrap } from './api/client'
 import type { DocumentRead, DocumentUpdate } from './api/types'
-import { PAGE_SIZE } from './contacts'
+import { PAGE_SIZE, PICKER_LIMIT } from './contacts'
 
 // Files are pdf, Markdown or plain text, up to 25 MB (routers/documents.py).
 export const ACCEPTED_TYPES = ['.pdf', '.md', '.markdown', '.txt', 'application/pdf', 'text/markdown', 'text/plain']
@@ -159,6 +159,6 @@ export const filenameFor = (doc: Pick<DocumentRead, 'title' | 'format'>) =>
 export const documentOptionsQuery = (api: Api, search: string) =>
   queryOptions({
     queryKey: ['documents', 'options', search],
-    queryFn: () => unwrap(api.GET('/documents/', { params: { query: { search: search || undefined, limit: 10 } } })),
+    queryFn: () => unwrap(api.GET('/documents/', { params: { query: { search: search || undefined, limit: PICKER_LIMIT } } })),
     placeholderData: keepPreviousData,
   })
