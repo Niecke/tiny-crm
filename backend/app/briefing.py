@@ -45,7 +45,7 @@ from app.auth.users import User
 # fails. See app/models/__init__.py — the API is only safe here because it
 # imports every router.
 from app.models import Capture, Deal, Interaction, Task, Watch
-from app.models.deal import IN_PLAY_STAGES
+from app.models.deal import IN_PLAY_STAGES, overdue_on
 from app.models.next_step import next_step_exists
 
 logger = logging.getLogger(__name__)
@@ -104,6 +104,11 @@ class DayWindow:
         """
         return max(0, (self.today - self.local(moment).date()).days)
 
+    def days_past(self, day: date) -> int:
+        """`days_late` for a value that is already a calendar date, such as a
+        deal's expected close: no timezone to apply, the date is the date."""
+        return max(0, (self.today - day).days)
+
 
 @dataclass
 class Briefing:
@@ -135,6 +140,11 @@ class Briefing:
     # in their stage first. The same blind spot as a capture: no date of its
     # own, so nothing else would ever bring it up again.
     stalled_deals: list[Deal] = field(default_factory=list)
+    # In play, with an expected close date before today, furthest past first
+    # (#117). A forecast that has expired reads exactly like one that has not
+    # until something says so. A deal can be here and stalled at once: the two
+    # sections ask different questions of it.
+    overdue_deals: list[Deal] = field(default_factory=list)
 
     @property
     def recipient(self) -> str:
@@ -150,6 +160,7 @@ class Briefing:
             or self.watches_due
             or self.captures_waiting
             or self.stalled_deals
+            or self.overdue_deals
         )
 
 
@@ -170,6 +181,7 @@ class BriefingQueries:
     watches_due: Select[tuple[Watch]]
     captures_waiting: Select[tuple[Capture]]
     stalled_deals: Select[tuple[Deal]]
+    overdue_deals: Select[tuple[Deal]]
 
 
 def briefing_queries(user_id: UUID, window: DayWindow) -> BriefingQueries:
@@ -217,6 +229,12 @@ def briefing_queries(user_id: UUID, window: DayWindow) -> BriefingQueries:
             live(Deal),
         )
         .order_by(Deal.stage_changed_at.asc(), Deal.id.asc()),
+        # The window's calendar day, not `window.start`: an expected close is a
+        # date with no time on it, and `overdue_on` is the one definition the
+        # `?overdue=true` list shares.
+        overdue_deals=select(Deal)
+        .where(Deal.user_id == user_id, overdue_on(window.today), live(Deal))
+        .order_by(Deal.expected_close_date.asc(), Deal.id.asc()),
     )
 
 
@@ -233,6 +251,7 @@ async def gather_briefing(session: AsyncSession, user: User, window: DayWindow) 
         watches_due=list(await session.scalars(queries.watches_due)),
         captures_waiting=list(await session.scalars(queries.captures_waiting)),
         stalled_deals=list(await session.scalars(queries.stalled_deals)),
+        overdue_deals=list(await session.scalars(queries.overdue_deals)),
     )
 
 
@@ -334,6 +353,24 @@ def _stalled_deal_line(deal: Deal, window: DayWindow) -> str:
     return "• " + " · ".join(parts)
 
 
+def _overdue_deal_line(deal: Deal, window: DayWindow) -> str:
+    """One deal whose forecast has expired: what, with whom, and by how much.
+
+    The stage is on the line because it decides what to do about it: a `lead`
+    a month past its date wants a new date, a `negotiation` wants a phone call.
+    """
+    parts = [f"*{escape(deal.title)}*"]
+    who = " · ".join(escape(p) for p in (deal.contact_name, deal.organization_name) if p)
+    if who:
+        parts.append(who)
+    parts.append(deal.stage)
+    # Never None here — the query only matches a date before today.
+    if deal.expected_close_date is not None:
+        days = window.days_past(deal.expected_close_date)
+        parts.append(f"_{_count(days, 'day')} past expected close_")
+    return "• " + " · ".join(parts)
+
+
 def _capped(lines: list[str]) -> list[str]:
     if len(lines) <= MAX_LINES:
         return lines
@@ -385,6 +422,10 @@ def render_slack(briefing: Briefing, *, app_url: str | None = None) -> dict[str,
             "Deals with no next step",
             [_stalled_deal_line(d, window) for d in briefing.stalled_deals],
         ),
+        (
+            "Deals past expected close",
+            [_overdue_deal_line(d, window) for d in briefing.overdue_deals],
+        ),
     ]
 
     blocks: list[dict[str, Any]] = [
@@ -399,7 +440,7 @@ def render_slack(briefing: Briefing, *, app_url: str | None = None) -> dict[str,
                     "text": (
                         "Nothing due, nothing overdue, nothing to sweep, "
                         "nobody waiting to be written to, no deal left "
-                        "without a next step. Clear day."
+                        "without a next step or past its close date. Clear day."
                     ),
                 },
             }
@@ -428,6 +469,7 @@ def render_slack(briefing: Briefing, *, app_url: str | None = None) -> dict[str,
             (len(briefing.watches_due), "to sweep"),
             (len(briefing.captures_waiting), "to write"),
             (len(briefing.stalled_deals), "with no next step"),
+            (len(briefing.overdue_deals), "past expected close"),
         ]
         summary = " · ".join(f"{n} {label}" for n, label in counts if n)
     text = f"{window.today:%a} {window.today.day} {window.today:%b}: {summary}"

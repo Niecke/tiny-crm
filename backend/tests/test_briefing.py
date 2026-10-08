@@ -17,7 +17,7 @@ import urllib.error
 import urllib.request
 import uuid
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -372,6 +372,103 @@ async def test_a_stalled_deal_says_who_it_is_with_and_how_long_it_has_sat(
     assert payload["text"] == "Fri 4 Sep: 3 with no next step"
 
 
+async def test_deals_past_their_expected_close_are_listed_furthest_past_first(
+    session_factory: async_sessionmaker[AsyncSession], alice: Account, bob: Account
+) -> None:
+    since = berlin("2026-06-01T09:00")
+    await _seed(
+        session_factory,
+        _deal(alice, "Expired", since, stage="negotiation", expected_close_date=date(2026, 9, 3)),
+        _deal(alice, "Long expired", since, expected_close_date=date(2026, 7, 1)),
+        # Today is not past yet.
+        _deal(alice, "Closing today", since, expected_close_date=date(2026, 9, 4)),
+        _deal(alice, "No date", since, stage="lead"),
+        # Decided either way: the forecast was answered, not missed.
+        _deal(alice, "Lost late", since, stage="lost", expected_close_date=date(2026, 8, 1)),
+        _deal(alice, "Won late", since, stage="won", expected_close_date=date(2026, 8, 1)),
+        # A date on a letter that has not been sent is a plan (#255).
+        _deal(alice, "Unsent", since, stage="draft", expected_close_date=date(2026, 8, 1)),
+        _deal(
+            alice,
+            "Put away",
+            since,
+            expected_close_date=date(2026, 8, 1),
+            archived_at=berlin("2026-08-15T09:00"),
+        ),
+        _deal(bob, "Bob's", since, expected_close_date=date(2026, 8, 1)),
+    )
+
+    briefing = await _briefing_for(session_factory, alice)
+
+    assert [d.title for d in briefing.overdue_deals] == ["Long expired", "Expired"]
+
+
+async def test_a_deal_is_past_its_close_date_on_the_operators_day_not_utcs(
+    session_factory: async_sessionmaker[AsyncSession], alice: Account
+) -> None:
+    await _seed(
+        session_factory,
+        _deal(
+            alice, "Due the 4th", berlin("2026-06-01T09:00"), expected_close_date=date(2026, 9, 4)
+        ),
+    )
+
+    async with session_factory() as session:
+        user = await session.get(User, alice.id)
+        assert user is not None
+        # 23:30Z on the 4th is already the 5th in Berlin.
+        late = DayWindow.containing(datetime(2026, 9, 4, 23, 30, tzinfo=UTC), BERLIN)
+        briefing = await gather_briefing(session, user, late)
+
+    assert [d.title for d in briefing.overdue_deals] == ["Due the 4th"]
+    assert (await _briefing_for(session_factory, alice)).overdue_deals == []
+
+
+async def test_an_expired_forecast_says_who_it_is_with_and_by_how_much(
+    session_factory: async_sessionmaker[AsyncSession], alice: Account
+) -> None:
+    maria = Contact(user_id=alice.id, name="Maria")
+    acme = Organization(user_id=alice.id, name="ACME & Sons")
+    # Each has a task, so none of them is also in "no next step".
+    relaunch = _deal(
+        alice,
+        "Website <relaunch>",
+        berlin("2026-08-01T09:00"),
+        contact=maria,
+        organization=acme,
+        expected_close_date=date(2026, 8, 23),
+    )
+    tender = _deal(
+        alice,
+        "Tender",
+        berlin("2026-08-01T09:00"),
+        stage="negotiation",
+        expected_close_date=date(2026, 9, 3),
+    )
+    await _seed(
+        session_factory,
+        relaunch,
+        tender,
+        _task(alice, "Chase", berlin("2026-09-10T23:59"), deal=relaunch),
+        _task(alice, "Call", berlin("2026-09-10T23:59"), deal=tender),
+    )
+
+    briefing = await _briefing_for(session_factory, alice)
+    payload = render_slack(briefing)
+    text = _text_of(payload)
+
+    assert not briefing.is_empty
+    assert "*Deals past expected close* (2)" in text
+    assert (
+        "• *Website &lt;relaunch&gt;* · Maria · ACME &amp; Sons · proposal"
+        " · _12 days past expected close_" in text
+    )
+    # Singular, not "1 days".
+    assert "• *Tender* · negotiation · _1 day past expected close_" in text
+    # The notification preview counts them, or they never show in it.
+    assert payload["text"] == "Fri 4 Sep: 2 past expected close"
+
+
 async def test_a_clear_day_is_empty(
     session_factory: async_sessionmaker[AsyncSession], alice: Account
 ) -> None:
@@ -690,7 +787,13 @@ async def test_the_endpoint_serves_todays_briefing_with_its_day_counts(
         _interaction(alice, "Forgotten follow-up", berlin("2026-09-01T11:00")),
         _watch(alice, "karriere", berlin("2026-09-04T15:00")),
         _capture(alice, "Jane Doe", berlin("2026-08-20T09:00"), url="https://example.com/jane"),
-        _deal(alice, "Quiet proposal", berlin("2026-08-23T09:00"), contact=contact),
+        _deal(
+            alice,
+            "Quiet proposal",
+            berlin("2026-08-23T09:00"),
+            contact=contact,
+            expected_close_date=date(2026, 9, 1),
+        ),
     )
 
     response = await client.get("/briefing/", headers=alice.headers)
@@ -727,6 +830,15 @@ async def test_the_endpoint_serves_todays_briefing_with_its_day_counts(
         "Maria",
         12,
     )
+    # The same deal, asked a different question: its forecast has expired too.
+    [expired] = body["overdue_deals"]
+    assert (
+        expired["title"],
+        expired["stage"],
+        expired["contact_name"],
+        expired["expected_close_date"],
+        expired["days_overdue"],
+    ) == ("Quiet proposal", "proposal", "Maria", "2026-09-01", 3)
 
 
 async def test_the_endpoints_today_is_the_operators_not_utcs(
@@ -760,7 +872,9 @@ async def test_the_endpoint_shows_nobody_elses_day(
         _interaction(alice, "Alice's meeting", berlin("2026-09-04T10:00")),
         _watch(alice, "alices", berlin("2026-09-01T09:00")),
         _capture(alice, "Alice's capture", berlin("2026-09-01T09:00")),
-        _deal(alice, "Alice's deal", berlin("2026-09-01T09:00")),
+        _deal(
+            alice, "Alice's deal", berlin("2026-09-01T09:00"), expected_close_date=date(2026, 9, 1)
+        ),
     )
 
     body = (await client.get("/briefing/", headers=bob.headers)).json()
@@ -773,5 +887,6 @@ async def test_the_endpoint_shows_nobody_elses_day(
         "watches_due",
         "captures_waiting",
         "stalled_deals",
+        "overdue_deals",
     ):
         assert body[section] == [], section

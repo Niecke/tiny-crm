@@ -54,7 +54,7 @@ from app.archive import live
 from app.briefing import DayWindow, briefing_queries
 from app.db import count_rows
 from app.models import Capture, Deal, DealStageEvent, Interaction, Task
-from app.models.deal import IN_PLAY_STAGES, OPEN_STAGES, WON_STAGES, overdue_on
+from app.models.deal import IN_PLAY_STAGES, OPEN_STAGES, WON_STAGES
 from app.schemas.interaction import InteractionKind
 from app.schemas.metrics import (
     ActivityMetrics,
@@ -369,7 +369,6 @@ async def attention_metrics(
     day = period.day
     briefing = briefing_queries(user_id, day)
 
-    overdue_deals = select(Deal).where(Deal.user_id == user_id, overdue_on(day.today), live(Deal))
     oldest_capture = await session.scalar(
         briefing.captures_waiting.with_only_columns(func.min(Capture.created_at)).order_by(None)
     )
@@ -380,7 +379,7 @@ async def attention_metrics(
             list=ListQuery(path="/deals/", params={"stalled": "true"}),
         ),
         overdue_deals=AttentionRow(
-            count=await count_rows(session, overdue_deals),
+            count=await count_rows(session, briefing.overdue_deals),
             list=ListQuery(path="/deals/", params={"overdue": "true"}),
         ),
         overdue_tasks=AttentionRow(

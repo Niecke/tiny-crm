@@ -91,9 +91,9 @@ the board the day the work starts.
 letter before anything is sent; moving it to `lead` says it went out, and
 starts the clock a lead is chased by. A draft is on the board and in
 `?status=open`, and is left out of everything that counts or chases the
-pipeline: `?stalled`, `?overdue`, the briefing's stalled deals, and the
-dashboard's pipeline, velocity and attention figures. A new deal still starts
-at `lead` unless `draft` is asked for.
+pipeline: `?stalled`, `?overdue`, the briefing's stalled and overdue deals, and
+the dashboard's pipeline, velocity and attention figures. A new deal still
+starts at `lead` unless `draft` is asked for.
 
 **`?status=` is the coarse question** the UI actually asks — `open` (not
 decided yet: drafts and what is still being competed for), `active` (on my
@@ -516,7 +516,8 @@ attach pickers used by every form), `LinkedTasksSection`, `PaginationBar`,
 
 Weekday mornings, 07:00, one Slack message: overdue tasks, what is due today,
 today's planned interactions, planned interactions never confirmed, the sources
-due to be swept, and the people still waiting to be written to.
+due to be swept, the people still waiting to be written to, the deals with no
+next step, and the deals past their expected close date.
 
 `app/briefing.py` gathers and renders, `scripts/send_briefing.py` runs it,
 `charts/tinycrm/templates/briefing-cronjob.yaml` schedules it on the backend
@@ -541,6 +542,14 @@ else in the app would ever surface one, so an inbox nobody opens stays invisible
 until the names in it are cold. Each line carries how long it has waited, which
 is the part that means something: "3 waiting" is a healthy inbox on a Tuesday
 and a broken habit if the oldest is from March.
+
+**Deals past their expected close date** (#117) are the rows of
+`GET /deals/?overdue=true`, furthest past first: in play, with an
+`expected_close_date` before today. One predicate (`overdue_on`) and one query
+(`briefing_queries().overdue_deals`) serve the message, `GET /briefing`, and the
+dashboard's count. A deal can be listed here and under "no next step" at once —
+one asks whether anybody is working it, the other whether its forecast still
+holds.
 
 ```bash
 cd backend

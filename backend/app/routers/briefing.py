@@ -22,6 +22,7 @@ from app.schemas.briefing import (
     BriefingCapture,
     BriefingDeal,
     BriefingInteraction,
+    BriefingOverdueDeal,
     BriefingRead,
     BriefingTask,
     BriefingWatch,
@@ -98,6 +99,20 @@ def _deal(deal: Deal, window: DayWindow) -> BriefingDeal:
     )
 
 
+def _overdue_deal(deal: Deal, window: DayWindow) -> BriefingOverdueDeal:
+    # The query only matches a deal with a date before today.
+    assert deal.expected_close_date is not None
+    return BriefingOverdueDeal(
+        id=deal.id,
+        title=deal.title,
+        stage=deal.stage,
+        contact_name=deal.contact_name,
+        organization_name=deal.organization_name,
+        expected_close_date=deal.expected_close_date,
+        days_overdue=window.days_past(deal.expected_close_date),
+    )
+
+
 def to_read(briefing: Briefing) -> BriefingRead:
     window = briefing.window
     return BriefingRead(
@@ -112,6 +127,7 @@ def to_read(briefing: Briefing) -> BriefingRead:
         watches_due=[_watch(w, window) for w in briefing.watches_due],
         captures_waiting=[_capture(c, window) for c in briefing.captures_waiting],
         stalled_deals=[_deal(d, window) for d in briefing.stalled_deals],
+        overdue_deals=[_overdue_deal(d, window) for d in briefing.overdue_deals],
     )
 
 

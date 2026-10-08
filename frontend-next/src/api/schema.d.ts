@@ -1496,6 +1496,32 @@ export interface components {
             /** Days Late */
             days_late: number;
         };
+        /** BriefingOverdueDeal */
+        BriefingOverdueDeal: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /**
+             * Stage
+             * @enum {string}
+             */
+            stage: "draft" | "lead" | "qualified" | "proposal" | "negotiation" | "won" | "running" | "completed" | "lost";
+            /** Contact Name */
+            contact_name: string | null;
+            /** Organization Name */
+            organization_name: string | null;
+            /**
+             * Expected Close Date
+             * Format: date
+             */
+            expected_close_date: string;
+            /** Days Overdue */
+            days_overdue: number;
+        };
         /** BriefingRead */
         BriefingRead: {
             /**
@@ -1519,6 +1545,8 @@ export interface components {
             captures_waiting: components["schemas"]["BriefingCapture"][];
             /** Stalled Deals */
             stalled_deals: components["schemas"]["BriefingDeal"][];
+            /** Overdue Deals */
+            overdue_deals: components["schemas"]["BriefingOverdueDeal"][];
         };
         /** BriefingTask */
         BriefingTask: {

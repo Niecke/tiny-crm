@@ -76,6 +76,17 @@ class BriefingDeal(BaseModel):
     days_in_stage: int
 
 
+class BriefingOverdueDeal(BaseModel):
+    id: UUID
+    title: str
+    stage: DealStage
+    contact_name: str | None
+    organization_name: str | None
+    expected_close_date: date
+    # Calendar days since the expected close date; at least 1.
+    days_overdue: int
+
+
 class BriefingRead(BaseModel):
     # The day this is for, and whose day: echoed so a client can say "today"
     # and mean the same day the briefing meant.
@@ -89,3 +100,6 @@ class BriefingRead(BaseModel):
     captures_waiting: list[BriefingCapture]
     # Open deals with no open task and nothing planned, longest in stage first.
     stalled_deals: list[BriefingDeal]
+    # In play, expected close before today, furthest past first — the same
+    # rows as GET /deals/?overdue=true.
+    overdue_deals: list[BriefingOverdueDeal]
