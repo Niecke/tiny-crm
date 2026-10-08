@@ -605,8 +605,8 @@ shows an archived row.
 
 - **JWT bearer** via fastapi-users. No register router; accounts come from
   `python -m app.cli create-user` (`app/cli.py`), which mails an invite.
-  `/auth/jwt/login`, `/auth/jwt/refresh`, `/auth/jwt/logout`, `/users/me`,
-  `/users/me/password`.
+  `/auth/jwt/login`, `/auth/jwt/mfa`, `/auth/jwt/refresh`, `/auth/jwt/logout`,
+  `/users/me`, `/users/me/password`, `/users/me/mfa/*`.
 - **Sessions** (#133, `app/auth/sessions.py`): a login opens a row in
   `auth_sessions` and returns a 15-minute access token plus a refresh token.
   The access token names its session (`sid`), and every request checks that
@@ -620,6 +620,21 @@ shows an archived row.
   stays); a password reset (all of them). Both clients renew the access token
   shortly before it expires and retry once on a 401, so a stale tab recovers
   by itself.
+- **Two-factor sign-in** (#18, `app/auth/mfa.py`): TOTP from an authenticator
+  app, turned on from the account page (`/users/me/mfa/setup` → scan →
+  `/users/me/mfa/confirm` with the first code). With it on, a correct password
+  gets a challenge (`mfa_required`, a 5-minute `mfa_token`) instead of tokens,
+  and `/auth/jwt/mfa` trades that plus a code for the session. Codes are
+  single-use (the matched time step is stored); wrong codes count against the
+  same per-address limit and per-account backoff as wrong passwords, and the
+  backoff only clears once the code is right. Ten single-use **recovery codes**
+  (stored as SHA-256) are issued on setup and replaced via
+  `/users/me/mfa/recovery-codes` (password). Turning it off needs password
+  and code (`/users/me/mfa/disable`); turning it on or off ends every other
+  session. A password reset leaves MFA on. The secret is encrypted with a key
+  derived from `JWT_SECRET` — **rotating it voids every stored secret**, and
+  those accounts sign in with a recovery code. Last resort:
+  `python -m app.cli disable-mfa <email>`.
 - **Password reset** (#128): `/auth/forgot-password` mails a link through
   Brevo (`app/mail.py`); `/auth/reset-password` redeems it. The pages are
   frontend-next only: `/next/forgot-password` (linked from sign-in) and

@@ -8,7 +8,7 @@ export const Route = createFileRoute('/_authed/account/')({
   component: AccountPage,
 })
 
-// Who is signed in, and the one thing they can change about it. The guard has
+// Who is signed in, and the two things they can change about it. The guard has
 // already loaded /users/me, so this renders from the cache without a request.
 function AccountPage() {
   const { api } = Route.useRouteContext()
@@ -41,6 +41,15 @@ function AccountPage() {
                   <span className="muted">Never changed</span>
                 )}
               </Row>
+              <Row label="Two-factor sign-in">
+                {me.mfa_enabled_at ? (
+                  <>
+                    On <span className="muted">· since {formatDateTime(me.mfa_enabled_at)}</span>
+                  </>
+                ) : (
+                  <span className="muted">Off</span>
+                )}
+              </Row>
             </ul>
           </div>
         </section>
@@ -49,6 +58,9 @@ function AccountPage() {
       <div className="form-actions account-actions">
         <Link to="/system" className="button button-quiet">
           System status
+        </Link>
+        <Link to="/account/mfa" className="button button-quiet">
+          Two-factor sign-in
         </Link>
         <Link to="/account/password" className="button">
           Change password

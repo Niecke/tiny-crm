@@ -31,6 +31,10 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 LOGIN_PATH = "/auth/jwt/login"
+# The second sign-in step (app/auth/mfa.py): a wrong code costs what a wrong
+# password does.
+MFA_PATH = "/auth/jwt/mfa"
+_GUESS_PATHS = frozenset({LOGIN_PATH, MFA_PATH})
 
 # Client address -> timestamps of its recent failed logins, oldest first.
 _failures: dict[str, deque[float]] = {}
@@ -155,7 +159,7 @@ async def count_failed_logins(request: Request, call_next: RequestResponseEndpoi
     """
     response: Response = await call_next(request)
 
-    if request.url.path == LOGIN_PATH and response.status_code == _BAD_CREDENTIALS_STATUS:
+    if request.url.path in _GUESS_PATHS and response.status_code == _BAD_CREDENTIALS_STATUS:
         ip = _client_ip(request)
         record_failed_login(ip)
         logger.warning(

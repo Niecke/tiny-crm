@@ -3,13 +3,22 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.auth import current_active_user
+from app.auth import current_active_user, mfa
 from app.auth.sessions import close_sessions
 from app.auth.users import User, UserManager, current_session_id, get_user_manager
-from app.schemas.user import PasswordChange, UserRead
+from app.schemas.user import (
+    MfaCode,
+    MfaDisable,
+    MfaPassword,
+    MfaRecoveryCodes,
+    MfaSetup,
+    PasswordChange,
+    UserRead,
+)
 
 # The account's own endpoints. Deliberately no PATCH /users/me: nothing about an
-# account is editable except the password, and that needs the old one.
+# account is editable except the password, and that needs the old one — and
+# two-factor sign-in, which needs the password or a code to change.
 router = APIRouter(prefix="/users", tags=["users"])
 
 
@@ -43,4 +52,85 @@ async def change_password(
         user,
         {"hashed_password": new_hash, "password_changed_at": datetime.now(UTC)},
     )
+    await close_sessions(user_manager.db, user.id, keep=session_id)
+
+
+def _check_password(user_manager: UserManager, user: User, password: str) -> None:
+    verified, _ = user_manager.password_helper.verify_and_update(password, user.hashed_password)
+    if not verified:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="PASSWORD_INCORRECT")
+
+
+def _conflict(detail: str) -> HTTPException:
+    return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
+
+
+# Two-factor sign-in (app/auth/mfa.py has the design). Setup and confirm need
+# no password: the caller is signed in, and nothing changes for them until a
+# code from the new authenticator proves it works. Turning it on or off ends
+# every other session, as a password change does.
+
+
+@router.post("/me/mfa/setup", response_model=MfaSetup)
+async def start_mfa_setup(
+    user: User = Depends(current_active_user),
+    user_manager: UserManager = Depends(get_user_manager),
+) -> MfaSetup:
+    """Store a new pending secret, replacing any earlier unconfirmed one."""
+    if mfa.is_enabled(user):
+        raise _conflict("MFA_ALREADY_ENABLED")
+    secret = mfa.new_secret()
+    await user_manager.user_db.update(user, {"mfa_secret": mfa.seal(secret)})
+    return MfaSetup(secret=secret, otpauth_uri=mfa.provisioning_uri(user.email, secret))
+
+
+@router.post("/me/mfa/confirm", response_model=MfaRecoveryCodes)
+async def confirm_mfa_setup(
+    body: MfaCode,
+    user: User = Depends(current_active_user),
+    session_id: UUID = Depends(current_session_id),
+    user_manager: UserManager = Depends(get_user_manager),
+) -> MfaRecoveryCodes:
+    """Turn MFA on with the first code from the authenticator."""
+    if mfa.is_enabled(user):
+        raise _conflict("MFA_ALREADY_ENABLED")
+    secret = mfa.unseal(user.mfa_secret) if user.mfa_secret else None
+    if secret is None:
+        raise _conflict("MFA_SETUP_NOT_STARTED")
+    step = mfa.matching_step(secret, body.code)
+    if step is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="MFA_CODE_INVALID")
+    codes = await mfa.enable(user_manager.db, user, step)
+    await close_sessions(user_manager.db, user.id, keep=session_id)
+    return MfaRecoveryCodes(recovery_codes=codes)
+
+
+@router.post("/me/mfa/recovery-codes", response_model=MfaRecoveryCodes)
+async def replace_recovery_codes(
+    body: MfaPassword,
+    user: User = Depends(current_active_user),
+    user_manager: UserManager = Depends(get_user_manager),
+) -> MfaRecoveryCodes:
+    """A fresh set of recovery codes; the old set stops working."""
+    if not mfa.is_enabled(user):
+        raise _conflict("MFA_NOT_ENABLED")
+    _check_password(user_manager, user, body.password)
+    codes = await mfa.replace_recovery_codes(user_manager.db, user.id)
+    return MfaRecoveryCodes(recovery_codes=codes)
+
+
+@router.post("/me/mfa/disable", status_code=status.HTTP_204_NO_CONTENT)
+async def disable_mfa(
+    body: MfaDisable,
+    user: User = Depends(current_active_user),
+    session_id: UUID = Depends(current_session_id),
+    user_manager: UserManager = Depends(get_user_manager),
+) -> None:
+    """Turn MFA off. Needs both factors: a stolen session alone cannot."""
+    if not mfa.is_enabled(user):
+        raise _conflict("MFA_NOT_ENABLED")
+    _check_password(user_manager, user, body.password)
+    if not await mfa.claim_code(user_manager.db, user, body.code):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="MFA_CODE_INVALID")
+    await mfa.disable(user_manager.db, user.id)
     await close_sessions(user_manager.db, user.id, keep=session_id)

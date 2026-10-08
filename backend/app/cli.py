@@ -5,6 +5,7 @@
     printf '%s\n' "$PW" | python -m app.cli create-user you@example.com --set-password
     python -m app.cli invite you@example.com                       # send again
     python -m app.cli unlock you@example.com                       # end a login lock
+    python -m app.cli disable-mfa you@example.com                  # lost authenticator
 
 Run from the backend directory (/app in the image), so `app` is importable.
 Reads the same environment as the API: DATABASE_URL, and for mail
@@ -31,6 +32,7 @@ from pydantic import ValidationError
 # The whole model registry, not just User: SQLAlchemy configures mappers against
 # all of it on first query, and a relationship naming an unimported model fails.
 import app.models  # noqa: F401
+from app.auth import mfa
 from app.auth.throttle import clear_login, clear_reset_mail
 from app.auth.users import User, UserManager
 from app.config import settings
@@ -115,6 +117,17 @@ async def _unlock(email: str) -> None:
         typer.echo(f"Nothing to clear for {email}.")
 
 
+async def _disable_mfa(email: str) -> None:
+    async with _user_manager() as manager:
+        user = await manager.user_db.get_by_email(email)
+        if user is None:
+            raise _fail(f"no user with the address {email}")
+        if await mfa.disable(manager.db, user.id):
+            typer.echo(f"Two-factor sign-in turned off for {user.email}.")
+        else:
+            typer.echo(f"{user.email} has no two-factor sign-in to turn off.")
+
+
 @cli.command("create-user")
 def create_user(
     email: str,
@@ -161,6 +174,16 @@ def unlock(email: str) -> None:
     The address need not have an account: failures are counted per address.
     """
     asyncio.run(_unlock(email))
+
+
+@cli.command("disable-mfa")
+def disable_mfa(email: str) -> None:
+    """Turn off two-factor sign-in for an account, dropping its recovery codes.
+
+    For someone who lost both the authenticator and the recovery codes. Their
+    password still applies; they can set MFA up again from the account page.
+    """
+    asyncio.run(_disable_mfa(email))
 
 
 if __name__ == "__main__":

@@ -17,7 +17,7 @@ from fastapi_users.authentication.strategy import StrategyDestroyNotSupportedErr
 from fastapi_users.db import SQLAlchemyBaseUserTableUUID, SQLAlchemyUserDatabase
 from fastapi_users.exceptions import UserInactive
 from fastapi_users.jwt import generate_jwt
-from sqlalchemy import DateTime, String
+from sqlalchemy import BigInteger, DateTime, String
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -43,6 +43,12 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     password_changed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # Two-factor sign-in (app/auth/mfa.py). The secret is sealed, never plain;
+    # set without `mfa_enabled_at` it is a setup still waiting for its first code.
+    mfa_secret: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    mfa_enabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # The TOTP time step last accepted, so a code is good once.
+    mfa_last_step: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
 
 async def get_user_db(

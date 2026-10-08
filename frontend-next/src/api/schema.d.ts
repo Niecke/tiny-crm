@@ -1071,6 +1071,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/jwt/mfa": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Verify Mfa */
+        post: operations["verify_mfa_auth_jwt_mfa_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/jwt/refresh": {
         parameters: {
             query?: never;
@@ -1208,6 +1225,86 @@ export interface paths {
          *     point when the reason for the change is a lost laptop.
          */
         post: operations["change_password_users_me_password_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/me/mfa/setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Mfa Setup
+         * @description Store a new pending secret, replacing any earlier unconfirmed one.
+         */
+        post: operations["start_mfa_setup_users_me_mfa_setup_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/me/mfa/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Mfa Setup
+         * @description Turn MFA on with the first code from the authenticator.
+         */
+        post: operations["confirm_mfa_setup_users_me_mfa_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/me/mfa/recovery-codes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Replace Recovery Codes
+         * @description A fresh set of recovery codes; the old set stops working.
+         */
+        post: operations["replace_recovery_codes_users_me_mfa_recovery_codes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/me/mfa/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Disable Mfa
+         * @description Turn MFA off. Needs both factors: a stolen session alone cannot.
+         */
+        post: operations["disable_mfa_users_me_mfa_disable_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2430,6 +2527,65 @@ export interface components {
             /** Field */
             field?: string | null;
         };
+        /**
+         * MfaChallenge
+         * @description What a login answers instead of a TokenPair when the account has MFA on
+         *     (app/auth/mfa.py). Trade `mfa_token` and a code at /auth/jwt/mfa.
+         */
+        MfaChallenge: {
+            /**
+             * Mfa Required
+             * @default true
+             * @constant
+             */
+            mfa_required: true;
+            /** Mfa Token */
+            mfa_token: string;
+            /** Expires In */
+            expires_in: number;
+        };
+        /** MfaCode */
+        MfaCode: {
+            /** Code */
+            code: string;
+        };
+        /** MfaDisable */
+        MfaDisable: {
+            /** Password */
+            password: string;
+            /** Code */
+            code: string;
+        };
+        /** MfaPassword */
+        MfaPassword: {
+            /** Password */
+            password: string;
+        };
+        /**
+         * MfaRecoveryCodes
+         * @description Shown once. Only their hashes are kept.
+         */
+        MfaRecoveryCodes: {
+            /** Recovery Codes */
+            recovery_codes: string[];
+        };
+        /**
+         * MfaSetup
+         * @description A pending secret: shown as a QR code, confirmed with its first code.
+         */
+        MfaSetup: {
+            /** Secret */
+            secret: string;
+            /** Otpauth Uri */
+            otpauth_uri: string;
+        };
+        /** MfaVerifyBody */
+        MfaVerifyBody: {
+            /** Mfa Token */
+            mfa_token: string;
+            /** Code */
+            code: string;
+        };
         /** MoneyByCurrency */
         MoneyByCurrency: {
             /** Currency */
@@ -3218,6 +3374,8 @@ export interface components {
             name?: string | null;
             /** Password Changed At */
             password_changed_at?: string | null;
+            /** Mfa Enabled At */
+            mfa_enabled_at?: string | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -5953,11 +6111,62 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
+                    "application/json": components["schemas"]["TokenPair"] | components["schemas"]["MfaChallenge"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_mfa_auth_jwt_mfa_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MfaVerifyBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
                     "application/json": components["schemas"]["TokenPair"];
                 };
             };
             /** @description Bad Request */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -6229,6 +6438,123 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["PasswordChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_mfa_setup_users_me_mfa_setup_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MfaSetup"];
+                };
+            };
+        };
+    };
+    confirm_mfa_setup_users_me_mfa_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MfaCode"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MfaRecoveryCodes"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    replace_recovery_codes_users_me_mfa_recovery_codes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MfaPassword"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MfaRecoveryCodes"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    disable_mfa_users_me_mfa_disable_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MfaDisable"];
             };
         };
         responses: {

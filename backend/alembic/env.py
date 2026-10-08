@@ -14,6 +14,7 @@ from app.config import settings  # noqa: F401
 from app.logging_config import configure_logging
 from app import models as _models  # noqa: F401
 from app.auth import users as _auth  # noqa: F401
+from app.auth import mfa as _mfa  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)
