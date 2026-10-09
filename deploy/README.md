@@ -343,6 +343,13 @@ backend:
 
 The photos are sent to Anthropic to be read and are not stored anywhere.
 
+The model that reads them is `backend.businessCards.model` (default
+`claude-opus-5-5`). It is not secret, so set it under `values:` in
+`deploy/flux/prod/helmrelease.yaml` — or in `tinycrm-values`, if you would
+rather not commit it. Either change rolls the backend pods with the new
+`BUSINESS_CARD_MODEL`; no new image or release is needed. Each scan shows the
+model and tokens it used on the review screen, to compare the cost.
+
 ### Turning on mail
 
 Invites and password-reset links go out through Brevo's API (`app/mail.py`).

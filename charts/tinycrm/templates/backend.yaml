@@ -116,6 +116,10 @@ spec:
             {{- end }}
             - name: MAIL_FROM_NAME
               value: {{ .Values.backend.mail.fromName | quote }}
+            # The Claude model that reads scanned business cards. A values
+            # change, not a release, to trade cost against accuracy.
+            - name: BUSINESS_CARD_MODEL
+              value: {{ .Values.backend.businessCards.model | quote }}
           # readiness only. /health runs SELECT 1 and returns 503 when the
           # database is unreachable — correct for pulling a pod out of the
           # Service, wrong for liveness, where it would restart every backend

@@ -99,6 +99,10 @@ backend:
   businessCards:
     # A bearer credential: it belongs in the cluster Secret, never in git.
     anthropicApiKey: ""
+    # The model that reads the cards. Not secret — set it under `values:` in the
+    # HelmRelease (or in tinycrm-values); either way it rolls the backend pods
+    # without a new image. claude-haiku-5-5 costs a fraction of this.
+    model: claude-opus-5-5
 
   resources:
     requests:
