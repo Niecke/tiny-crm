@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.0](https://github.com/Niecke/tiny-crm/compare/v0.2.0...v0.3.0) (2026-10-09)
+
+
+### Features
+
+* add two-factor sign-in with TOTP authenticator apps ([#274](https://github.com/Niecke/tiny-crm/issues/274)) ([245784d](https://github.com/Niecke/tiny-crm/commit/245784d493ba76ce99a6d0bbede4a6fa8a1eb5c8))
+* business card scanner ([#276](https://github.com/Niecke/tiny-crm/issues/276)) ([0a24784](https://github.com/Niecke/tiny-crm/commit/0a24784cca99980ca76a270a0aefb346ddbe5917))
+* log access requests as separate JSON fields ([#281](https://github.com/Niecke/tiny-crm/issues/281)) ([bc27a62](https://github.com/Niecke/tiny-crm/commit/bc27a623091f86d19b9cc64d6eb1644693c03b88))
+
+
+### Bug Fixes
+
+* align the Scan card button and log every failed card read ([#279](https://github.com/Niecke/tiny-crm/issues/279)) ([d76a2d9](https://github.com/Niecke/tiny-crm/commit/d76a2d929ac996801c29af355991007f85356611))
+* let the scan create a company the card reader did not recognise ([#284](https://github.com/Niecke/tiny-crm/issues/284)) ([7f67e28](https://github.com/Niecke/tiny-crm/commit/7f67e28f45968c3bd402b1d69aed8997a11328cd))
+* mark every business card field required so the schema is accepted ([#282](https://github.com/Niecke/tiny-crm/issues/282)) ([c26c0fb](https://github.com/Niecke/tiny-crm/commit/c26c0fb8ba4d3003f93d937fd116b09aaad98ed8))
+
 ## [0.2.0](https://github.com/Niecke/tiny-crm/compare/v0.1.0...v0.2.0) (2026-10-08)
 
 
