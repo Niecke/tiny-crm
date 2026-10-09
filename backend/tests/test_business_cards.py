@@ -427,13 +427,32 @@ async def test_the_claude_reader_sends_both_sides_and_parses_the_answer() -> Non
     images = [block for block in content if block["type"] == "image"]
     assert [image["source"]["media_type"] for image in images] == ["image/jpeg", "image/png"]
     assert sent[0]["model"] == "claude-opus-5-5"
+    # The JSON is asked for in the instructions, not with structured output:
+    # with this field list the API never answered (#262).
+    assert "format" not in sent[0].get("output_config", {})
+    assert '"organization_email"' in sent[0]["system"]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        '```json\n{"name": "Ada", "postal_code": 1010}\n```',
+        'Here is the card:\n{"name": "Ada", "postal_code": "1010"}',
+    ],
+)
+async def test_the_claude_reader_takes_the_json_out_of_a_wrapped_answer(text: str) -> None:
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(200, json=_message(text))
+
+    read = await _claude(handler).read([CardImage(JPEG, "image/jpeg")])
+    assert read.reading == CardReading(name="Ada", postal_code="1010")
 
 
 @pytest.mark.parametrize(
     ("text", "stop_reason"),
     [
-        # A refusal carries no JSON, so the SDK's parser fails before returning.
         ("", "refusal"),
+        ("I cannot read this card.", "end_turn"),
         ('{"name": "Ada', "max_tokens"),
         (READING.model_dump_json(), "refusal"),
     ],

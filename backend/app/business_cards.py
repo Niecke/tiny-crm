@@ -23,7 +23,7 @@ from typing import Literal, Protocol
 
 import anthropic
 import httpx2
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from app.config import settings
 
@@ -70,7 +70,14 @@ class CardReading(BaseModel):
     """What the model reads off the card. Every field is optional: a card
     without a street address is normal, and a guess would be worse than a gap.
 
+    The model is asked for this as JSON and the answer is checked here, not
+    by the API's structured output: with this many optional fields the API
+    never finished preparing the format, and every read timed out (#262).
+
     The descriptions are the model's instructions for each field."""
+
+    # A postcode or phone number may come back as a JSON number.
+    model_config = ConfigDict(coerce_numbers_to_str=True)
 
     name: str | None = Field(None, description="The person's full name, as printed.")
     job_title: str | None = Field(None, description="The person's role or title.")
@@ -118,6 +125,30 @@ country is clear. Keep a person's own email and number apart from the company's 
 shared ones (office@, info@, a switchboard). Leave a field empty when the card \
 does not show it; never invent or complete a value. If the photos do not show a \
 business card, leave every field empty."""
+
+
+def _answer_format() -> str:
+    """The JSON the model is asked for, one line per field with what goes in it."""
+    lines = [
+        f'- "{name}": {field.description or name.replace("_", " ")}'
+        for name, field in CardReading.model_fields.items()
+    ]
+    return (
+        "Answer with one JSON object and nothing else — no prose, no code fence. "
+        "Use these keys, with null for anything the card does not show:\n" + "\n".join(lines)
+    )
+
+
+INSTRUCTIONS = f"{SYSTEM_PROMPT}\n\n{_answer_format()}"
+
+
+def parse_reading(text: str) -> CardReading:
+    """The model's answer as a CardReading. Tolerates a code fence or a word
+    around the object; raises ValidationError for anything that is not one."""
+    start, end = text.find("{"), text.rfind("}")
+    if start != -1 and end > start:
+        text = text[start : end + 1]
+    return CardReading.model_validate_json(text)
 
 
 class CardReadError(RuntimeError):
@@ -186,12 +217,11 @@ class ClaudeCardReader:
         content.append({"type": "text", "text": "Read this business card."})
 
         try:
-            response = await self._client.beta.messages.parse(
+            response = await self._client.beta.messages.create(
                 model=self._model,
                 max_tokens=4096,
-                system=SYSTEM_PROMPT,
+                system=INSTRUCTIONS,
                 messages=[{"role": "user", "content": content}],
-                output_format=CardReading,
                 # Transcription, not reasoning: the low end is plenty, and the
                 # operator is waiting on the answer.
                 output_config={"effort": "low"},
@@ -218,19 +248,22 @@ class ClaudeCardReader:
             if isinstance(exc, anthropic.RateLimitError):
                 raise CardReadError("The card reader is busy — try again in a minute.") from None
             raise CardReadError("The card reader refused the request.") from None
-        except ValidationError:
-            # A refusal or a cut-off answer is not the JSON the schema asks
-            # for, and the SDK's parser gives up on it before returning.
-            logger.error("Business card read returned no usable answer")
-            raise CardReadError("The card reader gave no usable answer — try again.") from None
 
         if response.stop_reason == "refusal":
             logger.error("Business card read declined by %s", response.model)
             raise CardReadError("The card reader declined to read these photos.")
-        reading = response.parsed_output
-        if reading is None:
-            logger.error("Business card read stopped with %s", response.stop_reason)
-            raise CardReadError("The card reader gave no usable answer — try again.")
+        text = "".join(block.text for block in response.content if block.type == "text")
+        try:
+            reading = parse_reading(text)
+        except ValidationError:
+            # Cut off at max_tokens, or not the JSON asked for. Neither the
+            # answer nor its errors are logged: both hold what the card says.
+            logger.error(
+                "Business card read gave no usable answer: stop %s, %d characters",
+                response.stop_reason,
+                len(text),
+            )
+            raise CardReadError("The card reader gave no usable answer — try again.") from None
         usage = CardReadUsage(
             model=response.model,
             input_tokens=response.usage.input_tokens,

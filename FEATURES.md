@@ -92,9 +92,12 @@ and the photos are not kept. `import` files the corrected draft: either a new
 created in one transaction so a refused contact never leaves a company behind.
 
 **The reading is Claude's.** `app/business_cards.py` sends the photos to the
-Anthropic API (`ANTHROPIC_API_KEY`, model `BUSINESS_CARD_MODEL`) and gets back a
-fixed schema rather than a column of OCR text — the hard part of a card is which
-line is the person and which number the switchboard. Without a key `scan` is a
+Anthropic API (`ANTHROPIC_API_KEY`, model `BUSINESS_CARD_MODEL`) and gets back
+named fields rather than a column of OCR text — the hard part of a card is which
+line is the person and which number the switchboard. The fields are asked for
+as JSON in the instructions and checked by the backend (`CardReading`), not
+with the API's structured output: with this many optional fields that never
+answered, and every read timed out. Without a key `scan` is a
 **503** naming the variable. A failed or declined read is a **502** with a
 message the screen shows as is; neither the photos nor the reading reach a log.
 Every scan also returns `usage` — the model that answered (after a refusal
