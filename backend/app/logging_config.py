@@ -10,10 +10,50 @@ from typing import Any
 # Shared with uvicorn via `--log-config` so the reloader process logs JSON too.
 LOG_CONFIG_PATH = Path(__file__).resolve().parent.parent / "log_config.json"
 
+ACCESS_LOGGER = "uvicorn.access"
+
+
+def _access_fields(record: logging.LogRecord) -> dict[str, Any] | None:
+    """Splits a uvicorn access record into one field per value.
+
+    uvicorn logs every request as '%s - "%s %s HTTP/%s" %d' and passes the client
+    address, method, path with query string, HTTP version and status as args, so
+    the values are read from there instead of parsed back out of the message.
+    Any other shape returns None and the record is rendered flat: a uvicorn
+    release that changes the call should cost the fields, not the log line.
+    """
+    args = record.args
+    if record.name != ACCESS_LOGGER or not isinstance(args, tuple) or len(args) != 5:
+        return None
+    client_addr, method, full_path, http_version, status = args
+    if not isinstance(status, int):
+        return None
+
+    fields: dict[str, Any] = {}
+    # "host:port". An IPv6 host has colons of its own, so split on the last one.
+    # Empty when uvicorn has no peer address to report (a unix socket). The host
+    # is the real client behind a trusted proxy, see _client_ip in ratelimit.py.
+    host, _, port = str(client_addr).rpartition(":")
+    if host and port.isdigit():
+        fields["source_ip"] = host
+        # X-Forwarded-For names a host and no port, so for a proxied request
+        # uvicorn reports port 0. That is every request in the cluster.
+        if int(port):
+            fields["source_port"] = int(port)
+    path, _, query = str(full_path).partition("?")
+    fields["http_method"] = str(method)
+    fields["http_path"] = path
+    if query:
+        fields["http_query"] = query
+    fields["http_version"] = str(http_version)
+    fields["http_status"] = status
+    return fields
+
 
 class JsonFormatter(logging.Formatter):
     """Renders each log record as a single-line JSON object with consistent base
-    fields so output is machine-parseable."""
+    fields so output is machine-parseable. Access records additionally carry the
+    request as separate fields, see _access_fields()."""
 
     def format(self, record: logging.LogRecord) -> str:
         payload: dict[str, Any] = {
@@ -25,6 +65,14 @@ class JsonFormatter(logging.Formatter):
             # getMessage() applies %-style args (e.g. logger.error("... %s", x))
             "message": record.getMessage(),
         }
+        access = _access_fields(record)
+        if access is not None:
+            # The address and version now have fields of their own; what stays is
+            # the part worth reading in `kubectl logs`.
+            payload["message"] = (
+                f"{access['http_method']} {access['http_path']} {access['http_status']}"
+            )
+            payload.update(access)
         if record.exc_info:
             payload["exception"] = self.formatException(record.exc_info)
         return json.dumps(payload, default=str)

@@ -47,6 +47,20 @@ cd backend
 uv run uvicorn app.main:app --reload --log-config log_config.json
 ```
 
+The backend logs one JSON object per line. Every line has `timestamp`,
+`timestamp_str`, `log_level`, `logger` and `message`, plus `exception` when
+there is a traceback. Access lines (`"logger": "uvicorn.access"`) carry the
+request as fields of their own:
+
+```json
+{"timestamp": 1791542947, "timestamp_str": "2026-10-09T10:49:07.656789+00:00", "log_level": "INFO", "logger": "uvicorn.access", "message": "GET /contacts/ 200", "source_ip": "10.42.0.1", "source_port": 38084, "http_method": "GET", "http_path": "/contacts/", "http_query": "search=acme", "http_version": "1.1", "http_status": 200}
+```
+
+`http_query` is there only when the request has a query string. Behind the
+ingress `source_ip` is the browser's address, not the proxy's, as long as
+`FORWARDED_ALLOW_IPS` covers the proxy; such a line has no `source_port`,
+because `X-Forwarded-For` does not carry one.
+
 Run the React client locally (see [frontend-next/README.md](frontend-next/README.md))
 ```bash
 cd frontend-next
