@@ -234,13 +234,28 @@ const toDefaults = (scan: BusinessCardScan): FormInput => {
     // A company already on file wins over making a second one.
     company: scan.match ? 'existing' : o ? 'new' : 'none',
     organization_id: scan.match?.id ?? null,
+    // With no company read, "New company" starts from what the card does
+    // show: the website's domain and the address printed on it.
     org_name: o?.name ?? '',
-    org_domain: o?.domain ?? '',
+    org_domain: o ? (o.domain ?? '') : hostOf(c.website),
     org_email: o?.email ?? '',
     org_phone: o?.phone ?? '',
-    org_address: o?.address ?? '',
+    org_address: o ? (o.address ?? '') : addressOf(c),
   }
 }
+
+// `https://www.acme.example/team` → `acme.example`; '' for anything else.
+const hostOf = (website: string | null | undefined) => {
+  if (!website) return ''
+  try {
+    return new URL(website.includes('://') ? website : `https://${website}`).hostname.replace(/^www\./, '')
+  } catch {
+    return ''
+  }
+}
+
+const addressOf = (c: BusinessCardScan['contact']) =>
+  [c.street, [c.postal_code, c.city].filter(Boolean).join(' '), c.country].filter(Boolean).join(', ')
 
 const toBody = (v: FormOutput): BusinessCardImport => ({
   contact: {
@@ -301,9 +316,11 @@ function CardReview({
     },
   })
 
+  // "New company" is always offered: a brand printed without GmbH or e.U.
+  // may not have been read as a company, and the operator knows better.
   const companyOptions: { value: CompanyChoice; label: string }[] = [
     { value: 'existing', label: 'On file' },
-    ...(scan.organization ? [{ value: 'new' as const, label: 'New company' }] : []),
+    { value: 'new', label: 'New company' },
     { value: 'none', label: 'No company' },
   ]
 
