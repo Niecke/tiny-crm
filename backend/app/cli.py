@@ -6,6 +6,7 @@
     python -m app.cli invite you@example.com                       # send again
     python -m app.cli unlock you@example.com                       # end a login lock
     python -m app.cli disable-mfa you@example.com                  # lost authenticator
+    python -m app.cli ping-worker                                  # is the worker running?
 
 Run from the backend directory (/app in the image), so `app` is importable.
 Reads the same environment as the API: DATABASE_URL, and for mail
@@ -20,6 +21,7 @@ from __future__ import annotations
 import asyncio
 import secrets
 import sys
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Annotated
@@ -27,6 +29,7 @@ from typing import Annotated
 import typer
 from fastapi_users.db import SQLAlchemyUserDatabase
 from fastapi_users.exceptions import InvalidPasswordException, UserAlreadyExists
+from procrastinate.jobs import Status
 from pydantic import ValidationError
 
 # The whole model registry, not just User: SQLAlchemy configures mappers against
@@ -37,6 +40,7 @@ from app.auth.throttle import clear_login, clear_reset_mail
 from app.auth.users import User, UserManager
 from app.config import settings
 from app.db import _session_factory
+from app.jobs import jobs_app, ping
 from app.logging_config import configure_logging
 from app.mail import MailDeliveryError, get_mail_sender
 from app.schemas.user import UserCreate
@@ -128,6 +132,31 @@ async def _disable_mfa(email: str) -> None:
             typer.echo(f"{user.email} has no two-factor sign-in to turn off.")
 
 
+async def _ping_worker(queues: list[str], timeout: float) -> None:
+    async with jobs_app.open_async():
+        started = time.monotonic()
+        waiting = {
+            queue: await ping.configure(queue=queue).defer_async()
+            for queue in dict.fromkeys(queues)
+        }
+        while waiting:
+            for queue, job_id in list(waiting.items()):
+                status = await jobs_app.job_manager.get_job_status_async(job_id)
+                if status is Status.SUCCEEDED:
+                    del waiting[queue]
+                    typer.echo(f"{queue}: answered after {time.monotonic() - started:.1f}s.")
+                elif status not in (Status.TODO, Status.DOING):
+                    raise _fail(f"{queue}: the ping job ended as {status.value}")
+            if waiting and time.monotonic() - started > timeout:
+                # The jobs stay queued and run when a worker comes up; they
+                # do nothing, so there is no reason to cancel them.
+                raise _fail(
+                    f"no worker took a job from {', '.join(waiting)} within {timeout:g}s — "
+                    "is `python -m app.worker` running, and does WORKER_POOLS list the queue?"
+                )
+            await asyncio.sleep(0.2)
+
+
 @cli.command("create-user")
 def create_user(
     email: str,
@@ -184,6 +213,28 @@ def disable_mfa(email: str) -> None:
     password still applies; they can set MFA up again from the account page.
     """
     asyncio.run(_disable_mfa(email))
+
+
+@cli.command("ping-worker")
+def ping_worker(
+    queue: Annotated[
+        list[str] | None,
+        typer.Option(help="Queue to ping; repeat for several. Default: every queue in a pool."),
+    ] = None,
+    timeout: Annotated[float, typer.Option(help="Seconds to wait for the answers.")] = 30,
+) -> None:
+    """Check that the background worker is taking jobs.
+
+    Queues a job that does nothing on each queue and waits for it to be done:
+    proof of the queue's schema, of a running worker and of a pool serving that
+    queue. An answer well under five seconds also means the worker heard about
+    the job (LISTEN/NOTIFY) instead of finding it on its next poll.
+
+    The queues come from this process's WORKER_POOLS, which is the worker's
+    only if both read the same environment — name them with --queue otherwise.
+    """
+    queues = queue or [name for pool in settings.worker_pools for name in pool.queues]
+    asyncio.run(_ping_worker(queues, timeout))
 
 
 if __name__ == "__main__":

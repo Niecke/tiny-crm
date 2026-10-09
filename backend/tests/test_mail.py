@@ -11,6 +11,8 @@ from app.mail import (
     BrevoSender,
     Mail,
     MailDeliveryError,
+    PermanentMailError,
+    TransientMailError,
     get_mail_sender,
     invite_mail,
 )
@@ -53,7 +55,8 @@ async def test_a_refusal_raises_without_the_key_or_the_body() -> None:
     def handler(request: httpx2.Request) -> httpx2.Response:
         return httpx2.Response(401, json={"code": "unauthorized", "message": "Key not found"})
 
-    with pytest.raises(MailDeliveryError) as raised:
+    # Permanent: the worker must not retry a key Brevo does not know.
+    with pytest.raises(PermanentMailError) as raised:
         await _sender(httpx2.MockTransport(handler)).send(MAIL)
 
     assert "401" in str(raised.value)
@@ -65,8 +68,35 @@ async def test_an_unreachable_brevo_raises() -> None:
     def handler(request: httpx2.Request) -> httpx2.Response:
         raise httpx2.ConnectError("connection refused", request=request)
 
-    with pytest.raises(MailDeliveryError, match="could not reach Brevo"):
+    with pytest.raises(TransientMailError, match="could not reach Brevo"):
         await _sender(httpx2.MockTransport(handler)).send(MAIL)
+
+
+@pytest.mark.parametrize(
+    ("status", "error"),
+    [
+        # Brevo's own trouble, or its rate limit: later may work.
+        (500, TransientMailError),
+        (503, TransientMailError),
+        (429, TransientMailError),
+        # About this request: asking again changes nothing.
+        (400, PermanentMailError),
+        (401, PermanentMailError),
+        (403, PermanentMailError),
+        # Not the 201 a sent mail gets, and nothing a retry would turn into one.
+        (200, PermanentMailError),
+    ],
+)
+async def test_the_status_decides_whether_a_retry_can_help(
+    status: int, error: type[MailDeliveryError]
+) -> None:
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(status, json={"code": "x", "message": "y"})
+
+    with pytest.raises(MailDeliveryError) as raised:
+        await _sender(httpx2.MockTransport(handler)).send(MAIL)
+
+    assert type(raised.value) is error
 
 
 def test_the_html_escapes_the_name_and_the_text_does_not() -> None:

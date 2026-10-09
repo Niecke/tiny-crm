@@ -22,7 +22,7 @@ from app.auth.sessions import AuthSession
 from app.auth.users import User
 from app.config import settings
 from tests.conftest import Account
-from tests.test_password_reset import NEW_PASSWORD, _reset_token
+from tests.test_password_reset import NEW_PASSWORD, RunJobs, _reset_token
 
 
 @dataclass
@@ -454,9 +454,9 @@ async def test_one_account_turning_mfa_off_leaves_the_other(
 
 
 async def test_a_password_reset_leaves_mfa_on(
-    client: AsyncClient, enrolled: Enrolled, outbox: Any
+    client: AsyncClient, enrolled: Enrolled, outbox: Any, run_jobs: RunJobs
 ) -> None:
-    token = await _reset_token(client, enrolled.account.email, outbox)
+    token = await _reset_token(client, enrolled.account.email, outbox, run_jobs)
     reset = await client.post(
         "/auth/reset-password", json={"token": token, "password": NEW_PASSWORD}
     )
@@ -527,10 +527,10 @@ async def test_a_challenge_dies_with_a_password_change(
 
 
 async def test_a_challenge_dies_with_a_password_reset(
-    client: AsyncClient, enrolled: Enrolled, outbox: Any
+    client: AsyncClient, enrolled: Enrolled, outbox: Any, run_jobs: RunJobs
 ) -> None:
     challenge = await login(client, enrolled.account)
-    token = await _reset_token(client, enrolled.account.email, outbox)
+    token = await _reset_token(client, enrolled.account.email, outbox, run_jobs)
     await client.post("/auth/reset-password", json={"token": token, "password": NEW_PASSWORD})
 
     response = await client.post(

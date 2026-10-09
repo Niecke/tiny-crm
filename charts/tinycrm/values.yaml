@@ -86,6 +86,8 @@ backend:
   # https://<ingress.host>/reset-password, a page of the React frontend.
   # Optional — without brevoApiKey and fromAddress nothing is sent: a reset
   # request is logged and dropped, and the CLI refuses to invite.
+  # Invites are sent by the CLI itself; reset links by the worker below, which
+  # reads these same values.
   mail:
     # A bearer credential: it belongs in the cluster Secret, never in git.
     brevoApiKey: ""
@@ -110,6 +112,46 @@ backend:
       memory: 256Mi
     limits:
       memory: 512Mi
+
+# ---------------------------------------------------------------------------
+# The background worker: the backend image started as `python -m app.worker`.
+# It runs the jobs the API defers — mail first (password-reset links), later
+# anything too slow for a request. The queue lives in Postgres, so there is no
+# broker to deploy.
+#
+# Mail is configured once, under backend.mail, and read by both.
+# ---------------------------------------------------------------------------
+worker:
+  # Off means queued mail is never sent: a forgot-password still answers 202
+  # and the job waits in the database for a worker.
+  enabled: true
+  # Set by hand. Any number is safe — jobs are claimed with SKIP LOCKED.
+  replicas: 1
+
+  # One pool per entry: `queues` it serves, `concurrency` jobs at once. A
+  # pool's slots are its own, which is what keeps mail moving while a long job
+  # occupies another pool. The `default` queue must be served by some pool:
+  # the queue's own housekeeping runs there.
+  pools:
+    - name: mail
+      queues: [mail]
+      concurrency: 2
+    - name: default
+      queues: [default]
+      concurrency: 1
+
+  # How long a stopping pod may finish what it is running. Above the longest
+  # task; the worker aborts what is left ten seconds before this runs out.
+  terminationGracePeriodSeconds: 60
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      # Shared by every pool: an out-of-memory kill in one takes the others
+      # down until the pod is back. If that happens, split the pools.
+      memory: 384Mi
 
 # The React client, built from frontend-next/ (#122).
 frontend:

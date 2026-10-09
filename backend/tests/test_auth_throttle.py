@@ -5,6 +5,7 @@ instead of sleeping.
 """
 
 import asyncio
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -19,6 +20,15 @@ from tests.conftest import Account, Outbox
 from tests.test_password_reset import token_from
 
 FREE = settings.login_backoff_free_failures
+
+RunJobs = Callable[[], Awaitable[None]]
+
+
+async def _forgot_password(client: AsyncClient, email: str, run_jobs: RunJobs) -> Response:
+    """Ask for a reset mail and let the worker send what that queued."""
+    response = await client.post("/auth/forgot-password", json={"email": email})
+    await run_jobs()
+    return response
 
 
 async def _login(client: AsyncClient, email: str, password: str) -> Response:
@@ -221,11 +231,11 @@ async def test_a_burst_gets_no_more_attempts_than_a_queue(
 
 
 async def test_a_password_reset_ends_the_lock(
-    client: AsyncClient, alice: Account, outbox: Outbox
+    client: AsyncClient, alice: Account, outbox: Outbox, run_jobs: RunJobs
 ) -> None:
     await _fail_until_locked(client, alice.email)
 
-    await client.post("/auth/forgot-password", json={"email": alice.email})
+    await _forgot_password(client, alice.email, run_jobs)
     [mail] = outbox.sent
     response = await client.post(
         "/auth/reset-password", json={"token": token_from(mail), "password": "a-fresh-secret"}
@@ -239,10 +249,10 @@ async def test_a_password_reset_ends_the_lock(
 
 
 async def test_a_second_reset_request_inside_the_cooldown_sends_nothing(
-    client: AsyncClient, alice: Account, outbox: Outbox
+    client: AsyncClient, alice: Account, outbox: Outbox, run_jobs: RunJobs
 ) -> None:
-    first = await client.post("/auth/forgot-password", json={"email": alice.email})
-    second = await client.post("/auth/forgot-password", json={"email": alice.email})
+    first = await _forgot_password(client, alice.email, run_jobs)
+    second = await _forgot_password(client, alice.email, run_jobs)
 
     # The same answer both times: the cooldown is not observable from outside.
     assert first.status_code == second.status_code == 202
@@ -253,32 +263,34 @@ async def test_the_cooldown_ends(
     client: AsyncClient,
     alice: Account,
     outbox: Outbox,
+    run_jobs: RunJobs,
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    await client.post("/auth/forgot-password", json={"email": alice.email})
+    await _forgot_password(client, alice.email, run_jobs)
     await _unlock_now(session_factory, "reset-mail:")
 
-    await client.post("/auth/forgot-password", json={"email": alice.email})
+    await _forgot_password(client, alice.email, run_jobs)
     assert len(outbox.sent) == 2
 
 
 async def test_a_failed_delivery_still_starts_the_cooldown(
-    client: AsyncClient, alice: Account, outbox: Outbox
+    client: AsyncClient, alice: Account, outbox: Outbox, run_jobs: RunJobs
 ) -> None:
     outbox.fail = True
-    response = await client.post("/auth/forgot-password", json={"email": alice.email})
+    response = await _forgot_password(client, alice.email, run_jobs)
     assert response.status_code == 202
 
     outbox.fail = False
-    await client.post("/auth/forgot-password", json={"email": alice.email})
+    await _forgot_password(client, alice.email, run_jobs)
     assert outbox.sent == []
 
 
 async def test_accounts_do_not_share_a_cooldown(
-    client: AsyncClient, alice: Account, bob: Account, outbox: Outbox
+    client: AsyncClient, alice: Account, bob: Account, outbox: Outbox, run_jobs: RunJobs
 ) -> None:
     await client.post("/auth/forgot-password", json={"email": alice.email})
     await client.post("/auth/forgot-password", json={"email": bob.email})
+    await run_jobs()
 
     assert [mail.to_address for mail in outbox.sent] == [alice.email, bob.email]
 
@@ -310,16 +322,17 @@ async def test_unlock_ends_the_lock_and_the_cooldown(
     client: AsyncClient,
     alice: Account,
     outbox: Outbox,
+    run_jobs: RunJobs,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     await _fail_until_locked(client, alice.email)
-    await client.post("/auth/forgot-password", json={"email": alice.email})
+    await _forgot_password(client, alice.email, run_jobs)
 
     await cli._unlock(alice.email)
 
     assert "Cleared" in capsys.readouterr().out
     assert (await _login(client, alice.email, alice.password)).status_code == 200
-    await client.post("/auth/forgot-password", json={"email": alice.email})
+    await _forgot_password(client, alice.email, run_jobs)
     assert len(outbox.sent) == 2
 
 

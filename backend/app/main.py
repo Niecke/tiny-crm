@@ -14,6 +14,7 @@ from sqlalchemy.orm.exc import StaleDataError
 from app.auth import fastapi_users
 from app.config import Environment, settings
 from app.db import get_session
+from app.jobs import jobs_app
 from app.logging_config import configure_logging
 from app.ratelimit import count_failed_logins
 from app.routers import (
@@ -77,7 +78,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Runs some checks when booting the application"""
     check_secure_defaults()
     await check_storage()
-    yield
+    # The job queue's own connections (app/jobs/). The API only defers; the
+    # work is done by the worker, `python -m app.worker`.
+    async with jobs_app.open_async():
+        yield
 
 
 class ApiDocsUrls(TypedDict):

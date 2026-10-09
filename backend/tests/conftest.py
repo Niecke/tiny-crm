@@ -15,13 +15,14 @@ from __future__ import annotations
 import asyncio
 import os
 import uuid
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
 from dataclasses import dataclass
 from typing import Any
 
 import pytest
 from fastapi_users.password import PasswordHelper
 from httpx2 import ASGITransport, AsyncClient, Response
+from procrastinate.testing import InMemoryConnector
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app import ratelimit
@@ -29,7 +30,9 @@ from app.auth.sessions import open_session
 from app.auth.users import User, UserManager
 from app.config import settings
 from app.db import Base, get_session
-from app.mail import Mail, MailDeliveryError, get_mail_sender
+from app.jobs import jobs_app
+from app.jobs import mail as mail_jobs
+from app.mail import Mail, PermanentMailError, TransientMailError, get_mail_sender
 from app.main import app
 
 # The shipped placeholder is too short for HS256 and PyJWT warns on every token.
@@ -123,24 +126,70 @@ async def client(
     app.dependency_overrides.clear()
 
 
+@pytest.fixture(autouse=True)
+async def job_queue(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[InMemoryConnector]:
+    """The job queue, in memory: what the API defers lands in `.jobs` and stays
+    there until a test runs it with `run_jobs`.
+
+    Autouse, so no test reaches for procrastinate's real tables — the scratch
+    database has none, its schema comes from the models.
+    """
+    # At start-up a worker defers the periodic slot that has just passed. Not
+    # here: a housekeeping job turning up in some tests' queues and not in
+    # others would make every count of jobs a matter of timing.
+    monkeypatch.setitem(jobs_app.periodic_defaults, "max_delay", 0)
+    connector = InMemoryConnector()
+    # Opened, as the API's lifespan does: the connector notes the loop it
+    # belongs to, which deferring after a worker has run relies on.
+    with jobs_app.replace_connector(connector):
+        async with jobs_app.open_async():
+            yield connector
+
+
+@pytest.fixture
+def run_jobs(
+    monkeypatch: pytest.MonkeyPatch, session_factory: async_sessionmaker[AsyncSession]
+) -> Callable[[], Awaitable[None]]:
+    """Run whatever is queued and due, the way the worker would — once, against
+    this test's database. A job that failed and waits for its retry is left."""
+    monkeypatch.setattr(mail_jobs, "_session_factory", session_factory)
+
+    async def run() -> None:
+        await jobs_app.run_worker_async(wait=False, install_signal_handlers=False)
+
+    return run
+
+
 class Outbox:
-    """A MailSender that keeps what it is given. `fail` makes it refuse."""
+    """A MailSender that keeps what it is given.
+
+    `fail` makes it refuse the way Brevo refuses a bad key — for good.
+    `unreachable` makes it fail the way a network error does — for now.
+    """
 
     def __init__(self) -> None:
         self.sent: list[Mail] = []
         self.fail = False
+        self.unreachable = False
 
     async def send(self, mail: Mail) -> None:
+        if self.unreachable:
+            raise TransientMailError("could not reach Brevo: ConnectTimeout")
         if self.fail:
-            raise MailDeliveryError("Brevo refused the mail: HTTP 401 unauthorized")
+            raise PermanentMailError("Brevo refused the mail: HTTP 401 unauthorized")
         self.sent.append(mail)
 
 
 @pytest.fixture
-def outbox(client: AsyncClient) -> Outbox:
-    """Mail the API sends lands here instead of at Brevo."""
+def outbox(client: AsyncClient, monkeypatch: pytest.MonkeyPatch) -> Outbox:
+    """Mail lands here instead of at Brevo.
+
+    For the API and the worker alike: the API has to find mail configured
+    before it queues anything, and the worker (`run_jobs`) does the sending.
+    """
     box = Outbox()
     app.dependency_overrides[get_mail_sender] = lambda: box
+    monkeypatch.setattr(mail_jobs, "get_mail_sender", lambda: box)
     return box
 
 
