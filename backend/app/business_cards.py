@@ -104,7 +104,12 @@ class CardReading(BaseModel):
         description="ISO 3166-1 alpha-2 code, e.g. AT. Infer it from the address or the "
         "phone prefix only when unambiguous.",
     )
-    organization_name: str | None = Field(None, description="The company's name.")
+    organization_name: str | None = Field(
+        None,
+        description="The company, firm or brand the person works for, as printed — often "
+        "the logo or the most prominent name on the card, and often without a legal form "
+        "such as GmbH, e.U. or Ltd. It belongs here even then, not in notes.",
+    )
     organization_domain: str | None = Field(
         None, description="The company's domain without scheme or www, e.g. acme.example."
     )
@@ -117,7 +122,8 @@ class CardReading(BaseModel):
     notes: str | None = Field(
         None,
         description="Anything else printed on the card worth keeping: VAT or registration "
-        "numbers, social profiles, a second office. Not slogans.",
+        "numbers, social profiles, a second office. Not slogans, and not the company's "
+        "name — that is organization_name.",
     )
 
 
@@ -128,9 +134,11 @@ one card and return what is printed on it, field by field.
 Copy names, titles and addresses exactly as printed, keeping their language and \
 accents. Write phone numbers in international format (+43 1 234 5678) when the \
 country is clear. Keep a person's own email and number apart from the company's \
-shared ones (office@, info@, a switchboard). Leave a field empty when the card \
-does not show it; never invent or complete a value. If the photos do not show a \
-business card, leave every field empty."""
+shared ones (office@, info@, a switchboard). The company is often printed only \
+as a logo or brand name, without GmbH, e.U. or a similar legal form; it is still \
+the company. Leave a field empty when the card does not show it; never invent \
+or complete a value. If the photos do not show a business card, leave every \
+field empty."""
 
 
 class CardReadError(RuntimeError):
