@@ -53,7 +53,8 @@ def _access_fields(record: logging.LogRecord) -> dict[str, Any] | None:
 class JsonFormatter(logging.Formatter):
     """Renders each log record as a single-line JSON object with consistent base
     fields so output is machine-parseable. Access records additionally carry the
-    request as separate fields, see _access_fields()."""
+    request as separate fields, see _access_fields(); records about a queued job
+    carry the job's."""
 
     def format(self, record: logging.LogRecord) -> str:
         payload: dict[str, Any] = {
@@ -73,6 +74,23 @@ class JsonFormatter(logging.Formatter):
                 f"{access['http_method']} {access['http_path']} {access['http_status']}"
             )
             payload.update(access)
+        # procrastinate attaches the job to every record about one, and spells
+        # it out in the message with its arguments: `task[12](user_id='…')`.
+        # Arguments stay out of the log — today's are ids, a later task's may
+        # not be — and the job is identified by fields that can be filtered on.
+        job = getattr(record, "job", None)
+        if isinstance(job, dict):
+            name = f"{job.get('task_name')}[{job.get('id')}]"
+            payload["message"] = payload["message"].replace(str(job.get("call_string")), name)
+            payload["job_id"] = job.get("id")
+            payload["task"] = job.get("task_name")
+            payload["queue"] = job.get("queue")
+            # How many runs came before this one; 0 on the first.
+            payload["attempts"] = job.get("attempts")
+        # What happened, as a stable word: start_job, job_success, job_error_retry, …
+        action = getattr(record, "action", None)
+        if isinstance(action, str):
+            payload["action"] = action
         if record.exc_info:
             payload["exception"] = self.formatException(record.exc_info)
         return json.dumps(payload, default=str)

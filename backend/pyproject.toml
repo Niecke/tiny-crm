@@ -27,6 +27,13 @@ dependencies = [
     "cryptography>=50.0.2",
     # Reads scanned business cards, app/business_cards.py.
     "anthropic>=1.0",
+    # The background worker's job queue, app/jobs/. Pinned exactly: its schema is
+    # vendored into an Alembic migration (alembic/procrastinate/README.md), so a
+    # new version is a migration to write, not only a number to bump.
+    "procrastinate==3.10.0",
+    # procrastinate's driver; the app itself stays on asyncpg. [binary] brings
+    # its own libpq, which the slim base image does not have.
+    "psycopg[binary]>=3.3.6",
 ]
 
 [dependency-groups]

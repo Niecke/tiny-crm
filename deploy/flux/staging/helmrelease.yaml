@@ -31,7 +31,7 @@ spec:
       name: tinycrm-values
       valuesKey: values.yaml
   # Staging shares the CX23 with production (2 vCPU / 4 GB). Everything below is
-  # sized so the whole stack stays around 250 Mi of real use, and so it is what
+  # sized so the whole stack stays around 370 Mi of real use, and so it is what
   # gets evicted when memory runs short.
   values:
     priorityClassName: tinycrm-staging
@@ -63,6 +63,15 @@ spec:
       resources:
         requests:
           cpu: 50m
+          memory: 128Mi
+        limits:
+          memory: 256Mi
+    # About 115 Mi resident once it has imported the models, with nothing
+    # running. Mail is the only work it has, so the limit stays close to that.
+    worker:
+      resources:
+        requests:
+          cpu: 25m
           memory: 128Mi
         limits:
           memory: 256Mi

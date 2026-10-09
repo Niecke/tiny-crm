@@ -81,6 +81,19 @@
       "semanticCommitType": "fix"
     },
     {
+      "description": "procrastinate's database schema is vendored into an Alembic migration, so an update may need a migration written by hand. Never automerged, and the PR says what to check.",
+      "matchManagers": [
+        "pep621"
+      ],
+      "matchPackageNames": [
+        "procrastinate"
+      ],
+      "automerge": false,
+      "prBodyNotes": [
+        ":warning: **procrastinate's schema is vendored.** If this release changes it, `tests/test_jobs.py` fails and the update needs its own Alembic revision first — the steps are in `backend/alembic/procrastinate/README.md`."
+      ]
+    },
+    {
       "description": "Backend runtime dependencies ship in the image too. Dev dependency groups stay chore(deps). npm `dependencies` in frontend-next/ already get fix from config:recommended.",
       "matchManagers": [
         "pep621"

@@ -31,7 +31,8 @@ is only what is still open.
 | Auth | fastapi-users, JWT bearer, accounts created via `python -m app.cli create-user` | Password reset and invites mailed through Brevo; no register router |
 | Blob store | S3-compatible via aioboto3, Versity Gateway locally, Hetzner Object Storage in production | Bucket versioning checked at boot |
 | Client | Flutter web, Riverpod 3, go_router 17, dio, flutter_secure_storage | Hand-written models |
-| Scheduling | Kubernetes CronJobs on the backup and backend images | Off-site backup; weekday morning briefing to Slack. No scheduler inside the API |
+| Background jobs | procrastinate on the application's Postgres; a worker Deployment on the backend image (`python -m app.worker`) | A reserved pool per queue, mail first: password-reset links are queued by the API and sent by the worker (#206). No broker to run or back up |
+| Scheduling | Kubernetes CronJobs on the backup and backend images | Off-site backup; weekday morning briefing to Slack. No scheduler inside the API; the worker schedules only its queue's own housekeeping |
 | CI/CD | GitHub Actions → Google Artifact Registry (`europe-west1`), WIF auth, Renovate | Test → build → integration test → promote-by-digest |
 | Deploy | Flux (pull-based), Helm chart in `charts/tinycrm/` | Merging to `main` is the deploy |
 | Serving | Caddy inside the frontend image, Podman/Docker Compose | `compose.full.yml` = db + s3 + backend + frontend |

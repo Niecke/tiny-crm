@@ -17,6 +17,7 @@ from fastapi_users.authentication.strategy import StrategyDestroyNotSupportedErr
 from fastapi_users.db import SQLAlchemyBaseUserTableUUID, SQLAlchemyUserDatabase
 from fastapi_users.exceptions import UserInactive
 from fastapi_users.jwt import generate_jwt
+from procrastinate.exceptions import AlreadyEnqueued, ProcrastinateException
 from sqlalchemy import BigInteger, DateTime, String
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
@@ -25,14 +26,7 @@ from app.auth.sessions import close_sessions, read_access_token, session_is_open
 from app.auth.throttle import claim_reset_mail, clear_login
 from app.config import settings
 from app.db import Base, get_session
-from app.mail import (
-    MailDeliveryError,
-    MailNotConfiguredError,
-    MailSender,
-    get_mail_sender,
-    invite_mail,
-    reset_mail,
-)
+from app.mail import MailNotConfiguredError, MailSender, get_mail_sender, invite_mail
 from app.schemas.user import MIN_PASSWORD_LENGTH
 
 logger = logging.getLogger(__name__)
@@ -118,18 +112,29 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, UUID]):
     async def on_after_forgot_password(
         self, user: User, token: str, request: Request | None = None
     ) -> None:
-        """Mail the reset link. Never raises.
+        """Queue the reset mail for the worker (app/jobs/mail.py). Never raises.
 
-        POST /auth/forgot-password answers 202 for unknown addresses without
-        reaching this hook. An error escaping here would turn that into a 500
-        for known ones only — telling an outsider which accounts exist. So a
-        failed delivery is the operator's problem, reported in the log.
+        Nothing is sent from here. Waiting for Brevo inside the request made a
+        known address answer seconds later than an unknown one, which told an
+        outsider which accounts exist just as a different status would have. Now
+        both get their 202 in the time of a couple of inserts.
+
+        `token` is not used: the worker mints its own when it sends, so no
+        credential sits in the job table (see send_password_reset).
+
+        For the same reason as the timing, no error may escape: POST
+        /auth/forgot-password answers 202 for unknown addresses without reaching
+        this hook, and a 500 for known ones only would give them away. A mail
+        that could not be queued is the operator's problem, reported in the log.
 
         At most one mail per PASSWORD_RESET_COOLDOWN_SECONDS (#134), claimed
-        before sending so a failed delivery costs one too. Inside the cooldown
+        before queueing so a failed delivery costs one too. Inside the cooldown
         the request is dropped and still answered 202: the mail already sent is
         the one to use.
         """
+        # Imported here: the job module needs this one for UserManager.
+        from app.jobs.mail import reset_lock, send_password_reset
+
         if not await claim_reset_mail(self.db, user.email):
             logger.info("Password reset for user %s skipped: mail cooldown running", user.id)
             return
@@ -141,11 +146,20 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, UUID]):
             )
             return
         try:
-            await self.mail_sender.send(reset_mail(user.email, user.name, token))
-        except MailDeliveryError as exc:
-            logger.error("Password reset mail for user %s not sent: %s", user.id, exc)
+            await send_password_reset.configure(queueing_lock=reset_lock(user.id)).defer_async(
+                user_id=str(user.id), requested_at=datetime.now(UTC).isoformat()
+            )
+        except AlreadyEnqueued:
+            # A mail for this account is still waiting — the cooldown has run
+            # out while the worker is behind or retrying. That one will do.
+            logger.info("Password reset for user %s skipped: a mail is already queued", user.id)
             return
-        logger.info("Password reset mail sent to user %s", user.id)
+        except ProcrastinateException as exc:
+            logger.error(
+                "Password reset mail for user %s not queued: %s", user.id, type(exc).__name__
+            )
+            return
+        logger.info("Password reset mail queued for user %s", user.id)
 
     async def on_after_reset_password(self, user: User, request: Request | None = None) -> None:
         # The token only ever travelled by mail, so redeeming it proves the

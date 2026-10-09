@@ -106,6 +106,21 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  # The background worker: the backend image started with its other command,
+  # as the chart's worker Deployment starts it. Given what that Deployment
+  # gets — the database and the signing key, no object-store keys — so the run
+  # also proves a worker starts in production mode without them.
+  worker:
+    image: ${REGISTRY:-ghcr.io/niecke/tiny-crm}/backend:${IMAGE_TAG:?set IMAGE_TAG}
+    command: ["python", "-m", "app.worker"]
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql+asyncpg://crm:crm@db:5432/crm
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
   # The React client, built from frontend-next/ (#122).
   frontend:
     image: ${REGISTRY:-ghcr.io/niecke/tiny-crm}/frontend:${IMAGE_TAG:?set IMAGE_TAG}

@@ -1,5 +1,6 @@
 from enum import StrEnum
 
+from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Placeholder values shipped in the defaults so a fresh checkout runs against
@@ -13,6 +14,18 @@ DEFAULT_S3_SECRET_KEY = "minioadmin"
 class Environment(StrEnum):
     development = "development"
     production = "production"
+
+
+class WorkerPool(BaseModel):
+    """One group of job slots in the worker: these queues, this many at once.
+
+    A pool's slots are its own — a queue backed up in one pool never takes a
+    slot from another. That is how mail keeps moving while a long job runs.
+    """
+
+    name: str
+    queues: list[str] = Field(min_length=1)
+    concurrency: int = Field(default=1, ge=1)
 
 
 class Settings(BaseSettings):
@@ -80,7 +93,8 @@ class Settings(BaseSettings):
     # Transactional mail through Brevo's API (app/mail.py): the invite a new
     # account gets and the password-reset link. Both links point at APP_URL, so
     # sending needs all three. Unset means no mail: a reset request is logged
-    # and dropped, and the CLI refuses to invite.
+    # and dropped, and the CLI refuses to invite. The API needs them to know
+    # whether to queue a reset mail, the worker to send it.
     brevo_api_key: str | None = None
     # Must be a sender Brevo has verified, on a domain with its SPF/DKIM records.
     mail_from_address: str | None = None
@@ -88,6 +102,25 @@ class Settings(BaseSettings):
     # How long an invite or reset link stays usable. Either one is single-use
     # regardless: the token is bound to the password hash it was issued for.
     password_token_lifetime_seconds: int = 60 * 60 * 12
+
+    # The background worker (app/worker.py, `python -m app.worker`): the pools
+    # it runs, as JSON in WORKER_POOLS. Mail has a pool nothing else can
+    # occupy. All pools share one process; running one Deployment per pool
+    # later is this variable set differently on each, not a code change.
+    worker_pools: list[WorkerPool] = [
+        WorkerPool(name="mail", queues=["mail"], concurrency=2),
+        WorkerPool(name="default", queues=["default"], concurrency=1),
+    ]
+    # On SIGTERM the worker takes no new jobs and gives the running ones this
+    # long to finish before aborting them. Keep it below the pod's
+    # terminationGracePeriodSeconds, or the kill comes first and the jobs are
+    # left for the stalled-job sweep instead of being recorded as aborted.
+    worker_shutdown_grace_seconds: int = 50
+    # A queued mail older than this is dropped instead of sent: a reset link
+    # arriving an hour after the click answers a question nobody is asking any
+    # more. Above the retry schedule's total (app/jobs/mail.py), so a mail is
+    # only ever dropped for a worker that was down, not for one that retried.
+    mail_max_age_seconds: int = 60 * 30
 
     # Business card scanning (app/business_cards.py): the photos are read by
     # Claude through the Anthropic API. Unset means no scanning — the scan

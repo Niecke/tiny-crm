@@ -212,7 +212,7 @@ right after the first merge — the HelmRelease reports not-ready until they exi
 
 The staging stack has no backup and no briefing CronJob, runs at a negative
 priority so the kubelet evicts it before production, and is sized to about
-250 Mi of real memory. Its first admin comes from `python -m app.cli create-user`
+370 Mi of real memory, the worker's 115 Mi included. Its first admin comes from `python -m app.cli create-user`
 exactly as in production, with `-n tinycrm-staging`.
 
 ### The frontend image
@@ -279,6 +279,56 @@ clears it, then reconcile.
 
 `flux resume` and `flux reconcile` block while watching. Ctrl-C only stops the
 watching — pass `--wait=false` to skip it.
+
+### The background worker
+
+`tinycrm-worker` is the backend image started as `python -m app.worker`. It runs
+what the API defers instead of doing inside a request — for now the
+password-reset mail. The queue is [procrastinate](https://procrastinate.readthedocs.io/)
+in the application's own Postgres: no broker, and the jobs are in the nightly
+backup with everything else. Its tables come from the migration Job.
+
+```bash
+kubectl -n tinycrm get deploy tinycrm-worker
+kubectl -n tinycrm logs deploy/tinycrm-worker            # one JSON line per job start and end
+# Is it taking jobs? Queues a no-op on every queue and waits for the answers.
+kubectl -n tinycrm exec deploy/tinycrm-backend -- python -m app.cli ping-worker
+```
+
+The log names a job by `task`, `job_id`, `queue` and `attempts`, never by its
+arguments. To look into the queue itself, procrastinate's own shell runs in
+either pod:
+
+```bash
+kubectl -n tinycrm exec -it deploy/tinycrm-worker -- \
+  python -m procrastinate --app=app.jobs.jobs_app shell
+# procrastinate> list_queues
+# procrastinate> list_jobs status=failed
+# procrastinate> retry 42
+```
+
+What to expect from it:
+
+- **Pools.** `worker.pools` gives each pool its queues and its number of
+  parallel jobs. `mail` has two slots nothing else can take; `default` has one
+  and also runs the queue's housekeeping. All pools share one process and its
+  memory limit — if a heavy task ever gets the pod OOM-killed, mail waits until
+  it is back. The fix then is a Deployment per pool, which is the same command
+  with a one-entry `WORKER_POOLS`.
+- **Scaling** is `worker.replicas`, by hand. Any number is safe.
+- **Stopping.** A pod being replaced finishes its running jobs first, for up to
+  `worker.terminationGracePeriodSeconds`. A worker that dies without that — OOM,
+  node loss — leaves its jobs marked as running; another worker hands them out
+  again within five minutes. So a job can run twice, and tasks are written for it.
+- **Retention.** Succeeded jobs are deleted after 7 days, failed ones after 30.
+- **Failures are silent for now.** A failed job is a log line at `ERROR` and a
+  row with `status=failed`; nothing alerts on it yet (T32), and the status page
+  is #207.
+- **`worker.enabled: false`** leaves reset mails queued and unsent; the API
+  still answers 202.
+
+Upgrading procrastinate needs a migration of its own:
+`backend/alembic/procrastinate/README.md`.
 
 ### Turning on the morning briefing
 
@@ -352,6 +402,11 @@ model and tokens it used on the review screen, to compare the cost.
 Invites and password-reset links go out through Brevo's API (`app/mail.py`).
 Until it is configured, `POST /auth/forgot-password` logs the request and sends
 nothing, and `create-user` refuses to invite.
+
+An invite is sent by the CLI itself, which reports a failure on the spot. A
+reset link is queued by the API and sent by the [background worker](#the-background-worker):
+both read `backend.mail.*`, and a reset mail that did not go out is a failed
+job there, not a line in the backend's log.
 
 In Brevo, once:
 

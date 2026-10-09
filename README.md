@@ -75,7 +75,8 @@ Containers are build each time to get latest code changes.
 podman-compose -f compose.full.yml build frontend && \
   podman-compose -f compose.full.yml build backend && \
   podman-compose -f compose.full.yml build migrate && \
-  podman-compose -f compose.full.yml up -d --force-recreate frontend backend
+  podman-compose -f compose.full.yml build worker && \
+  podman-compose -f compose.full.yml up -d --force-recreate frontend backend worker
 ```
 
 The `migrate` service runs `alembic upgrade head` once and exits; `backend`
@@ -83,6 +84,11 @@ waits for it to succeed. Migrations no longer run from the backend image's
 `CMD` — under a rolling update every starting replica would race the same
 migration — so the Helm chart runs them as a pre-upgrade hook and compose runs
 them as this one-shot service.
+
+The `worker` service is the same backend image started as `python -m app.worker`:
+it runs what the API defers instead of doing in the request, the password-reset
+mail first. `podman-compose -f compose.full.yml exec backend python -m app.cli ping-worker`
+tells whether it is taking jobs.
 
 Shutdown again
 ```bash
@@ -189,6 +195,8 @@ Work happens on `feat/*` branches; `main` is what ships. The pipeline workflows:
    and the frontend, the React bundle with its SPA fallback, a real 404 for missing assets
    and the redirect from the old `/next` paths, admin creation, login, a 401 for anonymous
    requests, a contact round-trip through Postgres and a document round-trip through S3.
+   The worker runs next to the API from the same image and has to answer a ping on every
+   queue, which covers the job queue's migration and the worker process without a mail provider.
    The backend runs with `ENVIRONMENT=production` and generated secrets, so the run also
    proves the production startup guard passes on a properly configured instance.
 

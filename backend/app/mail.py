@@ -13,7 +13,12 @@ The copy lives in app/templates/mail/: a .txt and an .html per mail, the
 subject set at the top of the .txt.
 
 The token is a credential for the account until it is used or expires. It goes
-into the mail body and nowhere else — never a log line, never an error message.
+into the mail body and nowhere else — never a log line, never an error message,
+never a queued job.
+
+Who sends: the invite goes out from the CLI, with the operator watching. The
+reset link is queued by the API and sent by the worker (app/jobs/mail.py), so
+that a request never waits for Brevo.
 """
 
 from __future__ import annotations
@@ -33,8 +38,9 @@ logger = logging.getLogger(__name__)
 
 BREVO_SEND_URL = "https://api.brevo.com/v3/smtp/email"
 
-# How long to wait for Brevo. Short enough that a stalled forgot-password
-# request gives up rather than hangs; the user can simply ask again.
+# How long to wait for Brevo. Short enough that the operator at the CLI is not
+# left staring at a stalled invite, and that a worker slot is not held by one;
+# a queued mail is simply tried again.
 BREVO_TIMEOUT_SECONDS = 10
 
 # Where the links land: the frontend's page (src/routes/reset-password.tsx in
@@ -71,10 +77,25 @@ class MailSender(Protocol):
 
 class MailDeliveryError(RuntimeError):
     """The provider did not accept the mail. The text never carries the API key
-    or the mail body — the body holds the token, and this ends up in logs."""
+    or the mail body — the body holds the token, and this ends up in logs.
+
+    Raised as one of the two below, which say whether trying again can help.
+    The worker retries on one and gives up on the other (app/jobs/mail.py);
+    the CLI reports either to the operator, who is the retry.
+    """
 
 
-class MailNotConfiguredError(MailDeliveryError):
+class TransientMailError(MailDeliveryError):
+    """Brevo could not be reached or was not able to answer: a network error, a
+    5xx, a rate limit. The same request may well go through later."""
+
+
+class PermanentMailError(MailDeliveryError):
+    """Brevo understood the request and refused it — an unverified sender, a
+    revoked key. Sending it again gets the same answer."""
+
+
+class MailNotConfiguredError(PermanentMailError):
     """There is no sender, so nothing could be sent."""
 
 
@@ -112,13 +133,17 @@ class BrevoSender:
                     headers={"api-key": self._api_key, "accept": "application/json"},
                 )
         except httpx2.HTTPError as exc:
-            raise MailDeliveryError(f"could not reach Brevo: {type(exc).__name__}") from None
+            raise TransientMailError(f"could not reach Brevo: {type(exc).__name__}") from None
 
         # 201 with a messageId on success. Brevo's error body is a short
         # {"code", "message"} naming the problem (unverified sender, bad key)
         # without echoing the request.
         if response.status_code != 201:
-            raise MailDeliveryError(
+            # A 5xx is Brevo's trouble and a 429 its rate limit; both pass.
+            # Any other answer is about this request and will not change.
+            transient = response.status_code == 429 or response.status_code >= 500
+            error = TransientMailError if transient else PermanentMailError
+            raise error(
                 f"Brevo refused the mail: HTTP {response.status_code} {response.text.strip()}"
             )
         logger.info("Mail %r accepted by Brevo: %s", mail.subject, response.text.strip())
