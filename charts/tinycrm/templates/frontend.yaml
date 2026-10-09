@@ -64,9 +64,7 @@ spec:
             - name: http
               containerPort: 8080
           volumeMounts:
-            # Where the app fetches it. The Flutter image read it from the same
-            # path, so a release still pinned to a Flutter tag renders and runs
-            # unchanged on this chart.
+            # Where the app fetches it.
             - name: config
               mountPath: /srv/config.json
               subPath: config.json

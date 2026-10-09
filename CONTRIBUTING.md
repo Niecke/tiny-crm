@@ -1,6 +1,6 @@
 # Working on tinyCRM
 
-A small CRM for self-employment, built as a learning project for FastAPI and Flutter.
+A small CRM for self-employment, built as a learning project for FastAPI and React.
 
 What is already built is documented in [FEATURES.md](FEATURES.md). What is still
 open lives in [GitHub Issues](https://github.com/Niecke/tiny-crm/issues) — this
@@ -9,7 +9,7 @@ file is the standing context that does not belong in any single issue.
 ## Goals
 
 - Track contacts, organizations, interactions, tasks and deals for a solo business.
-- Learn FastAPI (backend) and Flutter web (frontend) end-to-end.
+- Learn FastAPI (backend) and React (frontend) end-to-end.
 - Ship a real, deployed, authenticated app — not just a localhost demo.
 
 ## Deliberately out of scope
@@ -68,7 +68,7 @@ messages and code comments still resolve.
 | Database | PostgreSQL 18 + asyncpg | Tags use Postgres-native `ARRAY(String)` |
 | Auth | fastapi-users, 15-minute JWT bearer plus rotating refresh token, sessions revocable server-side, accounts created via `python -m app.cli create-user` | Password reset and invites mailed through Brevo; no register router |
 | Blob store | S3-compatible via aioboto3, Versity Gateway locally, Hetzner Object Storage in production | Bucket versioning checked at boot |
-| Client | React + TypeScript (Vite), TanStack Query and Router, openapi-fetch, in `frontend-next/` | Generated API types; see #122 and [FRONTEND.md](FRONTEND.md). The Flutter client in `frontend/` is no longer built or shipped |
+| Client | React + TypeScript (Vite), TanStack Query and Router, openapi-fetch, in `frontend-next/` | Generated API types; see #122 and [FRONTEND.md](FRONTEND.md) |
 | Scheduling | Kubernetes CronJobs on the backup and backend images | Off-site backup; weekday morning briefing to Slack. No scheduler inside the API |
 | CI/CD | GitHub Actions → GHCR, Renovate | Test → build → integration test → promote-by-digest. Versioning is #114 |
 | Deploy | Flux (pull-based), Helm chart in `charts/tinycrm/` | Merging to `main` deploys staging; production follows release tags (#114) |

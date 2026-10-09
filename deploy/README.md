@@ -218,14 +218,11 @@ exactly as in production, with `-n tinycrm-staging`.
 ### The frontend image
 
 The `frontend` image is the React client, built from `frontend-next/` (#122).
-It kept the name of the Flutter client it replaced, which CI no longer builds;
-its code stays in `frontend/` for now. Tags promoted before the cutover are
-still Flutter builds, and both kinds run on the current chart: each serves at
-`/` and reads `config.json` from `/srv/config.json`.
-
-So production switches when its `frontend.image.tag` moves to a sha built
-after the cutover, together with the backend tag of the same build. The React
-image redirects the preview's old `/next/…` URLs to the same page at the root.
+It kept the name of the Flutter client it replaced, whose code is gone from the
+repository (#264). Every release tag is a React build; only `sha-` tags
+promoted before the cutover are still Flutter builds, and nothing can rebuild
+them. The React image redirects the preview's old `/next/…` URLs to the same
+page at the root.
 
 ## Repository settings this depends on
 
@@ -379,8 +376,8 @@ The from-address is not secret; set `backend.mail.fromAddress` under `values:`
 in `deploy/flux/prod/helmrelease.yaml`.
 
 Links point at `https://<ingress.host>/reset-password`: the page exists only
-in the React client, so a release still running a Flutter `frontend` tag lands
-invites on an app that has no such page.
+in the React client, so rolling `frontend` back to a `sha-` tag from before
+the cutover lands invites on an app that has no such page.
 
 ### Creating a user
 
