@@ -198,28 +198,38 @@ class ClaudeCardReader:
                 betas=[FALLBACK_BETA],
                 fallbacks="default",
             )
-        except anthropic.APIConnectionError:
+        # Every failure is logged before it becomes a 502: the SDK has already
+        # retried once by then, and its own retry line is all a log would
+        # otherwise show. Only the error is logged, never the request — that
+        # holds the photos.
+        except anthropic.APITimeoutError:
+            logger.error("Business card read timed out after %ss", READ_TIMEOUT_SECONDS)
+            raise CardReadError("The card reader took too long — try again.") from None
+        except anthropic.APIConnectionError as exc:
+            logger.error("Business card read could not connect: %r", exc.__cause__ or exc)
             raise CardReadError("Could not reach the card reader — try again.") from None
-        except anthropic.RateLimitError:
-            raise CardReadError("The card reader is busy — try again in a minute.") from None
         except anthropic.APIStatusError as exc:
-            # The status and request id are enough to look the call up; the
-            # body could echo the request, and that holds the photos.
             logger.error(
-                "Business card read failed: HTTP %s, request %s",
+                "Business card read failed: HTTP %s %s, request %s",
                 exc.status_code,
+                _api_error(exc),
                 exc.request_id,
             )
+            if isinstance(exc, anthropic.RateLimitError):
+                raise CardReadError("The card reader is busy — try again in a minute.") from None
             raise CardReadError("The card reader refused the request.") from None
         except ValidationError:
             # A refusal or a cut-off answer is not the JSON the schema asks
             # for, and the SDK's parser gives up on it before returning.
+            logger.error("Business card read returned no usable answer")
             raise CardReadError("The card reader gave no usable answer — try again.") from None
 
         if response.stop_reason == "refusal":
+            logger.error("Business card read declined by %s", response.model)
             raise CardReadError("The card reader declined to read these photos.")
         reading = response.parsed_output
         if reading is None:
+            logger.error("Business card read stopped with %s", response.stop_reason)
             raise CardReadError("The card reader gave no usable answer — try again.")
         usage = CardReadUsage(
             model=response.model,
@@ -233,6 +243,17 @@ class ClaudeCardReader:
             usage.output_tokens,
         )
         return CardRead(reading, usage)
+
+
+def _api_error(exc: anthropic.APIStatusError) -> str:
+    """Anthropic's own error type and message — "invalid_request_error: Your
+    credit balance is too low…". It describes the problem, not the request."""
+    body = exc.body
+    if isinstance(body, dict):
+        error = body.get("error")
+        if isinstance(error, dict):
+            return f"{error.get('type')}: {str(error.get('message'))[:300]}"
+    return ""
 
 
 async def get_card_reader() -> AsyncIterator[CardReader | None]:
