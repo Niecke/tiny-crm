@@ -19,11 +19,11 @@ import base64
 import logging
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Literal, Protocol
+from typing import Any, Literal, Protocol
 
 import anthropic
 import httpx2
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from app.config import settings
 
@@ -66,11 +66,24 @@ def sniff_image_type(data: bytes) -> ImageType | None:
     return None
 
 
+def _every_field_required(schema: dict[str, Any]) -> None:
+    schema["required"] = list(schema.get("properties", {}))
+
+
 class CardReading(BaseModel):
-    """What the model reads off the card. Every field is optional: a card
+    """What the model reads off the card. Every field may be empty: a card
     without a street address is normal, and a guess would be worse than a gap.
 
-    The descriptions are the model's instructions for each field."""
+    The descriptions are the model's instructions for each field.
+
+    Empty means null, not left out: the schema the model answers to lists
+    every field as required. With all of them optional the API refuses the
+    schema as too complex — and on the beta endpoint, rather than saying so,
+    it never answered, and every scan timed out (#262). The defaults stay, so
+    the code can still build a reading from a few fields.
+    """
+
+    model_config = ConfigDict(json_schema_extra=_every_field_required)
 
     name: str | None = Field(None, description="The person's full name, as printed.")
     job_title: str | None = Field(None, description="The person's role or title.")
@@ -91,7 +104,12 @@ class CardReading(BaseModel):
         description="ISO 3166-1 alpha-2 code, e.g. AT. Infer it from the address or the "
         "phone prefix only when unambiguous.",
     )
-    organization_name: str | None = Field(None, description="The company's name.")
+    organization_name: str | None = Field(
+        None,
+        description="The company, firm or brand the person works for, as printed — often "
+        "the logo or the most prominent name on the card, and often without a legal form "
+        "such as GmbH, e.U. or Ltd. It belongs here even then, not in notes.",
+    )
     organization_domain: str | None = Field(
         None, description="The company's domain without scheme or www, e.g. acme.example."
     )
@@ -104,7 +122,8 @@ class CardReading(BaseModel):
     notes: str | None = Field(
         None,
         description="Anything else printed on the card worth keeping: VAT or registration "
-        "numbers, social profiles, a second office. Not slogans.",
+        "numbers, social profiles, a second office. Not slogans, and not the company's "
+        "name — that is organization_name.",
     )
 
 
@@ -115,9 +134,11 @@ one card and return what is printed on it, field by field.
 Copy names, titles and addresses exactly as printed, keeping their language and \
 accents. Write phone numbers in international format (+43 1 234 5678) when the \
 country is clear. Keep a person's own email and number apart from the company's \
-shared ones (office@, info@, a switchboard). Leave a field empty when the card \
-does not show it; never invent or complete a value. If the photos do not show a \
-business card, leave every field empty."""
+shared ones (office@, info@, a switchboard). The company is often printed only \
+as a logo or brand name, without GmbH, e.U. or a similar legal form; it is still \
+the company. Leave a field empty when the card does not show it; never invent \
+or complete a value. If the photos do not show a business card, leave every \
+field empty."""
 
 
 class CardReadError(RuntimeError):
@@ -198,28 +219,38 @@ class ClaudeCardReader:
                 betas=[FALLBACK_BETA],
                 fallbacks="default",
             )
-        except anthropic.APIConnectionError:
+        # Every failure is logged before it becomes a 502: the SDK has already
+        # retried once by then, and its own retry line is all a log would
+        # otherwise show. Only the error is logged, never the request — that
+        # holds the photos.
+        except anthropic.APITimeoutError:
+            logger.error("Business card read timed out after %ss", READ_TIMEOUT_SECONDS)
+            raise CardReadError("The card reader took too long — try again.") from None
+        except anthropic.APIConnectionError as exc:
+            logger.error("Business card read could not connect: %r", exc.__cause__ or exc)
             raise CardReadError("Could not reach the card reader — try again.") from None
-        except anthropic.RateLimitError:
-            raise CardReadError("The card reader is busy — try again in a minute.") from None
         except anthropic.APIStatusError as exc:
-            # The status and request id are enough to look the call up; the
-            # body could echo the request, and that holds the photos.
             logger.error(
-                "Business card read failed: HTTP %s, request %s",
+                "Business card read failed: HTTP %s %s, request %s",
                 exc.status_code,
+                _api_error(exc),
                 exc.request_id,
             )
+            if isinstance(exc, anthropic.RateLimitError):
+                raise CardReadError("The card reader is busy — try again in a minute.") from None
             raise CardReadError("The card reader refused the request.") from None
         except ValidationError:
             # A refusal or a cut-off answer is not the JSON the schema asks
             # for, and the SDK's parser gives up on it before returning.
+            logger.error("Business card read returned no usable answer")
             raise CardReadError("The card reader gave no usable answer — try again.") from None
 
         if response.stop_reason == "refusal":
+            logger.error("Business card read declined by %s", response.model)
             raise CardReadError("The card reader declined to read these photos.")
         reading = response.parsed_output
         if reading is None:
+            logger.error("Business card read stopped with %s", response.stop_reason)
             raise CardReadError("The card reader gave no usable answer — try again.")
         usage = CardReadUsage(
             model=response.model,
@@ -233,6 +264,17 @@ class ClaudeCardReader:
             usage.output_tokens,
         )
         return CardRead(reading, usage)
+
+
+def _api_error(exc: anthropic.APIStatusError) -> str:
+    """Anthropic's own error type and message — "invalid_request_error: Your
+    credit balance is too low…". It describes the problem, not the request."""
+    body = exc.body
+    if isinstance(body, dict):
+        error = body.get("error")
+        if isinstance(error, dict):
+            return f"{error.get('type')}: {str(error.get('message'))[:300]}"
+    return ""
 
 
 async def get_card_reader() -> AsyncIterator[CardReader | None]:

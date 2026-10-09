@@ -111,8 +111,7 @@ backend:
     limits:
       memory: 512Mi
 
-# The React client, built from frontend-next/ (#122). The image name stayed
-# from the Flutter client it replaced, which is no longer built.
+# The React client, built from frontend-next/ (#122).
 frontend:
   image:
     repository: ghcr.io/niecke/tiny-crm/frontend

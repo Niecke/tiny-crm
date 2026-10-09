@@ -3,7 +3,7 @@
 A single-operator CRM for self-employment: contacts, organizations, deals,
 tasks, interactions, projects, documents and a watch list of sources to sweep.
 
-FastAPI + PostgreSQL + S3 on the back, Flutter web on the front. Every row is
+FastAPI + PostgreSQL + S3 on the back, React on the front. Every row is
 scoped to a `user_id` and every endpoint checks it — there are no teams, roles
 or per-record permissions. Interactive API docs live at `/docs`.
 
@@ -494,8 +494,9 @@ adding one row.
 `limit` — with `limit` validated `1..200`. Every list has a **stable sort with
 an `id` tiebreaker**: paging over a non-unique order lets rows repeat or vanish
 between pages. The UI shows "1–25 of 213" and hides the bar when everything
-fits. Pickers deliberately use `listAll()` (walking pages at `limit=200`)
-because a truncated picker is the same silent bug in a smaller box.
+fits. Pickers search on the server as you type (`components/RecordPickers`)
+rather than filtering one loaded page, because a truncated picker is the same
+silent bug in a smaller box.
 
 **Deletes preserve history — detached.** Every link between records is
 `SET NULL` or drops only the join row. Deleting a company keeps its people;
@@ -504,14 +505,14 @@ them. Keeping the name on them as well is what archiving is for, and a delete
 is only allowed after it (Archive instead of delete).
 
 **Money never becomes a float.** `Numeric` in Postgres, a JSON string over the
-wire, a string end to end in Dart (`core/money_text.dart`).
+wire, a string end to end in the client (`formatMoney` in
+`frontend-next/src/deals.ts`).
 
-**Errors are one actionable sentence.** `core/error_text.dart` maps a failure
-to readable text (transport vs. status, `Retry-After` on 429, the server's own
-`detail` including FastAPI's validation list). `ErrorInterceptor` in `api.dart`
-re-throws anything from 400 up, because `validateStatus` accepts every status
-so the 401 handler can see one. Every delete goes through the same
-`confirmDelete()` dialog.
+**Errors are one actionable sentence.** `unwrap()` in
+`frontend-next/src/api/client.ts` rejects on anything that is not a 2xx with an
+`ApiError` carrying the status and the server's own `detail`, because
+`openapi-fetch` resolves on every status and TanStack Query only sees a
+rejection. Every delete asks first, through the same `ConfirmDialog`.
 
 ---
 
@@ -528,7 +529,7 @@ so the 401 handler can see one. Every delete goes through the same
 | `/deals` | List beside detail, scoped "On my plate" / "Still competing" / "No next step" / "Past expected close" / "Won" / "Finished" / one stage. Detail moves the deal with stage chips. |
 | `/organizations` | List beside detail: contacts at the company, add-someone-here, attached documents and interactions. |
 | `/projects` | Project list and detail with its contacts, tasks, documents and interactions. |
-| `/documents` | Upload, pdfrx viewer, markdown render, replace content, attach anywhere. |
+| `/documents` | Upload, pdf.js viewer, markdown render, replace content, attach anywhere. |
 | `/interactions` | "Planned" vs. "Activity log". "Follow up" on a tile creates a task carrying the interaction and the person. |
 | `/account`, `/account/password`, `/health`, `/login` | Profile, password change, health, sign-in. |
 
@@ -543,9 +544,10 @@ ever more than one tap away. One autofocused field: Enter saves and clears while
 keeping focus, so several go in without leaving the dialog, and each saved line
 can be undone on the spot. A failed save leaves the text where it is.
 
-Shared widgets worth knowing: `RecordPicker` / `AttachmentPickers` (the four
-attach pickers used by every form), `LinkedTasksSection`, `PaginationBar`,
-`AttachedDocumentsSection`, `AttachedInteractionsSection`, `QuickCaptureButton`.
+Shared components worth knowing (`frontend-next/src/components/`):
+`ContactPicker` / `OrganizationPicker` / `DealPicker` in `RecordPickers` and
+`LinksPicker` (the pickers used by every form), `TaskList`, `ui/Pagination`,
+`DocumentRows`, `InteractionList`, `QuickCaptureButton`.
 
 ---
 
@@ -746,11 +748,11 @@ the frontend polls it to prompt a reload after a deploy.
   accounts (Alice and Bob) with sessions opened directly, skipping the password hash.
   S3 is faked in memory for document tests. `uv run mypy app tests` is clean and
   gated in CI; `ruff check` and `ruff format --check` too.
-- **Frontend: 11 test files** (`cd frontend && flutter test`) covering the
-  hand-written models, money and date formatting, and error text.
-  `widget_test.dart` is browser-only — add `--platform chrome`.
+- **Frontend: 16 test files** (`cd frontend-next && npm test`, Vitest) covering
+  date and money formatting and labels, the API client's token renewal, and the
+  hooks that change the cache, with the API faked from its schema by MSW.
 - **`ci/smoke.sh`** drives the real built images against Postgres and the S3 fixture:
-  health, matching versions, the Flutter bundle and its SPA fallback, admin
+  health, matching versions, the React bundle and its SPA fallback, admin
   creation, login, a 401 for anonymous requests, contact / document / deal /
   watch round-trips, and the briefing script's `--dry-run` inside the image.
 

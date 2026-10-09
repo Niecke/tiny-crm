@@ -190,8 +190,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
-  # The React client in frontend-next/ (#122). The Flutter client in frontend/
-  # is no longer built, tested or shipped. The gate is the unit tests, what
+  # The React client in frontend-next/ (#122). The gate is the unit tests, what
   # `npm run build` enforces — the TypeScript type-check — plus the linter, and
   # that its generated API types match the backend. Node comes from
   # setup-node rather than the Dockerfile's image: JavaScript actions such as
@@ -361,9 +360,8 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # The image keeps the name `frontend` it had as the Flutter client: the chart,
-  # promote.yml and the HelmReleases all know it by that name, and the React
-  # build serves config.json and version.json at the same paths.
+  # The image is named `frontend`, not `frontend-next` after its directory: the
+  # chart, promote.yml and the HelmReleases all know it by that name.
   build-frontend:
     name: Build frontend
     needs: [changes, meta, backend-tests, frontend-checks]

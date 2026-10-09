@@ -61,10 +61,11 @@ ingress `source_ip` is the browser's address, not the proxy's, as long as
 `FORWARDED_ALLOW_IPS` covers the proxy; such a line has no `source_port`,
 because `X-Forwarded-For` does not carry one.
 
-Run flutter in debug mode locally
+Run the React client locally (see [frontend-next/README.md](frontend-next/README.md))
 ```bash
-cd frontend
-flutter run
+cd frontend-next
+npm install
+npm run dev
 ```
 
 ## Full stack (test)
@@ -88,36 +89,6 @@ Shutdown again
 podman-compose -f compose.full.yml down
 ```
 
-## Flutter Setup
-
-### 1. Download and extract
-```bash
-mkdir -p ~/development
-curl -L https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.41.9-stable.tar.xz \
-  | tar xJ -C ~/development
-```
-
-### 2. Add to PATH (for bash — swap .bashrc for .zshrc if you use zsh)
-```bash
-echo 'export PATH="$HOME/development/flutter/bin:$PATH"' >> ~/.bashrc
-source ~/.bashrc
-```
-
-### 3. Enable web target + install dependencies
-```bash
-flutter config --enable-web
-flutter doctor
-```
-
-### 4. Chromium for Flutter web dev (Flutter can't use Firefox)
-```bash
-sudo dnf install chromium
-
-echo 'export CHROME_EXECUTABLE=chromium-browser' >> ~/.bashrc
-source ~/.bashrc
-flutter doctor
-```
-
 ## Git Stuff
 
 ```bash
@@ -130,8 +101,9 @@ cd backend
 .venv/bin/ruff format --check .
 cd ..
 
-echo ">>> flutter analyze (frontend)"
-"$HOME/development/flutter/bin/flutter" analyze frontend
+echo ">>> oxlint (frontend-next)"
+cd frontend-next
+npm run lint
 ```
 ## Tests
 
@@ -144,8 +116,8 @@ podman-compose up -d db                       # or point TEST_DATABASE_URL elsew
 cd backend && uv run pytest                   # 340 tests
 cd backend && uv run pytest --cov=app         # with a coverage summary
 
-cd frontend && flutter test                   # widget_test.dart is browser-only, skipped here
-cd frontend && flutter test --platform chrome # includes the widget test
+cd frontend-next && npm test                  # Vitest unit tests
+cd frontend-next && npm run test:coverage     # with a coverage report
 ```
 
 `TEST_DATABASE_URL` defaults to `postgresql+asyncpg://crm:crm@localhost:5432/postgres`. The
@@ -203,8 +175,7 @@ Work happens on `feat/*` branches; `main` is what ships. The pipeline workflows:
    container), uploading their JUnit report and coverage file. **Frontend checks** lints and
    type-checks the React client in `frontend-next/` (#122) with `npm run lint` and
    `npm run build`, and fails when its generated API types no longer match the backend's
-   OpenAPI schema; it has no test suite yet. The Flutter client in `frontend/` is no longer
-   tested or built; its code stays in the repository for now.
+   OpenAPI schema, and runs its Vitest unit tests.
 2. **Test report** — renders the backend suite into a table (passed/failed/skipped, line
    coverage, duration) via `ci/pr_report.py`, writes it to the job summary and keeps a single
    updated comment on the PR, so results are readable without opening the run. Runs even when
@@ -249,12 +220,12 @@ lands on `main`. It must be a [conventional commit](https://www.conventionalcomm
 Allowed types: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`,
 `revert`, `style`, `test`. Renovate's `chore(deps):` / `fix(deps):` titles already fit.
 Anything that ships inside an image — the Dockerfile base images, the backend's
-`[project] dependencies`, pubspec `dependencies` — is `fix(deps)` and cuts a patch release;
+`[project] dependencies`, npm `dependencies` in `frontend-next/` — is `fix(deps)` and cuts a patch release;
 CI actions, compose files and dev dependencies stay `chore(deps)` and do not.
 
 **`.github/workflows/release-please.yml`** keeps one release pull request open against
 `main`. It bumps a single version for the whole product — `version.txt`,
-`backend/pyproject.toml` and `uv.lock`, `frontend/pubspec.yaml`, and both `version` and
+`backend/pyproject.toml` and `uv.lock`, and both `version` and
 `appVersion` in `charts/tinycrm/Chart.yaml` — and prepends the changes to `CHANGELOG.md`.
 Merging it tags `vX.Y.Z` and publishes the GitHub Release. Never bump those versions by
 hand; the files are listed in `release-please-config.json`.

@@ -427,6 +427,11 @@ async def test_the_claude_reader_sends_both_sides_and_parses_the_answer() -> Non
     images = [block for block in content if block["type"] == "image"]
     assert [image["source"]["media_type"] for image in images] == ["image/jpeg", "image/png"]
     assert sent[0]["model"] == "claude-opus-5-5"
+    # Every field required, empty as null: with them optional the API refuses
+    # the schema as too complex, or on the beta endpoint never answers (#262).
+    schema = sent[0]["output_config"]["format"]["schema"]
+    assert sorted(schema["required"]) == sorted(CardReading.model_fields)
+    assert {"type": "null"} in schema["properties"]["street"]["anyOf"]
 
 
 @pytest.mark.parametrize(
@@ -473,3 +478,51 @@ async def test_the_readers_client_is_closed_after_the_request(
 async def test_without_a_key_there_is_no_reader(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "anthropic_api_key", None)
     assert await anext(get_card_reader()) is None
+
+
+@pytest.mark.parametrize(
+    ("response", "shown", "logged"),
+    [
+        (httpx2.ReadTimeout("slow"), "took too long", "timed out"),
+        (httpx2.ConnectError("refused"), "Could not reach", "could not connect"),
+        (
+            httpx2.Response(
+                429,
+                json={"type": "error", "error": {"type": "rate_limit_error", "message": "slow"}},
+            ),
+            "busy",
+            "HTTP 429 rate_limit_error: slow",
+        ),
+        (
+            httpx2.Response(
+                400,
+                json={
+                    "type": "error",
+                    "error": {
+                        "type": "invalid_request_error",
+                        "message": "Your credit balance is too low",
+                    },
+                },
+            ),
+            "refused",
+            "HTTP 400 invalid_request_error: Your credit balance is too low",
+        ),
+    ],
+)
+async def test_every_failed_read_is_logged(
+    caplog: pytest.LogCaptureFixture,
+    response: httpx2.Response | Exception,
+    shown: str,
+    logged: str,
+) -> None:
+    # The SDK's own retry line used to be the only trace of a timeout, a
+    # connection error or a rate limit.
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        if isinstance(response, Exception):
+            raise response
+        return response
+
+    with pytest.raises(CardReadError, match=shown):
+        await _claude(handler).read([CardImage(JPEG, "image/jpeg")])
+    errors = [r.getMessage() for r in caplog.records if r.levelname == "ERROR"]
+    assert any(logged in message for message in errors), errors
