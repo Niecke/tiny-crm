@@ -5,6 +5,7 @@ it: the upload guards, turning a reading into drafts, finding the company that
 is already on file, and filing the card without leaving half of it behind.
 """
 
+import asyncio
 import json
 from collections.abc import Iterator
 from typing import Any
@@ -13,6 +14,7 @@ import httpx2
 import pytest
 from httpx2 import AsyncClient
 
+from app import business_cards
 from app.business_cards import (
     CardImage,
     CardRead,
@@ -396,17 +398,61 @@ def _claude(handler: Any) -> ClaudeCardReader:
     )
 
 
-def _message(text: str, stop_reason: str = "end_turn") -> dict[str, Any]:
-    return {
-        "id": "msg_test",
-        "type": "message",
-        "role": "assistant",
-        "model": "claude-opus-5-5",
-        "content": [{"type": "text", "text": text}],
-        "stop_reason": stop_reason,
-        "stop_sequence": None,
-        "usage": {"input_tokens": 1500, "output_tokens": 180},
-    }
+def _stream(text: str, stop_reason: str = "end_turn") -> httpx2.Response:
+    """The answer as the API streams it: server-sent events, the text in two
+    deltas, the stop reason and output tokens at the end."""
+    half = len(text) // 2
+    events: list[tuple[str, dict[str, Any]]] = [
+        (
+            "message_start",
+            {
+                "type": "message_start",
+                "message": {
+                    "id": "msg_test",
+                    "type": "message",
+                    "role": "assistant",
+                    "model": "claude-opus-5-5",
+                    "content": [],
+                    "stop_reason": None,
+                    "stop_sequence": None,
+                    "usage": {"input_tokens": 1500, "output_tokens": 1},
+                },
+            },
+        ),
+        (
+            "content_block_start",
+            {
+                "type": "content_block_start",
+                "index": 0,
+                "content_block": {"type": "text", "text": ""},
+            },
+        ),
+        ("ping", {"type": "ping"}),
+        *(
+            (
+                "content_block_delta",
+                {
+                    "type": "content_block_delta",
+                    "index": 0,
+                    "delta": {"type": "text_delta", "text": part},
+                },
+            )
+            for part in (text[:half], text[half:])
+            if part
+        ),
+        ("content_block_stop", {"type": "content_block_stop", "index": 0}),
+        (
+            "message_delta",
+            {
+                "type": "message_delta",
+                "delta": {"stop_reason": stop_reason, "stop_sequence": None},
+                "usage": {"output_tokens": 180},
+            },
+        ),
+        ("message_stop", {"type": "message_stop"}),
+    ]
+    body = "".join(f"event: {name}\ndata: {json.dumps(data)}\n\n" for name, data in events)
+    return httpx2.Response(200, text=body, headers={"content-type": "text/event-stream"})
 
 
 async def test_the_claude_reader_sends_both_sides_and_parses_the_answer() -> None:
@@ -415,7 +461,7 @@ async def test_the_claude_reader_sends_both_sides_and_parses_the_answer() -> Non
     def handler(request: httpx2.Request) -> httpx2.Response:
         sent.append(json.loads(request.content))
         assert request.headers["x-api-key"] == "sk-test"
-        return httpx2.Response(200, json=_message(READING.model_dump_json()))
+        return _stream(READING.model_dump_json())
 
     read = await _claude(handler).read([CardImage(JPEG, "image/jpeg"), CardImage(PNG, "image/png")])
     assert read.reading == READING
@@ -442,7 +488,7 @@ async def test_the_claude_reader_reports_an_answer_it_cannot_use(
     text: str, stop_reason: str
 ) -> None:
     def handler(request: httpx2.Request) -> httpx2.Response:
-        return httpx2.Response(200, json=_message(text, stop_reason=stop_reason))
+        return _stream(text, stop_reason=stop_reason)
 
     with pytest.raises(CardReadError):
         await _claude(handler).read([CardImage(JPEG, "image/jpeg")])
@@ -478,7 +524,7 @@ async def test_without_a_key_there_is_no_reader(monkeypatch: pytest.MonkeyPatch)
 @pytest.mark.parametrize(
     ("response", "shown", "logged"),
     [
-        (httpx2.ReadTimeout("slow"), "took too long", "timed out"),
+        (httpx2.ReadTimeout("slow"), "took too long", "stalled: nothing for 60s"),
         (httpx2.ConnectError("refused"), "Could not reach", "could not connect"),
         (
             httpx2.Response(
@@ -521,3 +567,17 @@ async def test_every_failed_read_is_logged(
         await _claude(handler).read([CardImage(JPEG, "image/jpeg")])
     errors = [r.getMessage() for r in caplog.records if r.levelname == "ERROR"]
     assert any(logged in message for message in errors), errors
+
+
+async def test_a_read_that_runs_past_the_deadline_gives_up(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setattr(business_cards, "READ_DEADLINE_SECONDS", 0.05)
+
+    async def handler(request: httpx2.Request) -> httpx2.Response:
+        await asyncio.sleep(1)
+        return _stream(READING.model_dump_json())
+
+    with pytest.raises(CardReadError, match="took too long"):
+        await _claude(handler).read([CardImage(JPEG, "image/jpeg")])
+    assert any("longer than 0.05s" in r.getMessage() for r in caplog.records)

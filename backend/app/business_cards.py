@@ -15,6 +15,7 @@ they nor the reading appear in a log line.
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import logging
 from collections.abc import AsyncIterator
@@ -35,9 +36,15 @@ ImageType = Literal["image/jpeg", "image/png", "image/gif", "image/webp"]
 # sending them, so a real card never comes near it.
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 
-# Long enough for a slow vision request, short enough that the scan screen
-# gives up rather than spins.
-READ_TIMEOUT_SECONDS = 60
+# The answer is streamed, so the connection is never idle for long while the
+# model works — the API sends events, and pings between them. This is how long
+# it may go quiet before the read counts as stalled.
+IDLE_TIMEOUT_SECONDS = 60
+
+# How long one read may take in all. A card is short, but the model thinks
+# before it answers and that is not fast; past this the scan screen gives up
+# rather than spins.
+READ_DEADLINE_SECONDS = 150
 
 # Routes a declined request to another model instead of failing it outright.
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
@@ -159,7 +166,7 @@ class ClaudeCardReader:
     ) -> None:
         self._client = anthropic.AsyncAnthropic(
             api_key=api_key,
-            timeout=READ_TIMEOUT_SECONDS,
+            timeout=IDLE_TIMEOUT_SECONDS,
             max_retries=1,
             http_client=http_client,
         )
@@ -186,24 +193,32 @@ class ClaudeCardReader:
         content.append({"type": "text", "text": "Read this business card."})
 
         try:
-            response = await self._client.beta.messages.parse(
-                model=self._model,
-                max_tokens=4096,
-                system=SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": content}],
-                output_format=CardReading,
-                # Transcription, not reasoning: the low end is plenty, and the
-                # operator is waiting on the answer.
-                output_config={"effort": "low"},
-                betas=[FALLBACK_BETA],
-                fallbacks="default",
-            )
+            # Streamed rather than one request waiting for the whole answer: a
+            # waiting request sends nothing back while the model thinks, and
+            # a slow read ran into the idle timeout before it was done.
+            async with asyncio.timeout(READ_DEADLINE_SECONDS):
+                async with self._client.beta.messages.stream(
+                    model=self._model,
+                    max_tokens=4096,
+                    system=SYSTEM_PROMPT,
+                    messages=[{"role": "user", "content": content}],
+                    output_format=CardReading,
+                    # Transcription, not reasoning: the low end is plenty, and
+                    # the operator is waiting on the answer.
+                    output_config={"effort": "low"},
+                    betas=[FALLBACK_BETA],
+                    fallbacks="default",
+                ) as stream:
+                    response = await stream.get_final_message()
         # Every failure is logged before it becomes a 502: the SDK has already
         # retried once by then, and its own retry line is all a log would
         # otherwise show. Only the error is logged, never the request — that
         # holds the photos.
+        except TimeoutError:
+            logger.error("Business card read took longer than %ss", READ_DEADLINE_SECONDS)
+            raise CardReadError("The card reader took too long — try again.") from None
         except anthropic.APITimeoutError:
-            logger.error("Business card read timed out after %ss", READ_TIMEOUT_SECONDS)
+            logger.error("Business card read stalled: nothing for %ss", IDLE_TIMEOUT_SECONDS)
             raise CardReadError("The card reader took too long — try again.") from None
         except anthropic.APIConnectionError as exc:
             logger.error("Business card read could not connect: %r", exc.__cause__ or exc)
