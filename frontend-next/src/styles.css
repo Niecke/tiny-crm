@@ -2976,3 +2976,20 @@ textarea.input {
 .card-sides-review {
   grid-template-columns: repeat(auto-fit, minmax(10rem, 16rem));
 }
+
+/* A list page's header actions, e.g. "Scan card" beside "New contact": the
+   secondary one at the primary's size, so the two line up as a pair. */
+.page-header-row .header-actions {
+  align-items: center;
+}
+
+/* Too narrow for the title and both buttons: the buttons move under it. */
+.page-header-row:has(> .header-actions) {
+  flex-wrap: wrap;
+  row-gap: var(--space-2);
+}
+
+.page-header-row .header-actions .button-quiet {
+  padding: var(--space-2) var(--space-4);
+  font-size: inherit;
+}
