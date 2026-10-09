@@ -1821,6 +1821,30 @@ textarea.input {
 /* Actions under a panel that is not a form: the account page's buttons. */
 .account-actions {
   justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+/* Two-factor setup (routes/_authed/account/mfa.tsx). The QR code keeps a white
+   background in dark mode too: scanners need the contrast. */
+.mfa-qr {
+  align-self: flex-start;
+  background: #fff;
+  border-radius: var(--radius-sm);
+}
+
+.mfa-secret {
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.recovery-codes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: var(--space-2);
+  font-family: var(--font-mono);
 }
 
 .page-header-row {

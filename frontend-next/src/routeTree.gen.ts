@@ -28,6 +28,7 @@ import { Route as AuthedSystemRouteImport } from './routes/_authed/system'
 import { Route as AuthedTasksRouteRouteImport } from './routes/_authed/tasks/route'
 import { Route as AuthedWatchesRouteRouteImport } from './routes/_authed/watches/route'
 import { Route as AuthedAccountIndexRouteImport } from './routes/_authed/account/index'
+import { Route as AuthedAccountMfaRouteImport } from './routes/_authed/account/mfa'
 import { Route as AuthedAccountPasswordRouteImport } from './routes/_authed/account/password'
 import { Route as AuthedContactsIndexRouteImport } from './routes/_authed/contacts/index'
 import { Route as AuthedContactsNewRouteImport } from './routes/_authed/contacts/new'
@@ -154,6 +155,11 @@ const AuthedWatchesRouteRoute = AuthedWatchesRouteRouteImport.update({
 const AuthedAccountIndexRoute = AuthedAccountIndexRouteImport.update({
   id: '/account/',
   path: '/account/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedAccountMfaRoute = AuthedAccountMfaRouteImport.update({
+  id: '/account/mfa',
+  path: '/account/mfa',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedAccountPasswordRoute = AuthedAccountPasswordRouteImport.update({
@@ -346,6 +352,7 @@ export interface FileRoutesByFullPath {
   '/numbers': typeof AuthedNumbersRoute
   '/search': typeof AuthedSearchRoute
   '/system': typeof AuthedSystemRoute
+  '/account/mfa': typeof AuthedAccountMfaRoute
   '/account/password': typeof AuthedAccountPasswordRoute
   '/contacts/new': typeof AuthedContactsNewRoute
   '/deals/new': typeof AuthedDealsNewRoute
@@ -389,6 +396,7 @@ export interface FileRoutesByTo {
   '/search': typeof AuthedSearchRoute
   '/system': typeof AuthedSystemRoute
   '/': typeof AuthedIndexRoute
+  '/account/mfa': typeof AuthedAccountMfaRoute
   '/account/password': typeof AuthedAccountPasswordRoute
   '/contacts/new': typeof AuthedContactsNewRoute
   '/deals/new': typeof AuthedDealsNewRoute
@@ -443,6 +451,7 @@ export interface FileRoutesById {
   '/_authed/search': typeof AuthedSearchRoute
   '/_authed/system': typeof AuthedSystemRoute
   '/_authed/': typeof AuthedIndexRoute
+  '/_authed/account/mfa': typeof AuthedAccountMfaRoute
   '/_authed/account/password': typeof AuthedAccountPasswordRoute
   '/_authed/contacts/new': typeof AuthedContactsNewRoute
   '/_authed/deals/new': typeof AuthedDealsNewRoute
@@ -497,6 +506,7 @@ export interface FileRouteTypes {
     | '/numbers'
     | '/search'
     | '/system'
+    | '/account/mfa'
     | '/account/password'
     | '/contacts/new'
     | '/deals/new'
@@ -540,6 +550,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/system'
     | '/'
+    | '/account/mfa'
     | '/account/password'
     | '/contacts/new'
     | '/deals/new'
@@ -593,6 +604,7 @@ export interface FileRouteTypes {
     | '/_authed/search'
     | '/_authed/system'
     | '/_authed/'
+    | '/_authed/account/mfa'
     | '/_authed/account/password'
     | '/_authed/contacts/new'
     | '/_authed/deals/new'
@@ -768,6 +780,13 @@ declare module '@tanstack/react-router' {
       path: '/account'
       fullPath: '/account/'
       preLoaderRoute: typeof AuthedAccountIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/account/mfa': {
+      id: '/_authed/account/mfa'
+      path: '/account/mfa'
+      fullPath: '/account/mfa'
+      preLoaderRoute: typeof AuthedAccountMfaRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/account/password': {
@@ -1163,6 +1182,7 @@ interface AuthedRouteChildren {
   AuthedSearchRoute: typeof AuthedSearchRoute
   AuthedSystemRoute: typeof AuthedSystemRoute
   AuthedIndexRoute: typeof AuthedIndexRoute
+  AuthedAccountMfaRoute: typeof AuthedAccountMfaRoute
   AuthedAccountPasswordRoute: typeof AuthedAccountPasswordRoute
   AuthedAccountIndexRoute: typeof AuthedAccountIndexRoute
 }
@@ -1182,6 +1202,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedSearchRoute: AuthedSearchRoute,
   AuthedSystemRoute: AuthedSystemRoute,
   AuthedIndexRoute: AuthedIndexRoute,
+  AuthedAccountMfaRoute: AuthedAccountMfaRoute,
   AuthedAccountPasswordRoute: AuthedAccountPasswordRoute,
   AuthedAccountIndexRoute: AuthedAccountIndexRoute,
 }

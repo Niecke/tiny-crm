@@ -21,6 +21,10 @@ dependencies = [
     "typer>=0.27.2",
     # Mail bodies, app/templates/mail/.
     "jinja2>=3.1.6",
+    # Two-factor sign-in, app/auth/mfa.py: TOTP codes, and the TOTP secrets
+    # encrypted at rest (cryptography came in through pyjwt before; now named).
+    "pyotp>=2.10.0",
+    "cryptography>=50.0.2",
 ]
 
 [dependency-groups]
