@@ -11,9 +11,9 @@ recovery codes, shown once.
 /auth/jwt/login answers with a challenge instead — an `mfa_token`, a JWT
 naming the user, valid for MFA_TOKEN_LIFETIME — and /auth/jwt/mfa trades that
 token plus a code for the usual token pair. The challenge token has its own
-audience, so it is never accepted as an access token, and it carries a
-fingerprint of the stored secret, so turning MFA off and on again voids any
-challenge issued before.
+audience, so it is never accepted as an access token, and it names the setup
+it was issued for (when MFA was turned on), so turning MFA off and on again
+voids any challenge issued before.
 
 Code guesses are charged to the same per-account backoff as password guesses
 (app/auth/throttle.py), and the backoff is only cleared once the second step
@@ -237,9 +237,10 @@ async def disable(db: AsyncSession, user_id: UUID) -> bool:
 
 
 def _fingerprint(user: User) -> str:
-    # The sealed value is re-encrypted with a fresh nonce on every setup, so a
-    # new setup changes it even if the same secret came up twice.
-    return hashlib.sha256((user.mfa_secret or "").encode()).hexdigest()[:32]
+    # Which setup a challenge was issued for: every confirm stamps a new
+    # `mfa_enabled_at`, so turning MFA off and on again changes it. Nothing
+    # derived from the secret goes into the token.
+    return user.mfa_enabled_at.isoformat() if user.mfa_enabled_at else ""
 
 
 def issue_mfa_token(user: User) -> str:
