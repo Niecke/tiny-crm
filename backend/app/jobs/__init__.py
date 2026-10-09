@@ -32,6 +32,9 @@ from __future__ import annotations
 import logging
 
 from procrastinate import App, JobContext, PsycopgConnector
+from procrastinate.exceptions import ProcrastinateException, UniqueViolation
+from procrastinate.jobs import Job, Status
+from procrastinate.manager import QUEUEING_LOCK_CONSTRAINT, JobManager
 from sqlalchemy.engine import make_url
 
 from app.config import settings
@@ -99,13 +102,50 @@ async def retry_stalled_jobs(context: JobContext, timestamp: int) -> None:
 
     A worker that is killed — OOM, node gone — leaves its jobs in `doing`
     forever; nothing else would ever pick them up.
+
+    Job by job: one that cannot be queued again must not keep the ones after
+    it waiting for a sweep that gets past it. The sweep still ends as failed
+    then, so the job that is stuck shows up as more than a log line.
     """
     manager = context.app.job_manager
+    stuck = 0
     for job in await manager.get_stalled_jobs(seconds_since_heartbeat=STALLED_WORKER_SECONDS):
+        try:
+            await _hand_out_again(manager, job)
+        except ProcrastinateException as exc:
+            stuck += 1
+            logger.error(
+                "Job %s (%s) was left behind by a dead worker and could not be queued again: %s",
+                job.id,
+                job.task_name,
+                type(exc).__name__,
+            )
+    if stuck:
+        raise RuntimeError(f"{stuck} job(s) of a dead worker could not be queued again")
+
+
+async def _hand_out_again(manager: JobManager, job: Job) -> None:
+    try:
         await manager.retry_job(job)
+    except UniqueViolation as exc:
+        if exc.constraint_name != QUEUEING_LOCK_CONSTRAINT:
+            raise
+        # A queueing lock allows one *waiting* job. This one was running, so a
+        # second could be queued behind it — and now is: its replacement is
+        # already waiting, and queueing this one again would make two. Ended
+        # as aborted rather than left in `doing`, where every sweep would trip
+        # over it again.
+        await manager.finish_job(job, status=Status.ABORTED, delete_job=False)
         logger.warning(
-            "Job %s (%s) was left behind by a dead worker; queued again", job.id, job.task_name
+            "Job %s (%s) was left behind by a dead worker; given up, a newer job "
+            "with its queueing lock is already waiting",
+            job.id,
+            job.task_name,
         )
+        return
+    logger.warning(
+        "Job %s (%s) was left behind by a dead worker; queued again", job.id, job.task_name
+    )
 
 
 @jobs_app.periodic(cron="17 3 * * *")
