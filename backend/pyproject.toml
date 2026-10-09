@@ -73,7 +73,6 @@ branch = true
 omit = [
     # Import-time wiring with nothing to assert on.
     "app/version.py",
-    "app/logging_config.py",
 ]
 
 [tool.coverage.report]
