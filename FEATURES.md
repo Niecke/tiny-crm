@@ -97,6 +97,10 @@ fixed schema rather than a column of OCR text — the hard part of a card is whi
 line is the person and which number the switchboard. Without a key `scan` is a
 **503** naming the variable. A failed or declined read is a **502** with a
 message the screen shows as is; neither the photos nor the reading reach a log.
+Every scan also returns `usage` — the model that answered (after a refusal
+fallback, the one that took over) and the input and output tokens it billed —
+shown on the review screen and logged, so the cost of a read can be checked
+against the price list.
 
 **Matching an existing company.** Same domain first — taken from the printed
 domain, the website, or the email unless that is a mailbox provider's

@@ -221,18 +221,20 @@ async def scan_business_card(
     if back is not None:
         images.append(await _read_image(back, "back"))
     try:
-        reading = await reader.read(images)
+        read = await reader.read(images)
     except CardReadError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from None
 
-    contact, organization = to_drafts(reading)
+    contact, organization = to_drafts(read.reading)
     if contact.name is None and organization is None:
         raise HTTPException(
             status_code=422,
             detail="No name or company could be read from these photos — try a sharper photo",
         )
     match = await find_organization(session, user, organization) if organization else None
-    return BusinessCardScan(contact=contact, organization=organization, match=match)
+    return BusinessCardScan(
+        contact=contact, organization=organization, match=match, usage=read.usage
+    )
 
 
 @router.post("/import", response_model=ContactRead, status_code=201)

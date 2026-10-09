@@ -2,6 +2,7 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
+from app.business_cards import CardReadUsage
 from app.schemas.contact import ContactCreate
 from app.schemas.organization import OrganizationCreate
 
@@ -51,6 +52,7 @@ class BusinessCardScan(BaseModel):
     # None when the card names no company.
     organization: CardOrganizationDraft | None = None
     match: OrganizationMatch | None = None
+    usage: CardReadUsage
 
 
 class BusinessCardImport(BaseModel):

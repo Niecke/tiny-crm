@@ -1763,6 +1763,7 @@ export interface components {
             contact: components["schemas"]["CardContactDraft"];
             organization?: components["schemas"]["CardOrganizationDraft"] | null;
             match?: components["schemas"]["OrganizationMatch"] | null;
+            usage: components["schemas"]["CardReadUsage"];
         };
         /**
          * CaptureContact
@@ -2023,6 +2024,21 @@ export interface components {
             phone?: string | null;
             /** Address */
             address?: string | null;
+        };
+        /**
+         * CardReadUsage
+         * @description What one read cost: the model that answered and the tokens it billed.
+         *
+         *     Shown on the review screen so the cost of a scan can be checked against
+         *     the price list without opening the Anthropic console.
+         */
+        CardReadUsage: {
+            /** Model */
+            model: string;
+            /** Input Tokens */
+            input_tokens: number;
+            /** Output Tokens */
+            output_tokens: number;
         };
         /** ContactCreate */
         ContactCreate: {

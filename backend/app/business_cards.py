@@ -123,8 +123,28 @@ class CardReadError(RuntimeError):
     """The card could not be read. The text is safe to show the operator."""
 
 
+class CardReadUsage(BaseModel):
+    """What one read cost: the model that answered and the tokens it billed.
+
+    Shown on the review screen so the cost of a scan can be checked against
+    the price list without opening the Anthropic console.
+    """
+
+    # The model that actually answered — after a refusal fallback, not the one
+    # asked for.
+    model: str
+    input_tokens: int
+    output_tokens: int
+
+
+@dataclass(frozen=True)
+class CardRead:
+    reading: CardReading
+    usage: CardReadUsage
+
+
 class CardReader(Protocol):
-    async def read(self, images: list[CardImage]) -> CardReading:
+    async def read(self, images: list[CardImage]) -> CardRead:
         """Read one card from the photos of its sides, or raise CardReadError."""
 
 
@@ -144,7 +164,7 @@ class ClaudeCardReader:
         )
         self._model = model
 
-    async def read(self, images: list[CardImage]) -> CardReading:
+    async def read(self, images: list[CardImage]) -> CardRead:
         content: list[anthropic.types.beta.BetaContentBlockParam] = []
         for side, image in zip(("Front", "Back"), images, strict=False):
             content.append({"type": "text", "text": f"{side} of the card:"})
@@ -196,7 +216,18 @@ class ClaudeCardReader:
         reading = response.parsed_output
         if reading is None:
             raise CardReadError("The card reader gave no usable answer — try again.")
-        return reading
+        usage = CardReadUsage(
+            model=response.model,
+            input_tokens=response.usage.input_tokens,
+            output_tokens=response.usage.output_tokens,
+        )
+        logger.info(
+            "Business card read by %s: %d input, %d output tokens",
+            usage.model,
+            usage.input_tokens,
+            usage.output_tokens,
+        )
+        return CardRead(reading, usage)
 
 
 def get_card_reader() -> CardReader | None:

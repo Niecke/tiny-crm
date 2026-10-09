@@ -6410,11 +6410,15 @@
                 "type": "null"
               }
             ]
+          },
+          "usage": {
+            "$ref": "#/components/schemas/CardReadUsage"
           }
         },
         "type": "object",
         "required": [
-          "contact"
+          "contact",
+          "usage"
         ],
         "title": "BusinessCardScan"
       },
@@ -7302,6 +7306,30 @@
         ],
         "title": "CardOrganizationDraft",
         "description": "The company on the card, as read."
+      },
+      "CardReadUsage": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "input_tokens": {
+            "type": "integer",
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "type": "integer",
+            "title": "Output Tokens"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model",
+          "input_tokens",
+          "output_tokens"
+        ],
+        "title": "CardReadUsage",
+        "description": "What one read cost: the model that answered and the tokens it billed.\n\nShown on the review screen so the cost of a scan can be checked against\nthe price list without opening the Anthropic console."
       },
       "ContactCreate": {
         "properties": {

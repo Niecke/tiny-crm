@@ -235,6 +235,8 @@ const toBody = (v: FormOutput): BusinessCardImport => ({
       : null,
 })
 
+const tokens = (n: number) => n.toLocaleString()
+
 function CardReview({ scan, onRescan }: { scan: BusinessCardScan; onRescan: () => void }) {
   const { api } = Route.useRouteContext()
   const filters = Route.useSearch()
@@ -264,6 +266,12 @@ function CardReview({ scan, onRescan }: { scan: BusinessCardScan; onRescan: () =
   return (
     <form className="panel form" onSubmit={handleSubmit((values) => mutation.mutate(toBody(values)))} noValidate>
       <p className="muted">Check what was read against the card and correct anything that is off.</p>
+      {/* What this read cost, to check against the price list while the
+          model choice is still being settled. */}
+      <p className="scan-usage muted">
+        Read by <code>{scan.usage.model}</code> · {tokens(scan.usage.input_tokens)} input,{' '}
+        {tokens(scan.usage.output_tokens)} output tokens
+      </p>
 
       <fieldset className="form-section">
         <legend>Person</legend>

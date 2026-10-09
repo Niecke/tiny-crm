@@ -15,8 +15,10 @@ from httpx2 import AsyncClient
 
 from app.business_cards import (
     CardImage,
+    CardRead,
     CardReadError,
     CardReading,
+    CardReadUsage,
     ClaudeCardReader,
     get_card_reader,
     sniff_image_type,
@@ -44,17 +46,20 @@ READING = CardReading(
 )
 
 
+USAGE = CardReadUsage(model="claude-opus-5-5", input_tokens=1234, output_tokens=210)
+
+
 class FakeReader:
     def __init__(self, reading: CardReading = READING) -> None:
         self.reading = reading
         self.calls: list[list[CardImage]] = []
         self.fail: str | None = None
 
-    async def read(self, images: list[CardImage]) -> CardReading:
+    async def read(self, images: list[CardImage]) -> CardRead:
         self.calls.append(images)
         if self.fail:
             raise CardReadError(self.fail)
-        return self.reading
+        return CardRead(self.reading, USAGE)
 
 
 @pytest.fixture
@@ -92,6 +97,12 @@ async def test_a_scan_returns_a_draft_of_the_person_and_the_company(
         "address": "Hauptstraße 1, 1010 Wien, AT",
     }
     assert body["match"] is None
+    # What the read cost, for checking against the price list.
+    assert body["usage"] == {
+        "model": "claude-opus-5-5",
+        "input_tokens": 1234,
+        "output_tokens": 210,
+    }
     # Both sides went to the reader, front first, each as what it really is.
     assert [image.media_type for image in reader.calls[0]] == ["image/jpeg", "image/png"]
 
@@ -371,7 +382,7 @@ def _message(text: str, stop_reason: str = "end_turn") -> dict[str, Any]:
         "content": [{"type": "text", "text": text}],
         "stop_reason": stop_reason,
         "stop_sequence": None,
-        "usage": {"input_tokens": 10, "output_tokens": 10},
+        "usage": {"input_tokens": 1500, "output_tokens": 180},
     }
 
 
@@ -383,10 +394,11 @@ async def test_the_claude_reader_sends_both_sides_and_parses_the_answer() -> Non
         assert request.headers["x-api-key"] == "sk-test"
         return httpx2.Response(200, json=_message(READING.model_dump_json()))
 
-    reading = await _claude(handler).read(
-        [CardImage(JPEG, "image/jpeg"), CardImage(PNG, "image/png")]
+    read = await _claude(handler).read([CardImage(JPEG, "image/jpeg"), CardImage(PNG, "image/png")])
+    assert read.reading == READING
+    assert read.usage == CardReadUsage(
+        model="claude-opus-5-5", input_tokens=1500, output_tokens=180
     )
-    assert reading == READING
 
     content = sent[0]["messages"][0]["content"]
     images = [block for block in content if block["type"] == "image"]
