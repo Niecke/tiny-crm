@@ -4,18 +4,18 @@ What a particular job does is tested next to the feature it belongs to — the
 reset mail in test_password_reset.py. The worker process is test_worker.py.
 """
 
+import ast
 import asyncio
 import json
 import logging
 import pkgutil
-import re
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
+from importlib import resources
 from pathlib import Path
 
 import pytest
 import typer
-from procrastinate.schema import SchemaManager
 from procrastinate.testing import InMemoryConnector
 
 import app.jobs
@@ -33,28 +33,55 @@ from app.logging_config import JsonFormatter
 
 RunJobs = Callable[[], Awaitable[None]]
 
-VENDORED = Path(__file__).resolve().parent.parent / "alembic" / "procrastinate"
+REVISIONS = Path(__file__).resolve().parent.parent / "alembic" / "versions"
 
 
-def _version(path: Path) -> tuple[int, ...]:
-    match = re.fullmatch(r"schema_(\d+(?:\.\d+)*)\.sql", path.name)
-    assert match, f"unexpected file name {path.name}"
-    return tuple(int(part) for part in match.group(1).split("."))
+def _named_by_revisions() -> dict[str, list[str]]:
+    """The procrastinate migration files each Alembic revision applies, by
+    revision file.
 
-
-def test_the_vendored_schema_is_the_installed_procrastinate_s() -> None:
-    """procrastinate was updated and its schema changed with it.
-
-    The tables are created by an Alembic revision from the SQL vendored in
-    alembic/procrastinate/, so a new schema needs a new revision before the
-    new library runs against the old tables. The README there has the steps.
+    Read from the source, not imported: a revision module only works inside a
+    running migration.
     """
-    newest = max(VENDORED.glob("schema_*.sql"), key=_version)
+    named: dict[str, list[str]] = {}
+    for path in sorted(REVISIONS.glob("*.py")):
+        for node in ast.parse(path.read_text(encoding="utf-8")).body:
+            if (
+                isinstance(node, ast.Assign)
+                and isinstance(node.targets[0], ast.Name)
+                and node.targets[0].id == "PROCRASTINATE_MIGRATIONS"
+            ):
+                named[path.name] = list(ast.literal_eval(node.value))
+    return named
 
-    assert newest.read_text(encoding="utf-8") == SchemaManager.get_schema(), (
-        f"{newest.name} is not the schema of the installed procrastinate — "
-        "see alembic/procrastinate/README.md"
-    )
+
+def test_every_procrastinate_migration_is_applied_by_a_revision() -> None:
+    """procrastinate was updated and brought schema changes with it.
+
+    Its tables are migrated by Alembic revisions that name the SQL files the
+    package ships. A file no revision names is a change the database never
+    gets, while the new library already expects it. Add a revision for the
+    files listed — v2w3x4y5z6a7_procrastinate_schema.py says how.
+    """
+    shipped = {
+        script.name
+        for script in resources.files("procrastinate.sql.migrations").iterdir()
+        if script.name.endswith(".sql")
+    }
+    applied = [name for names in _named_by_revisions().values() for name in names]
+
+    assert sorted(shipped - set(applied)) == [], "shipped by procrastinate, applied by no revision"
+    assert sorted(set(applied) - shipped) == [], "named by a revision, no longer shipped"
+    assert len(applied) == len(set(applied)), "a file is applied twice"
+
+
+def test_a_revision_applies_its_files_in_procrastinate_s_order() -> None:
+    """Which is by name — a later file may build on an earlier one."""
+    named = _named_by_revisions()
+
+    assert named, "no revision applies procrastinate's schema"
+    for revision, names in named.items():
+        assert names == sorted(names), revision
 
 
 def test_the_queue_uses_the_application_database() -> None:

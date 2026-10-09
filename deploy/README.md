@@ -327,8 +327,9 @@ What to expect from it:
 - **`worker.enabled: false`** leaves reset mails queued and unsent; the API
   still answers 202.
 
-Upgrading procrastinate needs a migration of its own:
-`backend/alembic/procrastinate/README.md`.
+Upgrading procrastinate can need a migration of its own. The backend tests
+say when, and `backend/alembic/versions/v2w3x4y5z6a7_procrastinate_schema.py`
+says how.
 
 ### Turning on the morning briefing
 

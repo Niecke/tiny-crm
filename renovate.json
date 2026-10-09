@@ -81,7 +81,7 @@
       "semanticCommitType": "fix"
     },
     {
-      "description": "procrastinate's database schema is vendored into an Alembic migration, so an update may need a migration written by hand. Never automerged, and the PR says what to check.",
+      "description": "procrastinate's schema changes are applied by Alembic revisions that name its migration files, so an update may need a revision written by hand. Never automerged, and the PR says what to check.",
       "matchManagers": [
         "pep621"
       ],
@@ -90,7 +90,7 @@
       ],
       "automerge": false,
       "prBodyNotes": [
-        ":warning: **procrastinate's schema is vendored.** If this release changes it, `tests/test_jobs.py` fails and the update needs its own Alembic revision first — the steps are in `backend/alembic/procrastinate/README.md`."
+        ":warning: **procrastinate's schema is migrated by Alembic.** If this release ships new migration files, `tests/test_jobs.py` fails and lists them; the update then needs an Alembic revision applying them — see the docstring of `backend/alembic/versions/v2w3x4y5z6a7_procrastinate_schema.py`."
       ]
     },
     {
