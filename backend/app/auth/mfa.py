@@ -12,12 +12,15 @@ recovery codes, shown once.
 naming the user, valid for MFA_TOKEN_LIFETIME — and /auth/jwt/mfa trades that
 token plus a code for the usual token pair. The challenge token has its own
 audience, so it is never accepted as an access token, and it names the setup
-it was issued for (when MFA was turned on), so turning MFA off and on again
-voids any challenge issued before.
+and the password it was issued for (when each was last set), so turning MFA
+off and on again, or changing or resetting the password, voids any challenge
+issued before.
 
 Code guesses are charged to the same per-account backoff as password guesses
 (app/auth/throttle.py), and the backoff is only cleared once the second step
-succeeds: knowing the password buys no free code guesses.
+succeeds: knowing the password buys no free code guesses. The same goes for
+the account endpoints that check a password or code (new recovery codes,
+turning MFA off), so a stolen session cannot guess there without limit.
 
 **Codes.** Six digits, 30-second steps, one step of clock drift either way. A
 code is good once: the step it matched is stored in `mfa_last_step`, and that
@@ -54,7 +57,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from fastapi_users.jwt import decode_jwt, generate_jwt
-from sqlalchemy import DateTime, ForeignKey, String, delete, func, or_, update
+from sqlalchemy import DateTime, ForeignKey, String, delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -183,6 +186,12 @@ def _new_recovery_code() -> str:
 async def replace_recovery_codes(db: AsyncSession, user_id: UUID) -> list[str]:
     """A fresh set of recovery codes; every earlier one stops working."""
     codes = [_new_recovery_code() for _ in range(RECOVERY_CODE_COUNT)]
+    # One replacement at a time per account: without the row lock, a second
+    # DELETE could run before the first one's codes are committed, miss them,
+    # and leave both sets working.
+    await db.execute(
+        select(User.mfa_last_step).where(User.id == user_id).with_for_update()  # type: ignore[arg-type]
+    )
     await db.execute(delete(MfaRecoveryCode).where(MfaRecoveryCode.user_id == user_id))
     db.add_all(
         MfaRecoveryCode(user_id=user_id, code_hash=_hash_recovery_code(code)) for code in codes
@@ -214,13 +223,38 @@ async def claim_code(db: AsyncSession, user: User, code: str) -> bool:
     return await claim_recovery_code(db, user.id, code)
 
 
-async def enable(db: AsyncSession, user: User, step: int) -> list[str]:
-    """Turn the pending secret on; the confirming code's step counts as used."""
-    await db.execute(
+async def begin_setup(db: AsyncSession, user_id: UUID, sealed: str) -> bool:
+    """Store a pending secret; False if MFA is on (perhaps since a moment ago)."""
+    stored = await db.scalar(
         update(User)
-        .where(User.id == user.id)  # type: ignore[arg-type]
-        .values(mfa_enabled_at=datetime.now(UTC), mfa_last_step=step)
+        .where(User.id == user_id, User.mfa_enabled_at.is_(None))  # type: ignore[arg-type]
+        .values(mfa_secret=sealed)
+        .returning(User.mfa_secret)
     )
+    await db.commit()
+    return stored is not None
+
+
+async def enable(db: AsyncSession, user: User, step: int) -> list[str] | None:
+    """Turn the pending secret on; the confirming code's step counts as used.
+
+    Only if the stored secret is still the one `user` was loaded with, the one
+    the code was checked against: a setup started in another tab meanwhile
+    would otherwise get turned on unconfirmed. None if it changed.
+    """
+    enabled = await db.scalar(
+        update(User)
+        .where(
+            User.id == user.id,  # type: ignore[arg-type]
+            User.mfa_secret == user.mfa_secret,
+            User.mfa_enabled_at.is_(None),
+        )
+        .values(mfa_enabled_at=datetime.now(UTC), mfa_last_step=step)
+        .returning(User.mfa_enabled_at)
+    )
+    if enabled is None:
+        await db.rollback()
+        return None
     return await replace_recovery_codes(db, user.id)
 
 
@@ -237,10 +271,13 @@ async def disable(db: AsyncSession, user_id: UUID) -> bool:
 
 
 def _fingerprint(user: User) -> str:
-    # Which setup a challenge was issued for: every confirm stamps a new
-    # `mfa_enabled_at`, so turning MFA off and on again changes it. Nothing
-    # derived from the secret goes into the token.
-    return user.mfa_enabled_at.isoformat() if user.mfa_enabled_at else ""
+    # Which MFA setup and which password a challenge was issued for: every
+    # confirm stamps a new `mfa_enabled_at`, every password change or reset a
+    # new `password_changed_at`. Either one voids a pending challenge, so the
+    # old password plus a code opens nothing after a reset. Nothing derived
+    # from a secret goes into the token.
+    stamps = (user.mfa_enabled_at, user.password_changed_at)
+    return "|".join(stamp.isoformat() if stamp else "" for stamp in stamps)
 
 
 def issue_mfa_token(user: User) -> str:

@@ -10,7 +10,7 @@ from app.auth.sessions import close_session, close_sessions, open_session, rotat
 from app.auth.throttle import claim_login_attempt, clear_login
 from app.auth.users import UserManager, get_user_manager
 from app.db import get_session
-from app.ratelimit import enforce_login_rate_limit, record_locked_login
+from app.ratelimit import enforce_login_rate_limit, locked_out
 from app.schemas.auth import MfaChallenge, MfaVerifyBody, RefreshTokenBody, TokenPair
 
 # Sign-in, token renewal and sign-out (app/auth/sessions.py has the design).
@@ -24,16 +24,6 @@ logger = logging.getLogger(__name__)
 _REFRESH_REJECTED = "REFRESH_TOKEN_INVALID"
 _MFA_TOKEN_REJECTED = "MFA_TOKEN_INVALID"
 _MFA_CODE_REJECTED = "MFA_CODE_INVALID"
-
-
-def _locked_out(request: Request, retry_after: int) -> HTTPException:
-    record_locked_login(request)
-    logger.warning("Login refused for a locked account, retry in %ds", retry_after)
-    return HTTPException(
-        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-        detail="Too many failed login attempts. Try again later.",
-        headers={"Retry-After": str(retry_after)},
-    )
 
 
 @router.post(
@@ -54,7 +44,7 @@ async def login(
     # past the lock; a successful login takes it back below.
     retry_after = await claim_login_attempt(db, credentials.username)
     if retry_after is not None:
-        raise _locked_out(request, retry_after)
+        raise locked_out(request, retry_after)
 
     user = await user_manager.authenticate(credentials)
     # One answer for a wrong password and a deactivated account, as in
@@ -109,7 +99,7 @@ async def verify_mfa(
 
     retry_after = await claim_login_attempt(db, user.email)
     if retry_after is not None:
-        raise _locked_out(request, retry_after)
+        raise locked_out(request, retry_after)
     if not await mfa.claim_code(db, user, body.code):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_MFA_CODE_REJECTED)
 

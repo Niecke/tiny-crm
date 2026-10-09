@@ -24,7 +24,9 @@ function TwoFactorPage() {
   // Recovery codes just issued, shown until the user leaves the page. Kept
   // here rather than in the steps, so the refetch of /users/me that turning
   // MFA on causes does not unmount them.
-  const [codes, setCodes] = useState<string[] | null>(null)
+  // `afterSetup`: MFA was just turned on, which signed out every other device;
+  // a mere new set of codes leaves them signed in.
+  const [issued, setIssued] = useState<{ codes: string[]; afterSetup: boolean } | null>(null)
 
   return (
     <div className="page page-narrow">
@@ -36,14 +38,14 @@ function TwoFactorPage() {
         <p>A code from an authenticator app such as Google Authenticator or Microsoft Authenticator, asked for after the password at every sign-in.</p>
       </header>
 
-      {codes ? (
-        <RecoveryCodes codes={codes} />
+      {issued ? (
+        <RecoveryCodes codes={issued.codes} afterSetup={issued.afterSetup} />
       ) : !me ? (
         <p className="muted">Loading…</p>
       ) : me.mfa_enabled_at ? (
-        <Manage enabledAt={me.mfa_enabled_at} onCodes={setCodes} />
+        <Manage enabledAt={me.mfa_enabled_at} onCodes={(codes) => setIssued({ codes, afterSetup: false })} />
       ) : (
-        <Setup onCodes={setCodes} />
+        <Setup onCodes={(codes) => setIssued({ codes, afterSetup: true })} />
       )}
     </div>
   )
@@ -53,6 +55,7 @@ function describe(error: Error): string {
   if (error instanceof ApiError) {
     if (error.detail === 'MFA_CODE_INVALID') return 'That code is not correct.'
     if (error.detail === 'PASSWORD_INCORRECT') return 'The password is not correct.'
+    if (error.detail === 'MFA_SETUP_CHANGED') return 'Setup was restarted elsewhere. Scan the new code and try again.'
   }
   return error.message
 }
@@ -147,7 +150,7 @@ function QrCode({ value }: { value: string }) {
   return src ? <img className="mfa-qr" src={src} alt="QR code for the authenticator app" width={200} height={200} /> : null
 }
 
-function RecoveryCodes({ codes }: { codes: string[] }) {
+function RecoveryCodes({ codes, afterSetup }: { codes: string[]; afterSetup: boolean }) {
   const [copied, setCopied] = useState(false)
   const text = codes.join('\n') + '\n'
 
@@ -162,9 +165,15 @@ function RecoveryCodes({ codes }: { codes: string[] }) {
 
   return (
     <section className="panel form">
-      <p>
-        <strong>Two-factor sign-in is on.</strong> Every other device has been signed out.
-      </p>
+      {afterSetup ? (
+        <p>
+          <strong>Two-factor sign-in is on.</strong> Every other device has been signed out.
+        </p>
+      ) : (
+        <p>
+          <strong>New recovery codes.</strong> The ones issued before no longer work.
+        </p>
+      )}
       <p>
         Keep these recovery codes somewhere safe. Each one signs in once in place of a code from the app — for when the
         phone is lost. They are shown only now.

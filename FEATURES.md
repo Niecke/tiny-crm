@@ -627,7 +627,9 @@ shows an archived row.
   and `/auth/jwt/mfa` trades that plus a code for the session. Codes are
   single-use (the matched time step is stored); wrong codes count against the
   same per-address limit and per-account backoff as wrong passwords, and the
-  backoff only clears once the code is right. Ten single-use **recovery codes**
+  backoff only clears once the code is right — at sign-in and on the account
+  endpoints that check a password or code. A challenge dies when the password
+  is changed or reset, or MFA is turned off and on again. Ten single-use **recovery codes**
   (stored as SHA-256) are issued on setup and replaced via
   `/users/me/mfa/recovery-codes` (password). Turning it off needs password
   and code (`/users/me/mfa/disable`); turning it on or off ends every other

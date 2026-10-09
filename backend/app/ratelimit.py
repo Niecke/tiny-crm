@@ -31,10 +31,12 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 LOGIN_PATH = "/auth/jwt/login"
-# The second sign-in step (app/auth/mfa.py): a wrong code costs what a wrong
-# password does.
+# The second sign-in step and the MFA account endpoints (app/auth/mfa.py): a
+# wrong code or password there costs what a wrong password at login does.
 MFA_PATH = "/auth/jwt/mfa"
-_GUESS_PATHS = frozenset({LOGIN_PATH, MFA_PATH})
+_GUESS_PATHS = frozenset(
+    {LOGIN_PATH, MFA_PATH, "/users/me/mfa/recovery-codes", "/users/me/mfa/disable"}
+)
 
 # Client address -> timestamps of its recent failed logins, oldest first.
 _failures: dict[str, deque[float]] = {}
@@ -108,6 +110,17 @@ def record_locked_login(request: Request) -> None:
     account spends the same budget as guessing at an open one.
     """
     record_failed_login(_client_ip(request))
+
+
+def locked_out(request: Request, retry_after: int) -> HTTPException:
+    """The 429 for an attempt the per-account lock refused, charged to its address."""
+    record_locked_login(request)
+    logger.warning("Login refused for a locked account, retry in %ds", retry_after)
+    return HTTPException(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        detail="Too many failed login attempts. Try again later.",
+        headers={"Retry-After": str(retry_after)},
+    )
 
 
 def retry_after_seconds(ip: str) -> int | None:

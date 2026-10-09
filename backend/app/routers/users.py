@@ -1,11 +1,13 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.auth import current_active_user, mfa
 from app.auth.sessions import close_sessions
+from app.auth.throttle import claim_login_attempt, clear_login
 from app.auth.users import User, UserManager, current_session_id, get_user_manager
+from app.ratelimit import enforce_login_rate_limit, locked_out
 from app.schemas.user import (
     MfaCode,
     MfaDisable,
@@ -61,6 +63,17 @@ def _check_password(user_manager: UserManager, user: User, password: str) -> Non
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="PASSWORD_INCORRECT")
 
 
+async def _claim_guess(request: Request, user_manager: UserManager, user: User) -> None:
+    """Charge a password or code check to the account's login backoff.
+
+    The same budget as signing in (app/auth/throttle.py): a stolen session
+    cannot guess here faster than at the login form. A success clears it.
+    """
+    retry_after = await claim_login_attempt(user_manager.db, user.email)
+    if retry_after is not None:
+        raise locked_out(request, retry_after)
+
+
 def _conflict(detail: str) -> HTTPException:
     return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
 
@@ -80,7 +93,8 @@ async def start_mfa_setup(
     if mfa.is_enabled(user):
         raise _conflict("MFA_ALREADY_ENABLED")
     secret = mfa.new_secret()
-    await user_manager.user_db.update(user, {"mfa_secret": mfa.seal(secret)})
+    if not await mfa.begin_setup(user_manager.db, user.id, mfa.seal(secret)):
+        raise _conflict("MFA_ALREADY_ENABLED")
     return MfaSetup(secret=secret, otpauth_uri=mfa.provisioning_uri(user.email, secret))
 
 
@@ -101,12 +115,20 @@ async def confirm_mfa_setup(
     if step is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="MFA_CODE_INVALID")
     codes = await mfa.enable(user_manager.db, user, step)
+    if codes is None:
+        # Another setup replaced the secret this code was checked against.
+        raise _conflict("MFA_SETUP_CHANGED")
     await close_sessions(user_manager.db, user.id, keep=session_id)
     return MfaRecoveryCodes(recovery_codes=codes)
 
 
-@router.post("/me/mfa/recovery-codes", response_model=MfaRecoveryCodes)
+@router.post(
+    "/me/mfa/recovery-codes",
+    response_model=MfaRecoveryCodes,
+    dependencies=[Depends(enforce_login_rate_limit)],
+)
 async def replace_recovery_codes(
+    request: Request,
     body: MfaPassword,
     user: User = Depends(current_active_user),
     user_manager: UserManager = Depends(get_user_manager),
@@ -114,13 +136,20 @@ async def replace_recovery_codes(
     """A fresh set of recovery codes; the old set stops working."""
     if not mfa.is_enabled(user):
         raise _conflict("MFA_NOT_ENABLED")
+    await _claim_guess(request, user_manager, user)
     _check_password(user_manager, user, body.password)
+    await clear_login(user_manager.db, user.email)
     codes = await mfa.replace_recovery_codes(user_manager.db, user.id)
     return MfaRecoveryCodes(recovery_codes=codes)
 
 
-@router.post("/me/mfa/disable", status_code=status.HTTP_204_NO_CONTENT)
+@router.post(
+    "/me/mfa/disable",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(enforce_login_rate_limit)],
+)
 async def disable_mfa(
+    request: Request,
     body: MfaDisable,
     user: User = Depends(current_active_user),
     session_id: UUID = Depends(current_session_id),
@@ -129,8 +158,10 @@ async def disable_mfa(
     """Turn MFA off. Needs both factors: a stolen session alone cannot."""
     if not mfa.is_enabled(user):
         raise _conflict("MFA_NOT_ENABLED")
+    await _claim_guess(request, user_manager, user)
     _check_password(user_manager, user, body.password)
     if not await mfa.claim_code(user_manager.db, user, body.code):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="MFA_CODE_INVALID")
+    await clear_login(user_manager.db, user.email)
     await mfa.disable(user_manager.db, user.id)
     await close_sessions(user_manager.db, user.id, keep=session_id)

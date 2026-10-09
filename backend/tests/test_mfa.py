@@ -502,3 +502,132 @@ async def test_cli_disable_mfa(
 
     await cli._disable_mfa(enrolled.account.email)
     assert "no two-factor" in capsys.readouterr().out
+
+
+# Races and leftovers the review turned up
+
+
+async def test_a_challenge_dies_with_a_password_change(
+    client: AsyncClient, enrolled: Enrolled
+) -> None:
+    challenge = await login(client, enrolled.account)
+    changed = await client.post(
+        "/users/me/password",
+        json={"old_password": enrolled.account.password, "new_password": NEW_PASSWORD},
+        headers=enrolled.account.headers,
+    )
+    assert changed.status_code == 204
+
+    response = await client.post(
+        "/auth/jwt/mfa",
+        json={"mfa_token": challenge["mfa_token"], "code": code(enrolled.secret, 1)},
+    )
+
+    assert response.status_code == 401
+
+
+async def test_a_challenge_dies_with_a_password_reset(
+    client: AsyncClient, enrolled: Enrolled, outbox: Any
+) -> None:
+    challenge = await login(client, enrolled.account)
+    token = await _reset_token(client, enrolled.account.email, outbox)
+    await client.post("/auth/reset-password", json={"token": token, "password": NEW_PASSWORD})
+
+    response = await client.post(
+        "/auth/jwt/mfa",
+        json={"mfa_token": challenge["mfa_token"], "code": enrolled.recovery_codes[0]},
+    )
+
+    assert response.status_code == 401
+
+
+async def test_guesses_at_turning_mfa_off_run_into_the_account_backoff(
+    client: AsyncClient, enrolled: Enrolled
+) -> None:
+    def attempt(code: str) -> Any:
+        return client.post(
+            "/users/me/mfa/disable",
+            json={"password": enrolled.account.password, "code": code},
+            headers=enrolled.account.headers,
+        )
+
+    statuses = [(await attempt("000000")).status_code for _ in range(5)]
+
+    assert statuses == [400, 400, 400, 400, 429]
+    # Locked means locked, and signing in is locked along with it.
+    assert (await attempt(enrolled.recovery_codes[0])).status_code == 429
+    locked = await client.post(
+        "/auth/jwt/login",
+        data={"username": enrolled.account.email, "password": enrolled.account.password},
+    )
+    assert locked.status_code == 429
+
+
+async def test_password_guesses_for_new_recovery_codes_run_into_the_backoff(
+    client: AsyncClient, enrolled: Enrolled
+) -> None:
+    statuses = [
+        (
+            await client.post(
+                "/users/me/mfa/recovery-codes",
+                json={"password": "not it"},
+                headers=enrolled.account.headers,
+            )
+        ).status_code
+        for _ in range(5)
+    ]
+
+    assert statuses == [400, 400, 400, 400, 429]
+
+
+async def test_a_right_answer_clears_the_backoff(client: AsyncClient, enrolled: Enrolled) -> None:
+    headers = enrolled.account.headers
+    for _ in range(2):
+        await client.post(
+            "/users/me/mfa/recovery-codes", json={"password": "not it"}, headers=headers
+        )
+    ok = await client.post(
+        "/users/me/mfa/recovery-codes",
+        json={"password": enrolled.account.password},
+        headers=headers,
+    )
+    assert ok.status_code == 200
+
+    # Back to the free failures: the next wrong one is a 400, not a lock.
+    for _ in range(3):
+        again = await client.post(
+            "/users/me/mfa/recovery-codes", json={"password": "not it"}, headers=headers
+        )
+        assert again.status_code == 400
+
+
+async def test_confirming_a_secret_that_was_replaced_meanwhile_is_refused(
+    client: AsyncClient, session_factory: async_sessionmaker[AsyncSession], alice: Account
+) -> None:
+    first = (await client.post("/users/me/mfa/setup", headers=alice.headers)).json()["secret"]
+    async with session_factory() as session:
+        # What the confirm request loaded and checked its code against.
+        stale = await session.get(User, alice.id)
+    assert stale is not None
+    # A second tab starts setup again before the confirm writes.
+    await client.post("/users/me/mfa/setup", headers=alice.headers)
+
+    step = mfa.matching_step(first, code(first))
+    assert step is not None
+    async with session_factory() as session:
+        assert await mfa.enable(session, stale, step) is None
+
+    me = await client.get("/users/me", headers=alice.headers)
+    assert me.json()["mfa_enabled_at"] is None
+
+
+async def test_setup_cannot_replace_a_secret_that_was_just_turned_on(
+    session_factory: async_sessionmaker[AsyncSession], enrolled: Enrolled
+) -> None:
+    # The route's is_enabled() check passed before the other tab's confirm.
+    async with session_factory() as session:
+        assert not await mfa.begin_setup(session, enrolled.account.id, mfa.seal(mfa.new_secret()))
+        stored = await session.scalar(
+            select(User.mfa_secret).where(User.id == enrolled.account.id)  # type: ignore[arg-type]
+        )
+    assert stored is not None and mfa.unseal(stored) == enrolled.secret
