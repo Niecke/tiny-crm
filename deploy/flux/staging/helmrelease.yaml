@@ -69,6 +69,15 @@ spec:
     # About 115 Mi resident once it has imported the models, with nothing
     # running. Mail is the only work it has, so the limit stays close to that.
     worker:
+      # Off for the merge that introduces the worker (#206), on in the next.
+      # Flux renders the chart from the merge commit within a minute, while
+      # backend.image.tag above still names the image from before it — until
+      # promote.yml's own commit lands. A worker Deployment rendered in that
+      # gap would start `python -m app.worker` in an image that has no such
+      # module, crash-loop, and take the Helm upgrade down with it. Delete
+      # this line once the tag above is an image built from that merge.
+      # Production is not affected: a release moves chart and images together.
+      enabled: false
       resources:
         requests:
           cpu: 25m
