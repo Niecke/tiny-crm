@@ -81,13 +81,6 @@
       "semanticCommitType": "fix"
     },
     {
-      "description": "The Flutter client in frontend/ is no longer built or shipped since the React cutover (#122), so its updates stay chore(deps) instead of cutting patch releases.",
-      "matchFileNames": [
-        "frontend/**"
-      ],
-      "semanticCommitType": "chore"
-    },
-    {
       "description": "Backend runtime dependencies ship in the image too. Dev dependency groups stay chore(deps). npm `dependencies` in frontend-next/ already get fix from config:recommended.",
       "matchManagers": [
         "pep621"

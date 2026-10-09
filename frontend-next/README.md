@@ -1,8 +1,8 @@
 # frontend-next
 
-The tinyCRM web client. It replaced the Flutter app in `frontend/`, which is
-no longer built or deployed and stays in the repository for now — see
-[#122](https://github.com/Niecke/tiny-crm/issues/122).
+The tinyCRM web client. It replaced the Flutter app
+([#122](https://github.com/Niecke/tiny-crm/issues/122)), whose code was removed
+in [#264](https://github.com/Niecke/tiny-crm/issues/264).
 
 Vite + React + TypeScript, TanStack Query for server state, TanStack Router
 (file-based, `src/routes/`), react-hook-form + zod for forms, React Aria

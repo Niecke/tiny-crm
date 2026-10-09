@@ -8,7 +8,7 @@ answer "what is there", which the operator already knows. They do not answer
 "is this going well", "what is stuck", or "where does the money actually come
 from" — and those are the questions a solo business opens a CRM to ask.
 
-**Scope is the backend.** The Flutter UI is being replaced, so nothing below
+**Scope is the backend.** The UI was being rewritten when this was specified, so nothing below
 describes a layout, a chart or a tile. The deliverable is one endpoint whose
 response a client can render directly, plus the tests that prove the arithmetic.
 Where a number is genuinely useless without a particular presentation, that is

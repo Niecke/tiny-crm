@@ -21,10 +21,6 @@
         },
         {
           "type": "generic",
-          "path": "frontend/pubspec.yaml"
-        },
-        {
-          "type": "generic",
           "path": "charts/tinycrm/Chart.yaml"
         }
       ]

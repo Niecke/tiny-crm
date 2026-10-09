@@ -1,11 +1,11 @@
 # Frontend
 
-The React client in `frontend-next/` has replaced the Flutter app in
-`frontend/` ([#122](https://github.com/Niecke/tiny-crm/issues/122)). It was
-built in parallel and previewed at `/next/` on staging; since the cutover it is
-the `frontend` image, served at `/`. The Flutter code is no longer built,
-tested or deployed, and stays in the repository for now — see Cutover at the
-end of this file.
+The React client in `frontend-next/` has replaced the Flutter app
+([#122](https://github.com/Niecke/tiny-crm/issues/122)). It was built in
+parallel and previewed at `/next/` on staging; since the cutover it is the
+`frontend` image, served at `/`. The Flutter code was removed in
+[#264](https://github.com/Niecke/tiny-crm/issues/264) and lives on only in the
+git history — see Cutover at the end of this file.
 
 This file holds the decisions — what was chosen, why, and what would make it
 worth revisiting. How to run and build the app is in
@@ -189,8 +189,8 @@ Paths, path and query parameters, request bodies and responses are all typed
 from the schema: a misspelled path, an unknown filter or a field the backend
 does not return is a compile error.
 
-**Why.** The Flutter client's hand-written models are its biggest maintenance
-cost — `ContactRead` alone has 26 fields. Generated types turn a backend change
+**Why.** The Flutter client's hand-written models were its biggest maintenance
+cost — `ContactRead` alone had 26 fields. Generated types turn a backend change
 into a compile error at every affected screen. `openapi-fetch` was chosen over
 `@hey-api/openapi-ts` because it generates no runtime code to review and fits
 the `queryOptions` pattern unchanged.
@@ -225,7 +225,7 @@ printer API, which 6 keeps. Drop the override once a release supports 6.
 **Decision.** A login is a pair (#133, `backend/app/auth/sessions.py`): a
 15-minute access token and a refresh token. Both are stored in `localStorage`
 under `tinycrm.token` and `tinycrm.refresh` (`src/token.ts`), so a login
-survives a closed tab, as it does in the Flutter app, and all tabs share one
+survives a closed tab, as it did in the Flutter app, and all tabs share one
 session.
 
 **Renewal** lives in the API client's middleware (`src/api/client.ts`):
@@ -300,9 +300,7 @@ The app is built with Vite's default base (`/`) and served by Caddy from
 `/srv` in the `frontend` image (`frontend-next/Dockerfile`), the image name
 the Flutter client had. Hashed assets are cached for a year; everything else
 revalidates. The API URL comes from `/config.json`, mounted from the chart's
-frontend ConfigMap at the path the Flutter image used, so the chart runs
-either image — a release still pinned to a Flutter tag keeps working until its
-tag moves.
+frontend ConfigMap.
 
 During the preview the app lived under `/next/` in its own Deployment. Caddy
 now redirects `/next/…` to the same path at the root, so password-reset mails
@@ -322,7 +320,8 @@ Only a `POST` share target (sharing *files*) needs a service worker to catch
 the request. Current Chrome installs a PWA on a manifest, icons and HTTPS
 alone. A service worker would buy offline use, which a CRM that must reach
 its API anyway gets little from, and it brings back the stale-client problem
-the Flutter image's Caddyfile documents. **Revisit if** shares must survive
+the Flutter app had: installed PWAs running an old build after a deploy.
+**Revisit if** shares must survive
 being offline (queue them and send later) or files should be shareable — both
 are service-worker jobs.
 
@@ -390,12 +389,14 @@ The React app replaces Flutter at `/` when all of these hold:
 
 ## Cutover
 
-Done, except for deleting the Flutter code. `frontend-next/` is served at `/`
-(Vite `base`, the Caddy root, the chart's `frontend` Deployment and Ingress),
-and the Flutter image is dropped from CI and promote: building it was the
-slowest job in the pipeline. The manifest moved too: `id`, `scope`,
-`start_url` and the share `action` are `/`, the name "tinyCRM".
+Done. `frontend-next/` is served at `/` (Vite `base`, the Caddy root, the
+chart's `frontend` Deployment and Ingress), and the Flutter image is dropped
+from CI and promote: building it was the slowest job in the pipeline. The
+manifest moved too: `id`, `scope`, `start_url` and the share `action` are `/`,
+the name "tinyCRM".
 
-Still to do: delete `frontend/`, and with it the `frontend/pubspec.yaml` entry in
-`release-please-config.json` and the `frontend/**` rule in `renovate.json`.
-Renaming `frontend-next/` to `frontend/` can follow in the same change.
+The Flutter code in `frontend/` is deleted (#264), and with it the
+`frontend/pubspec.yaml` entry in `release-please-config.json` and the
+`frontend/**` rule in `renovate.json`.
+
+Still to do: renaming `frontend-next/` to `frontend/`.

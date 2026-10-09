@@ -113,7 +113,7 @@ class ContactRead(ContactCreate):
     # organization_id.
     organization_name: str | None = None
     # Serialised as a string, like every other amount in the API: a binary
-    # double cannot hold 0.10. See core/money_text.dart on the Dart side.
+    # double cannot hold 0.10. See formatMoney in frontend-next/src/deals.ts.
     known_day_rate: Decimal | None = None
     created_at: datetime
     updated_at: datetime
