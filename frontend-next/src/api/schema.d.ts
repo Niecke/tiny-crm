@@ -270,6 +270,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/business-cards/scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Scan Business Card
+         * @description Read a card from photos of its front and, if it has one, its back.
+         *
+         *     Returns a draft to correct, never a filed record. The photos are not kept.
+         */
+        post: operations["scan_business_card_business_cards_scan_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/business-cards/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Business Card
+         * @description File a checked card: a new company if one is given, and the contact under it.
+         */
+        post: operations["import_business_card_business_cards_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/organizations/": {
         parameters: {
             query?: never;
@@ -1474,6 +1516,19 @@ export interface components {
             /** Password */
             password: string;
         };
+        /** Body_scan_business_card_business_cards_scan_post */
+        Body_scan_business_card_business_cards_scan_post: {
+            /**
+             * Front
+             * @description Photo of the card's front
+             */
+            front: string;
+            /**
+             * Back
+             * @description Photo of the card's back
+             */
+            back?: string | null;
+        };
         /** Body_upload_document_documents__post */
         Body_upload_document_documents__post: {
             /** File */
@@ -1692,6 +1747,25 @@ export interface components {
             days_late: number;
         };
         /**
+         * BusinessCardImport
+         * @description The corrected card, filed in one go.
+         *
+         *     Either `organization` — a company to create and file the contact under —
+         *     or `contact.organization_id` for one already on file, or neither. Never
+         *     both: that would be two answers to which company this is.
+         */
+        BusinessCardImport: {
+            contact: components["schemas"]["ContactCreate"];
+            organization?: components["schemas"]["OrganizationCreate"] | null;
+        };
+        /** BusinessCardScan */
+        BusinessCardScan: {
+            contact: components["schemas"]["CardContactDraft"];
+            organization?: components["schemas"]["CardOrganizationDraft"] | null;
+            match?: components["schemas"]["OrganizationMatch"] | null;
+            usage: components["schemas"]["CardReadUsage"];
+        };
+        /**
          * CaptureContact
          * @description The person this capture turns out to be.
          *
@@ -1903,6 +1977,68 @@ export interface components {
             note?: string | null;
             /** Source */
             source?: ("referral" | "inbound" | "outbound" | "event" | "job_board" | "tender_portal" | "other") | null;
+        };
+        /**
+         * CardContactDraft
+         * @description The person on the card, as read. Unchecked: the operator corrects it
+         *     before anything is filed.
+         */
+        CardContactDraft: {
+            /** Name */
+            name?: string | null;
+            /** Job Title */
+            job_title?: string | null;
+            /** Email */
+            email?: string | null;
+            /** Email Secondary */
+            email_secondary?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Phone Secondary */
+            phone_secondary?: string | null;
+            /** Website */
+            website?: string | null;
+            /** Street */
+            street?: string | null;
+            /** Postal Code */
+            postal_code?: string | null;
+            /** City */
+            city?: string | null;
+            /** Country */
+            country?: string | null;
+            /** Notes */
+            notes?: string | null;
+        };
+        /**
+         * CardOrganizationDraft
+         * @description The company on the card, as read.
+         */
+        CardOrganizationDraft: {
+            /** Name */
+            name: string;
+            /** Domain */
+            domain?: string | null;
+            /** Email */
+            email?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Address */
+            address?: string | null;
+        };
+        /**
+         * CardReadUsage
+         * @description What one read cost: the model that answered and the tokens it billed.
+         *
+         *     Shown on the review screen so the cost of a scan can be checked against
+         *     the price list without opening the Anthropic console.
+         */
+        CardReadUsage: {
+            /** Model */
+            model: string;
+            /** Input Tokens */
+            input_tokens: number;
+            /** Output Tokens */
+            output_tokens: number;
         };
         /** ContactCreate */
         ContactCreate: {
@@ -2630,6 +2766,21 @@ export interface components {
             industry?: string | null;
             /** Notes */
             notes?: string | null;
+        };
+        /**
+         * OrganizationMatch
+         * @description A company already on file that the card most likely belongs to.
+         */
+        OrganizationMatch: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Matched On */
+            matched_on: string;
         };
         /** OrganizationRead */
         OrganizationRead: {
@@ -4164,6 +4315,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CaptureRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    scan_business_card_business_cards_scan_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_scan_business_card_business_cards_scan_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BusinessCardScan"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_business_card_business_cards_import_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BusinessCardImport"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactRead"];
                 };
             };
             /** @description Validation Error */

@@ -326,6 +326,30 @@ The schedule (`0 7 * * 1-5`, Europe/Berlin) and the timezone are in
 which decides whether a task due at 23:59 counts as today — change both
 together or not at all.
 
+### Turning on business card scanning
+
+Scanned business cards are read by Claude through the Anthropic API
+(`app/business_cards.py`). Until a key is set, the scan screen says scanning
+is not set up; nothing else changes.
+
+Create a key at console.anthropic.com → API keys. It is a bearer credential,
+so it goes into the `tinycrm-values` Secret like the others:
+
+```yaml
+backend:
+  businessCards:
+    anthropicApiKey: sk-ant-...
+```
+
+The photos are sent to Anthropic to be read and are not stored anywhere.
+
+The model that reads them is `backend.businessCards.model` (default
+`claude-opus-5-5`). It is not secret, so set it under `values:` in
+`deploy/flux/prod/helmrelease.yaml` — or in `tinycrm-values`, if you would
+rather not commit it. Either change rolls the backend pods with the new
+`BUSINESS_CARD_MODEL`; no new image or release is needed. Each scan shows the
+model and tokens it used on the review screen, to compare the cost.
+
 ### Turning on mail
 
 Invites and password-reset links go out through Brevo's API (`app/mail.py`).

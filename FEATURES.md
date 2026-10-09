@@ -79,6 +79,41 @@ company must never delete the people who worked there.
 
 ---
 
+## Business card scanning
+
+`POST /business-cards/scan` · `POST /business-cards/import` · screen: Contacts → **Scan card** (#262)
+
+**Read, check, then file — never in one step.** `scan` takes a photo of the
+card's front and, optionally, its back (multipart `front` / `back`; JPEG, PNG,
+GIF or WebP by their bytes, 5 MB a side) and returns a *draft*: the person, the
+company, and the company already on file it most likely is. Nothing is written
+and the photos are not kept. `import` files the corrected draft: either a new
+`organization` or `contact.organization_id` for one on file (both is a 422),
+created in one transaction so a refused contact never leaves a company behind.
+
+**The reading is Claude's.** `app/business_cards.py` sends the photos to the
+Anthropic API (`ANTHROPIC_API_KEY`, model `BUSINESS_CARD_MODEL`) and gets back a
+fixed schema rather than a column of OCR text — the hard part of a card is which
+line is the person and which number the switchboard. Without a key `scan` is a
+**503** naming the variable. A failed or declined read is a **502** with a
+message the screen shows as is; neither the photos nor the reading reach a log.
+Every scan also returns `usage` — the model that answered (after a refusal
+fallback, the one that took over) and the input and output tokens it billed —
+shown on the review screen and logged, so the cost of a read can be checked
+against the price list.
+
+**Matching an existing company.** Same domain first — taken from the printed
+domain, the website, or the email unless that is a mailbox provider's
+(gmail.com, gmx.at, …) — however the stored domain was typed (`www.`, a whole
+URL); then the same name, ignoring case. Live companies of this user only. A
+match is preselected on the review screen, so one company does not become two.
+
+**On the phone.** "Take photo" opens the rear camera; "Upload" picks a file.
+The screen shrinks each photo to 1600 px on its longest edge as a JPEG before
+sending it, which also turns an iPhone's HEIC into something the API accepts.
+
+---
+
 ## Deals
 
 `GET|POST /deals/` · `GET|PATCH|DELETE /deals/{id}` · `POST /deals/{id}/stage`
@@ -694,6 +729,8 @@ All via env or `backend/.env` (see `.env.example`).
 | `SLACK_WEBHOOK_URL` | unset | without it a real briefing send exits 2 |
 | `BRIEFING_TIMEZONE` | `Europe/Berlin` | must match the CronJob's `timeZone` |
 | `APP_URL` | unset | the "Open tinyCRM" link in the briefing |
+| `ANTHROPIC_API_KEY` | unset | reads scanned business cards; without it scanning answers 503 |
+| `BUSINESS_CARD_MODEL` | `claude-opus-5-5` | the Claude model that reads the cards |
 | `GIT_COMMIT` | `unknown` | injected at image build, served by `/version` |
 
 `GET /health` returns 200 `{status: ok, db: ok}` or **503** when the database

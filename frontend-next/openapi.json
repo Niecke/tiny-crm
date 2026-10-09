@@ -1036,6 +1036,100 @@
         }
       }
     },
+    "/business-cards/scan": {
+      "post": {
+        "tags": [
+          "business-cards"
+        ],
+        "summary": "Scan Business Card",
+        "description": "Read a card from photos of its front and, if it has one, its back.\n\nReturns a draft to correct, never a filed record. The photos are not kept.",
+        "operationId": "scan_business_card_business_cards_scan_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_scan_business_card_business_cards_scan_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BusinessCardScan"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/business-cards/import": {
+      "post": {
+        "tags": [
+          "business-cards"
+        ],
+        "summary": "Import Business Card",
+        "description": "File a checked card: a new company if one is given, and the contact under it.",
+        "operationId": "import_business_card_business_cards_import_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BusinessCardImport"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/organizations/": {
       "get": {
         "tags": [
@@ -5696,6 +5790,34 @@
         ],
         "title": "Body_reset_reset_password_auth_reset_password_post"
       },
+      "Body_scan_business_card_business_cards_scan_post": {
+        "properties": {
+          "front": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Front",
+            "description": "Photo of the card's front"
+          },
+          "back": {
+            "anyOf": [
+              {
+                "type": "string",
+                "contentMediaType": "application/octet-stream"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Back",
+            "description": "Photo of the card's back"
+          }
+        },
+        "type": "object",
+        "required": [
+          "front"
+        ],
+        "title": "Body_scan_business_card_business_cards_scan_post"
+      },
       "Body_upload_document_documents__post": {
         "properties": {
           "file": {
@@ -6240,6 +6362,65 @@
           "days_late"
         ],
         "title": "BriefingWatch"
+      },
+      "BusinessCardImport": {
+        "properties": {
+          "contact": {
+            "$ref": "#/components/schemas/ContactCreate"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OrganizationCreate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "contact"
+        ],
+        "title": "BusinessCardImport",
+        "description": "The corrected card, filed in one go.\n\nEither `organization` — a company to create and file the contact under —\nor `contact.organization_id` for one already on file, or neither. Never\nboth: that would be two answers to which company this is."
+      },
+      "BusinessCardScan": {
+        "properties": {
+          "contact": {
+            "$ref": "#/components/schemas/CardContactDraft"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CardOrganizationDraft"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "match": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OrganizationMatch"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "usage": {
+            "$ref": "#/components/schemas/CardReadUsage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "contact",
+          "usage"
+        ],
+        "title": "BusinessCardScan"
       },
       "CaptureContact": {
         "properties": {
@@ -6928,6 +7109,227 @@
         "type": "object",
         "title": "CaptureUpdate",
         "description": "Fixing up a capture before working it.\n\n`status` is deliberately absent. It moves through /convert and /dismiss and\nnowhere else — the same funnel Deal.stage has through `apply_stage`, so\nthat arriving at an ending always stamps everything that ending implies."
+      },
+      "CardContactDraft": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "job_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Title"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "email_secondary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Secondary"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "phone_secondary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone Secondary"
+          },
+          "website": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Website"
+          },
+          "street": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Street"
+          },
+          "postal_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Postal Code"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "title": "CardContactDraft",
+        "description": "The person on the card, as read. Unchecked: the operator corrects it\nbefore anything is filed."
+      },
+      "CardOrganizationDraft": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "domain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "CardOrganizationDraft",
+        "description": "The company on the card, as read."
+      },
+      "CardReadUsage": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "input_tokens": {
+            "type": "integer",
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "type": "integer",
+            "title": "Output Tokens"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model",
+          "input_tokens",
+          "output_tokens"
+        ],
+        "title": "CardReadUsage",
+        "description": "What one read cost: the model that answered and the tokens it billed.\n\nShown on the review screen so the cost of a scan can be checked against\nthe price list without opening the Anthropic console."
       },
       "ContactCreate": {
         "properties": {
@@ -9647,6 +10049,31 @@
           "name"
         ],
         "title": "OrganizationCreate"
+      },
+      "OrganizationMatch": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "matched_on": {
+            "type": "string",
+            "title": "Matched On"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "matched_on"
+        ],
+        "title": "OrganizationMatch",
+        "description": "A company already on file that the card most likely belongs to."
       },
       "OrganizationRead": {
         "properties": {

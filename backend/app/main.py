@@ -19,6 +19,7 @@ from app.ratelimit import count_failed_logins
 from app.routers import (
     auth,
     briefing,
+    business_cards,
     captures,
     contacts,
     deals,
@@ -140,6 +141,7 @@ async def stale_write(request: Request, exc: StaleDataError) -> JSONResponse:
 
 app.include_router(contacts.router)
 app.include_router(captures.router)
+app.include_router(business_cards.router)
 app.include_router(organizations.router)
 app.include_router(deals.router)
 app.include_router(tasks.router)

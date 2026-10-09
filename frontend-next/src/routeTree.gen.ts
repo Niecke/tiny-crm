@@ -32,6 +32,7 @@ import { Route as AuthedAccountMfaRouteImport } from './routes/_authed/account/m
 import { Route as AuthedAccountPasswordRouteImport } from './routes/_authed/account/password'
 import { Route as AuthedContactsIndexRouteImport } from './routes/_authed/contacts/index'
 import { Route as AuthedContactsNewRouteImport } from './routes/_authed/contacts/new'
+import { Route as AuthedContactsScanRouteImport } from './routes/_authed/contacts/scan'
 import { Route as AuthedDealsIndexRouteImport } from './routes/_authed/deals/index'
 import { Route as AuthedDealsNewRouteImport } from './routes/_authed/deals/new'
 import { Route as AuthedDocumentsIndexRouteImport } from './routes/_authed/documents/index'
@@ -175,6 +176,11 @@ const AuthedContactsIndexRoute = AuthedContactsIndexRouteImport.update({
 const AuthedContactsNewRoute = AuthedContactsNewRouteImport.update({
   id: '/new',
   path: '/new',
+  getParentRoute: () => AuthedContactsRouteRoute,
+} as any)
+const AuthedContactsScanRoute = AuthedContactsScanRouteImport.update({
+  id: '/scan',
+  path: '/scan',
   getParentRoute: () => AuthedContactsRouteRoute,
 } as any)
 const AuthedDealsIndexRoute = AuthedDealsIndexRouteImport.update({
@@ -355,6 +361,7 @@ export interface FileRoutesByFullPath {
   '/account/mfa': typeof AuthedAccountMfaRoute
   '/account/password': typeof AuthedAccountPasswordRoute
   '/contacts/new': typeof AuthedContactsNewRoute
+  '/contacts/scan': typeof AuthedContactsScanRoute
   '/deals/new': typeof AuthedDealsNewRoute
   '/documents/$documentId': typeof AuthedDocumentsDocumentIdRoute
   '/documents/new': typeof AuthedDocumentsNewRoute
@@ -399,6 +406,7 @@ export interface FileRoutesByTo {
   '/account/mfa': typeof AuthedAccountMfaRoute
   '/account/password': typeof AuthedAccountPasswordRoute
   '/contacts/new': typeof AuthedContactsNewRoute
+  '/contacts/scan': typeof AuthedContactsScanRoute
   '/deals/new': typeof AuthedDealsNewRoute
   '/documents/$documentId': typeof AuthedDocumentsDocumentIdRoute
   '/documents/new': typeof AuthedDocumentsNewRoute
@@ -454,6 +462,7 @@ export interface FileRoutesById {
   '/_authed/account/mfa': typeof AuthedAccountMfaRoute
   '/_authed/account/password': typeof AuthedAccountPasswordRoute
   '/_authed/contacts/new': typeof AuthedContactsNewRoute
+  '/_authed/contacts/scan': typeof AuthedContactsScanRoute
   '/_authed/deals/new': typeof AuthedDealsNewRoute
   '/_authed/documents/$documentId': typeof AuthedDocumentsDocumentIdRoute
   '/_authed/documents/new': typeof AuthedDocumentsNewRoute
@@ -509,6 +518,7 @@ export interface FileRouteTypes {
     | '/account/mfa'
     | '/account/password'
     | '/contacts/new'
+    | '/contacts/scan'
     | '/deals/new'
     | '/documents/$documentId'
     | '/documents/new'
@@ -553,6 +563,7 @@ export interface FileRouteTypes {
     | '/account/mfa'
     | '/account/password'
     | '/contacts/new'
+    | '/contacts/scan'
     | '/deals/new'
     | '/documents/$documentId'
     | '/documents/new'
@@ -607,6 +618,7 @@ export interface FileRouteTypes {
     | '/_authed/account/mfa'
     | '/_authed/account/password'
     | '/_authed/contacts/new'
+    | '/_authed/contacts/scan'
     | '/_authed/deals/new'
     | '/_authed/documents/$documentId'
     | '/_authed/documents/new'
@@ -808,6 +820,13 @@ declare module '@tanstack/react-router' {
       path: '/new'
       fullPath: '/contacts/new'
       preLoaderRoute: typeof AuthedContactsNewRouteImport
+      parentRoute: typeof AuthedContactsRouteRoute
+    }
+    '/_authed/contacts/scan': {
+      id: '/_authed/contacts/scan'
+      path: '/scan'
+      fullPath: '/contacts/scan'
+      preLoaderRoute: typeof AuthedContactsScanRouteImport
       parentRoute: typeof AuthedContactsRouteRoute
     }
     '/_authed/deals/': {
@@ -1018,6 +1037,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthedContactsRouteRouteChildren {
   AuthedContactsNewRoute: typeof AuthedContactsNewRoute
+  AuthedContactsScanRoute: typeof AuthedContactsScanRoute
   AuthedContactsIndexRoute: typeof AuthedContactsIndexRoute
   AuthedContactsContactIdEditRoute: typeof AuthedContactsContactIdEditRoute
   AuthedContactsContactIdIndexRoute: typeof AuthedContactsContactIdIndexRoute
@@ -1025,6 +1045,7 @@ interface AuthedContactsRouteRouteChildren {
 
 const AuthedContactsRouteRouteChildren: AuthedContactsRouteRouteChildren = {
   AuthedContactsNewRoute: AuthedContactsNewRoute,
+  AuthedContactsScanRoute: AuthedContactsScanRoute,
   AuthedContactsIndexRoute: AuthedContactsIndexRoute,
   AuthedContactsContactIdEditRoute: AuthedContactsContactIdEditRoute,
   AuthedContactsContactIdIndexRoute: AuthedContactsContactIdIndexRoute,

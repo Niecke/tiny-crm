@@ -25,6 +25,8 @@ dependencies = [
     # encrypted at rest (cryptography came in through pyjwt before; now named).
     "pyotp>=2.10.0",
     "cryptography>=50.0.2",
+    # Reads scanned business cards, app/business_cards.py.
+    "anthropic>=1.0",
 ]
 
 [dependency-groups]
