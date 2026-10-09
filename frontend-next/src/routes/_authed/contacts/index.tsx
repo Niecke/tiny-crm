@@ -37,9 +37,14 @@ function ContactsList() {
     <div className="page">
       <header className="page-header page-header-row">
         <h1>Contacts</h1>
-        <Link to="/contacts/new" search={filters} className="button">
-          New contact
-        </Link>
+        <div className="header-actions">
+          <Link to="/contacts/scan" search={filters} className="button button-quiet">
+            Scan card
+          </Link>
+          <Link to="/contacts/new" search={filters} className="button">
+            New contact
+          </Link>
+        </div>
       </header>
 
       <div className="toolbar filters">

@@ -23,6 +23,10 @@ stringData:
   # by app/mail.py.
   BREVO_API_KEY: {{ . | quote }}
   {{- end }}
+  {{- with .Values.backend.businessCards.anthropicApiKey }}
+  # Reads scanned business cards (app/business_cards.py). Unset = no scanning.
+  ANTHROPIC_API_KEY: {{ . | quote }}
+  {{- end }}
 ---
 apiVersion: v1
 kind: Service
@@ -62,7 +66,7 @@ spec:
       annotations:
         # Helm does not roll pods when only a referenced Secret changes, so a
         # rotated password would leave the running pods on the old one.
-        checksum/credentials: {{ printf "%s|%s|%s|%s" .Values.postgres.password $jwt $s3SecretKey .Values.backend.mail.brevoApiKey | sha256sum }}
+        checksum/credentials: {{ printf "%s|%s|%s|%s|%s" .Values.postgres.password $jwt $s3SecretKey .Values.backend.mail.brevoApiKey .Values.backend.businessCards.anthropicApiKey | sha256sum }}
     spec:
       {{- with .Values.priorityClassName }}
       priorityClassName: {{ . | quote }}

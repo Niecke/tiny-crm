@@ -89,6 +89,12 @@ class Settings(BaseSettings):
     # regardless: the token is bound to the password hash it was issued for.
     password_token_lifetime_seconds: int = 60 * 60 * 12
 
+    # Business card scanning (app/business_cards.py): the photos are read by
+    # Claude through the Anthropic API. Unset means no scanning — the scan
+    # endpoint answers 503 and says which variable to set.
+    anthropic_api_key: str | None = None
+    business_card_model: str = "claude-opus-5-5"
+
     def missing_mail_settings(self) -> list[str]:
         """Env vars that must be set before any mail can go out."""
         required = {

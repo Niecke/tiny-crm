@@ -326,6 +326,23 @@ The schedule (`0 7 * * 1-5`, Europe/Berlin) and the timezone are in
 which decides whether a task due at 23:59 counts as today — change both
 together or not at all.
 
+### Turning on business card scanning
+
+Scanned business cards are read by Claude through the Anthropic API
+(`app/business_cards.py`). Until a key is set, the scan screen says scanning
+is not set up; nothing else changes.
+
+Create a key at console.anthropic.com → API keys. It is a bearer credential,
+so it goes into the `tinycrm-values` Secret like the others:
+
+```yaml
+backend:
+  businessCards:
+    anthropicApiKey: sk-ant-...
+```
+
+The photos are sent to Anthropic to be read and are not stored anywhere.
+
 ### Turning on mail
 
 Invites and password-reset links go out through Brevo's API (`app/mail.py`).

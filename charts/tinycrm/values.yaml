@@ -93,6 +93,13 @@ backend:
     fromAddress: ""
     fromName: tinyCRM
 
+  # Business card scanning: photos of a card are read by Claude through the
+  # Anthropic API and turned into a contact and its company. Optional — without
+  # a key the scan screen says scanning is not set up.
+  businessCards:
+    # A bearer credential: it belongs in the cluster Secret, never in git.
+    anthropicApiKey: ""
+
   resources:
     requests:
       cpu: 100m
