@@ -23,6 +23,7 @@ from app.business_cards import (
     get_card_reader,
     sniff_image_type,
 )
+from app.config import settings
 from app.main import app
 from app.routers.business_cards import company_domain, normalise_domain, to_drafts
 from tests.conftest import Account, create_resource
@@ -125,16 +126,38 @@ async def test_a_scan_writes_nothing(
     assert organizations.json()["total"] == 0
 
 
+@pytest.mark.parametrize(
+    "stored",
+    [
+        "acme.example",
+        "www.acme.example",
+        "https://www.ACME.example",
+        "https://acme.example/team",
+        "https://acme.example?ref=card",
+        "acme.example#contact",
+        "http://acme.example:8080/",
+        " Acme.Example ",
+    ],
+)
 async def test_the_company_on_file_is_found_by_its_domain(
-    client: AsyncClient, alice: Account, reader: FakeReader
+    client: AsyncClient, alice: Account, reader: FakeReader, stored: str
 ) -> None:
-    # Stored as a whole URL and under a different name: the domain still says
-    # it is the same company.
+    # Stored however it was typed and under a different name: the domain still
+    # says it is the same company.
     org = await create_resource(
-        client, alice, "/organizations/", {"name": "Acme", "domain": "https://www.ACME.example"}
+        client, alice, "/organizations/", {"name": "Acme", "domain": stored}
     )
     body = (await _scan(client, alice, front=JPEG)).json()
     assert body["match"] == {"id": org["id"], "name": "Acme", "matched_on": "domain"}
+
+
+@pytest.mark.parametrize("stored", ["notacme.example", "acme.example.org", "shop.acme.example"])
+async def test_a_different_domain_is_not_a_match(
+    client: AsyncClient, alice: Account, reader: FakeReader, stored: str
+) -> None:
+    await create_resource(client, alice, "/organizations/", {"name": "Other", "domain": stored})
+    body = (await _scan(client, alice, front=JPEG)).json()
+    assert body["match"] is None
 
 
 async def test_the_company_on_file_is_found_by_its_name(
@@ -433,3 +456,20 @@ async def test_the_claude_reader_reports_an_api_error_without_its_body() -> None
 
     with pytest.raises(CardReadError, match="refused"):
         await _claude(handler).read([CardImage(JPEG, "image/jpeg")])
+
+
+async def test_the_readers_client_is_closed_after_the_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "anthropic_api_key", "sk-test")
+    dependency = get_card_reader()
+    reader = await anext(dependency)
+    assert isinstance(reader, ClaudeCardReader)
+    with pytest.raises(StopAsyncIteration):
+        await anext(dependency)
+    assert reader._client.is_closed()
+
+
+async def test_without_a_key_there_is_no_reader(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "anthropic_api_key", None)
+    assert await anext(get_card_reader()) is None

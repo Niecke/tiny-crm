@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import base64
 import logging
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
@@ -164,6 +165,10 @@ class ClaudeCardReader:
         )
         self._model = model
 
+    async def aclose(self) -> None:
+        """Close the client's connection pool."""
+        await self._client.close()
+
     async def read(self, images: list[CardImage]) -> CardRead:
         content: list[anthropic.types.beta.BetaContentBlockParam] = []
         for side, image in zip(("Front", "Back"), images, strict=False):
@@ -230,12 +235,19 @@ class ClaudeCardReader:
         return CardRead(reading, usage)
 
 
-def get_card_reader() -> CardReader | None:
+async def get_card_reader() -> AsyncIterator[CardReader | None]:
     """The configured reader, or None when no API key is set.
 
     A FastAPI dependency, so the tests swap in a fake with
-    app.dependency_overrides.
+    app.dependency_overrides. One client per scan: scans are rare, and closing
+    it when the request is done leaves no connections waiting on the garbage
+    collector.
     """
     if not settings.anthropic_api_key:
-        return None
-    return ClaudeCardReader(settings.anthropic_api_key, settings.business_card_model)
+        yield None
+        return
+    reader = ClaudeCardReader(settings.anthropic_api_key, settings.business_card_model)
+    try:
+        yield reader
+    finally:
+        await reader.aclose()

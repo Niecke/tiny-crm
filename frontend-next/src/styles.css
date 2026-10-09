@@ -2971,3 +2971,8 @@ textarea.input {
 .scan-usage {
   font-size: 0.875em;
 }
+
+/* On the review the photos are a reference, not the subject: keep them small. */
+.card-sides-review {
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 16rem));
+}

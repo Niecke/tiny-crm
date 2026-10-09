@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { FileTrigger } from 'react-aria-components'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
@@ -23,6 +23,10 @@ function ScanCard() {
   const { api } = Route.useRouteContext()
   const filters = Route.useSearch()
   const [scan, setScan] = useState<BusinessCardScan | null>(null)
+  // Held here rather than in the photo step, so the review can show them next
+  // to what was read, and "Scan again" comes back with them still chosen.
+  const [front, setFront] = usePhoto()
+  const [back, setBack] = usePhoto()
 
   const reading = useMutation({
     mutationFn: ({ front, back }: { front: File; back: File | null }) => scanCard(api, front, back),
@@ -38,10 +42,14 @@ function ScanCard() {
         <h1>Scan business card</h1>
       </header>
       {scan ? (
-        <CardReview scan={scan} onRescan={() => setScan(null)} />
+        <CardReview scan={scan} photos={[front, back]} onRescan={() => setScan(null)} />
       ) : (
         <CardPhotos
-          onRead={(front, back) => reading.mutate({ front, back })}
+          front={front}
+          back={back}
+          onFront={setFront}
+          onBack={setBack}
+          onRead={() => front && reading.mutate({ front: front.file, back: back?.file ?? null })}
           pending={reading.isPending}
           error={reading.error}
         />
@@ -53,23 +61,28 @@ function ScanCard() {
 // --- Step 1: the photos ------------------------------------------------------
 
 function CardPhotos({
+  front,
+  back,
+  onFront,
+  onBack,
   onRead,
   pending,
   error,
 }: {
-  onRead: (front: File, back: File | null) => void
+  front: Photo | null
+  back: Photo | null
+  onFront: (file: File | null) => void
+  onBack: (file: File | null) => void
+  onRead: () => void
   pending: boolean
   error: Error | null
 }) {
-  const [front, setFront] = useState<Photo | null>(null)
-  const [back, setBack] = useState<Photo | null>(null)
-
   return (
     <form
       className="panel form"
       onSubmit={(e) => {
         e.preventDefault()
-        if (front) onRead(front.file, back?.file ?? null)
+        onRead()
       }}
     >
       <p className="muted">
@@ -77,8 +90,8 @@ function CardPhotos({
         nothing is saved until you do.
       </p>
       <div className="card-sides">
-        <CardSide label="Front" photo={front} onChange={setFront} />
-        <CardSide label="Back (optional)" photo={back} onChange={setBack} />
+        <CardSide label="Front" photo={front} onChange={onFront} />
+        <CardSide label="Back (optional)" photo={back} onChange={onBack} />
       </div>
       {error && (
         <p className="form-error" role="alert">
@@ -94,9 +107,30 @@ function CardPhotos({
   )
 }
 
-// A chosen photo and the object URL its preview shows. The URL is made when
-// the photo is picked and released when it is replaced or removed.
+// A chosen photo and the object URL its preview shows.
 type Photo = { file: File; url: string }
+
+// One side's photo. Its object URL holds the whole original file in memory,
+// so it is released when the photo is replaced or removed, and when the page
+// is left with one still chosen.
+function usePhoto() {
+  const [photo, setPhoto] = useState<Photo | null>(null)
+  const current = useRef<Photo | null>(null)
+  useEffect(() => {
+    current.current = photo
+  }, [photo])
+  useEffect(
+    () => () => {
+      if (current.current) URL.revokeObjectURL(current.current.url)
+    },
+    [],
+  )
+  const change = (file: File | null) => {
+    if (photo) URL.revokeObjectURL(photo.url)
+    setPhoto(file ? { file, url: URL.createObjectURL(file) } : null)
+  }
+  return [photo, change] as const
+}
 
 function CardSide({
   label,
@@ -105,15 +139,11 @@ function CardSide({
 }: {
   label: string
   photo: Photo | null
-  onChange: (photo: Photo | null) => void
+  onChange: (file: File | null) => void
 }) {
-  const replace = (file: File | null) => {
-    if (photo) URL.revokeObjectURL(photo.url)
-    onChange(file ? { file, url: URL.createObjectURL(file) } : null)
-  }
   const pick = (list: FileList | null) => {
     const f = list?.[0]
-    if (f) replace(f)
+    if (f) onChange(f)
   }
   return (
     <div className="field card-side">
@@ -130,7 +160,7 @@ function CardSide({
           <Button variant="quiet">Upload</Button>
         </FileTrigger>
         {photo && (
-          <Button variant="quiet" onPress={() => replace(null)}>
+          <Button variant="quiet" onPress={() => onChange(null)}>
             Remove
           </Button>
         )}
@@ -164,7 +194,9 @@ const formSchema = z
     organization_id: z.string().nullable(),
     org_name: optional,
     org_domain: optional,
-    org_email: email,
+    // Checked below, and only for a new company: hidden behind "On file" or
+    // "No company" it is not sent, and must not block the save.
+    org_email: optional,
     org_phone: optional,
     org_address: optional,
   })
@@ -173,6 +205,10 @@ const formSchema = z
     message: 'Choose the company.',
   })
   .refine((v) => v.company !== 'new' || v.org_name, { path: ['org_name'], message: 'Name is required.' })
+  .refine((v) => v.company !== 'new' || v.org_email === '' || z.email().safeParse(v.org_email).success, {
+    path: ['org_email'],
+    message: 'Enter a valid email address.',
+  })
 
 type FormInput = z.input<typeof formSchema>
 type FormOutput = z.output<typeof formSchema>
@@ -237,7 +273,15 @@ const toBody = (v: FormOutput): BusinessCardImport => ({
 
 const tokens = (n: number) => n.toLocaleString()
 
-function CardReview({ scan, onRescan }: { scan: BusinessCardScan; onRescan: () => void }) {
+function CardReview({
+  scan,
+  photos,
+  onRescan,
+}: {
+  scan: BusinessCardScan
+  photos: (Photo | null)[]
+  onRescan: () => void
+}) {
   const { api } = Route.useRouteContext()
   const filters = Route.useSearch()
   const navigate = useNavigate()
@@ -266,6 +310,17 @@ function CardReview({ scan, onRescan }: { scan: BusinessCardScan; onRescan: () =
   return (
     <form className="panel form" onSubmit={handleSubmit((values) => mutation.mutate(toBody(values)))} noValidate>
       <p className="muted">Check what was read against the card and correct anything that is off.</p>
+      {/* The card itself, to check the fields against. */}
+      <div className="card-sides card-sides-review">
+        {photos.map(
+          (photo, i) =>
+            photo && (
+              <div key={photo.url} className="card-side-preview">
+                <img src={photo.url} alt={i === 0 ? 'Front of the card' : 'Back of the card'} />
+              </div>
+            ),
+        )}
+      </div>
       {/* What this read cost, to check against the price list while the
           model choice is still being settled. */}
       <p className="scan-usage muted">

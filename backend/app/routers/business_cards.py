@@ -15,7 +15,7 @@ from typing import Annotated
 from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from sqlalchemy import func, or_, select
+from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.archive import live
@@ -30,7 +30,7 @@ from app.business_cards import (
     get_card_reader,
     sniff_image_type,
 )
-from app.db import escape_like, get_session
+from app.db import get_session
 from app.models.contact import Contact
 from app.models.organization import Organization
 from app.routers.contacts import _check_organization, _reject_orphan_rate
@@ -159,6 +159,16 @@ def to_drafts(reading: CardReading) -> tuple[CardContactDraft, CardOrganizationD
     return contact, organization
 
 
+# The host part of a domain stored as typed — "acme.example",
+# "www.acme.example", "https://www.Acme.example/team?ref=card" — in SQL, the
+# same reduction normalise_domain() makes on the card's side.
+_HOST_PATTERN = r"^([a-z][a-z0-9+.-]*://)?(www\.)?([^/?#:]*).*$"
+
+
+def _stored_host() -> ColumnElement[str]:
+    return func.regexp_replace(func.lower(func.trim(Organization.domain)), _HOST_PATTERN, r"\3")
+
+
 async def find_organization(
     session: AsyncSession, user: User, draft: CardOrganizationDraft
 ) -> OrganizationMatch | None:
@@ -166,25 +176,8 @@ async def find_organization(
     the same name ignoring case."""
     owned = select(Organization).where(Organization.user_id == user.id, live(Organization))
     if draft.domain:
-        # Stored as typed: "acme.example", "www.acme.example" or a whole URL.
-        stored = func.lower(Organization.domain)
-        host = escape_like(draft.domain)
         found = await session.scalar(
-            owned.where(
-                or_(
-                    *(
-                        stored.like(pattern, escape="\\")
-                        for pattern in (
-                            host,
-                            f"www.{host}",
-                            f"%://{host}",
-                            f"%://www.{host}",
-                            f"%://{host}/%",
-                            f"%://www.{host}/%",
-                        )
-                    )
-                )
-            )
+            owned.where(_stored_host() == draft.domain)
             .order_by(Organization.created_at.asc())
             .limit(1)
         )
