@@ -19,11 +19,11 @@ import base64
 import logging
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Literal, Protocol
+from typing import Any, Literal, Protocol
 
 import anthropic
 import httpx2
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from app.config import settings
 
@@ -66,11 +66,24 @@ def sniff_image_type(data: bytes) -> ImageType | None:
     return None
 
 
+def _every_field_required(schema: dict[str, Any]) -> None:
+    schema["required"] = list(schema.get("properties", {}))
+
+
 class CardReading(BaseModel):
-    """What the model reads off the card. Every field is optional: a card
+    """What the model reads off the card. Every field may be empty: a card
     without a street address is normal, and a guess would be worse than a gap.
 
-    The descriptions are the model's instructions for each field."""
+    The descriptions are the model's instructions for each field.
+
+    Empty means null, not left out: the schema the model answers to lists
+    every field as required. With all of them optional the API refuses the
+    schema as too complex — and on the beta endpoint, rather than saying so,
+    it never answered, and every scan timed out (#262). The defaults stay, so
+    the code can still build a reading from a few fields.
+    """
+
+    model_config = ConfigDict(json_schema_extra=_every_field_required)
 
     name: str | None = Field(None, description="The person's full name, as printed.")
     job_title: str | None = Field(None, description="The person's role or title.")

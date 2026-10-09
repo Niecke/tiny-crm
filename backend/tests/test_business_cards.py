@@ -427,6 +427,11 @@ async def test_the_claude_reader_sends_both_sides_and_parses_the_answer() -> Non
     images = [block for block in content if block["type"] == "image"]
     assert [image["source"]["media_type"] for image in images] == ["image/jpeg", "image/png"]
     assert sent[0]["model"] == "claude-opus-5-5"
+    # Every field required, empty as null: with them optional the API refuses
+    # the schema as too complex, or on the beta endpoint never answers (#262).
+    schema = sent[0]["output_config"]["format"]["schema"]
+    assert sorted(schema["required"]) == sorted(CardReading.model_fields)
+    assert {"type": "null"} in schema["properties"]["street"]["anyOf"]
 
 
 @pytest.mark.parametrize(
