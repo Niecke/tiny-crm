@@ -7,7 +7,7 @@ name: Commitlint
 # `edited`, which should re-run this check and not the whole build pipeline.
 on:
   pull_request:
-    branches: [main]
+    branches: [main, "release/**"]
     types: [opened, edited, synchronize, reopened]
 
 permissions:
