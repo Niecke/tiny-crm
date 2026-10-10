@@ -57,8 +57,20 @@ spec:
       {{- with .Values.priorityClassName }}
       priorityClassName: {{ . | quote }}
       {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: alembic
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           image: {{ include "tinycrm.image" (list "backend" .Values.backend.image) | quote }}
           imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
           envFrom:
@@ -88,3 +100,9 @@ spec:
               memory: 128Mi
             limits:
               memory: 512Mi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

@@ -49,8 +49,20 @@ spec:
           {{- with .Values.priorityClassName }}
           priorityClassName: {{ . | quote }}
           {{- end }}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 26
+            runAsGroup: 26
+            fsGroup: 26
+            seccompProfile:
+              type: RuntimeDefault
           containers:
             - name: backup
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
               image: {{ include "tinycrm.image" (list "backup" .Values.backup.image) | quote }}
               imagePullPolicy: {{ .Values.backup.image.pullPolicy }}
               envFrom:
@@ -80,6 +92,8 @@ spec:
               volumeMounts:
                 - name: work
                   mountPath: /backup
+                - name: tmp
+                  mountPath: /tmp
               resources:
                 {{- toYaml .Values.backup.resources | nindent 16 }}
           volumes:
@@ -89,4 +103,6 @@ spec:
             - name: work
               emptyDir:
                 sizeLimit: {{ .Values.backup.workDirSize }}
+            - name: tmp
+              emptyDir: {}
 {{- end }}

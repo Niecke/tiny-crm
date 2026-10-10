@@ -27,7 +27,9 @@ FROM docker.io/library/python:3.14-slim@sha256:f85c5697265c178cc6887276c55fe16cf
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y \
     && rm -rf /var/lib/apt/lists/* \
-    && python -m pip uninstall --yes --root-user-action=ignore pip
+    && python -m pip uninstall --yes --root-user-action=ignore pip \
+    && groupadd --gid 10001 app \
+    && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin app
 
 WORKDIR /app
 
@@ -51,6 +53,8 @@ ENV GIT_COMMIT=${GIT_COMMIT}
 ARG APP_VERSION=dev
 ENV APP_VERSION=${APP_VERSION}
 RUN date -u +"%Y-%m-%dT%H:%M:%SZ" > /app/build_timestamp.txt
+
+USER 10001
 
 EXPOSE 8000
 
