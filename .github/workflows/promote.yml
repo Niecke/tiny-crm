@@ -5,7 +5,7 @@ name: Promote images
 # passed the integration test is exactly the digest that gets deployed.
 on:
   push:
-    branches: [main]
+    branches: [main, "release/**"]
   workflow_dispatch:
     inputs:
       source_tag:
@@ -143,10 +143,13 @@ jobs:
       # Staging only. Production (deploy/flux/prod/) is written by the release
       # workflow from a vX.Y.Z tag, never by a merge to main (#114).
       #
+      # When promoting images on a release branch, skip updating staging so
+      # staging continues to track main.
+      #
       # The push goes over the deploy key from the checkout step. It does
       # re-trigger promote; the job-level `if:` skips that run.
       - name: Record the staging tag for Flux
-        if: steps.images.outputs.exists == 'true'
+        if: steps.images.outputs.exists == 'true' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE: deploy/flux/staging/helmrelease.yaml
