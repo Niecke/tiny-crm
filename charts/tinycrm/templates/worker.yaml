@@ -1,0 +1,120 @@
+{{- if .Values.worker.enabled }}
+{{- $jwt := required "backend.jwtSecret is required — generate one with `openssl rand -hex 32`" .Values.backend.jwtSecret }}
+{{- if not .Values.worker.pools }}
+{{- fail "worker.pools is empty — a worker without pools runs nothing; set worker.enabled=false instead" }}
+{{- end }}
+# The background worker (backend/app/worker.py, #206): runs what the API
+# deferred instead of doing in the request — mail first, so that a
+# forgot-password answers in the same time whether or not the account exists.
+#
+# The queue is procrastinate, in the application's own Postgres. Its tables
+# come with the migration Job like every other table.
+#
+# Its own Secret rather than the backend's: that one also carries the
+# object-store keys and the Anthropic key, none of which a mail job needs. A
+# task that does need one adds it here, and only then.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "tinycrm.fullname" . }}-worker
+  labels:
+    {{- include "tinycrm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+type: Opaque
+stringData:
+  DATABASE_URL: {{ include "tinycrm.databaseUrl" . | quote }}
+  # Signs the reset links the worker mails; the API verifies them with the
+  # same key, so the two must never differ.
+  JWT_SECRET: {{ $jwt | quote }}
+  {{- with .Values.backend.mail.brevoApiKey }}
+  BREVO_API_KEY: {{ . | quote }}
+  {{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "tinycrm.fullname" . }}-worker
+  labels:
+    {{- include "tinycrm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  # Safe at any number: jobs are claimed with FOR UPDATE SKIP LOCKED, and the
+  # worker's own periodic housekeeping is deferred once however many there are.
+  replicas: {{ .Values.worker.replicas }}
+  selector:
+    matchLabels:
+      {{- include "tinycrm.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        {{- include "tinycrm.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: worker
+      annotations:
+        # Helm does not roll pods when only a referenced Secret changes, so a
+        # rotated password would leave the running pods on the old one.
+        checksum/credentials: {{ printf "%s|%s|%s" .Values.postgres.password $jwt .Values.backend.mail.brevoApiKey | sha256sum }}
+    spec:
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+      # On SIGTERM the worker stops taking jobs and lets the running ones
+      # finish. Longer than the longest task; the worker itself gives up ten
+      # seconds earlier (WORKER_SHUTDOWN_GRACE_SECONDS below), so that what is
+      # still running is recorded as aborted before the kill arrives.
+      terminationGracePeriodSeconds: {{ .Values.worker.terminationGracePeriodSeconds }}
+      containers:
+        - name: worker
+          # The same image the API runs: same models, same mail templates, and
+          # the two can never be a version apart.
+          image: {{ include "tinycrm.image" (list "backend" .Values.backend.image) | quote }}
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          command: ["python", "-m", "app.worker"]
+          envFrom:
+            - secretRef:
+                name: {{ include "tinycrm.fullname" . }}-worker
+          env:
+            - name: ENVIRONMENT
+              value: {{ .Values.backend.environment | quote }}
+            # One pool per entry, each with its own queues and its own slots.
+            # All in this one process for now. Giving a pool a Deployment of
+            # its own is this variable with a single entry — no code change.
+            - name: WORKER_POOLS
+              value: {{ .Values.worker.pools | toJson | quote }}
+            - name: WORKER_SHUTDOWN_GRACE_SECONDS
+              value: {{ max 1 (sub (int .Values.worker.terminationGracePeriodSeconds) 10) | quote }}
+            # The mail settings are the backend's: the API reads them to decide
+            # whether to queue a mail, the worker to send it.
+            {{- if .Values.ingress.host }}
+            - name: APP_URL
+              value: {{ printf "https://%s" .Values.ingress.host | quote }}
+            {{- end }}
+            {{- with .Values.backend.mail.fromAddress }}
+            - name: MAIL_FROM_ADDRESS
+              value: {{ . | quote }}
+            {{- end }}
+            - name: MAIL_FROM_NAME
+              value: {{ .Values.backend.mail.fromName | quote }}
+          # No Service and no readiness probe: nothing connects to a worker.
+          #
+          # Liveness without a port to ask: the worker touches this file every
+          # 15 seconds from its event loop, and the probe fails once it is
+          # older than a minute. That catches a wedged loop — a task that
+          # computes on it instead of in a thread — and deliberately not an
+          # unreachable database, which a restart would not cure.
+          #
+          # `find` prints the file only while it is fresh and exits 0 either
+          # way, so the test is on its output.
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - test -n "$(find /tmp/worker-alive -mmin -1 2>/dev/null)"
+            initialDelaySeconds: 20
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.worker.resources | nindent 12 }}
+{{- end }}

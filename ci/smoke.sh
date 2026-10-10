@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Integration test for the built images: starts backend + frontend + Postgres +
-# the S3 fixture from compose.ci.yml and drives one real workflow through the API.
+# Integration test for the built images: starts backend + worker + frontend +
+# Postgres + the S3 fixture from compose.ci.yml and drives one real workflow through the API.
 #
 #   IMAGE_TAG=ci-abc1234 ci/smoke.sh
 #
@@ -106,6 +106,20 @@ step "migrations ran and the admin CLI works"
 printf '%s\n' "$PASSWORD" \
   | $COMPOSE exec -T backend python -m app.cli create-user "$EMAIL" --superuser --set-password \
   | grep -q "Created user" || fail "could not create the admin user"
+
+step "the worker takes jobs from every queue"
+# No Brevo here, so no mail to send. A job that does nothing, deferred from the
+# API's container and run by the worker's, proves the same path without it: the
+# queue's tables (the migration), the worker process and a pool on each queue.
+pings=$($COMPOSE exec -T backend python -m app.cli ping-worker --timeout 60) \
+  || fail "the worker did not answer: $pings"
+for queue in mail default; do
+  echo "$pings" | grep -q "^$queue: answered" || fail "no answer from the $queue queue: $pings"
+done
+# The chart's liveness probe, word for word: it needs `find` in the image and
+# the file the worker keeps touching.
+$COMPOSE exec -T worker sh -c 'test -n "$(find /tmp/worker-alive -mmin -1 2>/dev/null)"' \
+  || fail "the worker's liveness file is missing or stale"
 
 step "login returns a token"
 token=$(curl -fsS -X POST "$API/auth/jwt/login" \

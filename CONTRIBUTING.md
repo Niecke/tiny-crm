@@ -69,7 +69,8 @@ messages and code comments still resolve.
 | Auth | fastapi-users, 15-minute JWT bearer plus rotating refresh token, sessions revocable server-side, accounts created via `python -m app.cli create-user` | Password reset and invites mailed through Brevo; no register router |
 | Blob store | S3-compatible via aioboto3, Versity Gateway locally, Hetzner Object Storage in production | Bucket versioning checked at boot |
 | Client | React + TypeScript (Vite), TanStack Query and Router, openapi-fetch, in `frontend-next/` | Generated API types; see #122 and [FRONTEND.md](FRONTEND.md) |
-| Scheduling | Kubernetes CronJobs on the backup and backend images | Off-site backup; weekday morning briefing to Slack. No scheduler inside the API |
+| Background jobs | procrastinate on the application's Postgres; a worker Deployment on the backend image (`python -m app.worker`) | A reserved pool per queue, mail first: password-reset links are queued by the API and sent by the worker (#206). No broker to run or back up |
+| Scheduling | Kubernetes CronJobs on the backup and backend images | Off-site backup; weekday morning briefing to Slack. No scheduler inside the API; the worker schedules only its queue's own housekeeping |
 | CI/CD | GitHub Actions → GHCR, Renovate | Test → build → integration test → promote-by-digest. Versioning is #114 |
 | Deploy | Flux (pull-based), Helm chart in `charts/tinycrm/` | Merging to `main` deploys staging; production follows release tags (#114) |
-| Serving | Caddy inside the frontend image, Podman/Docker Compose | `compose.full.yml` = db + s3 + backend + frontend |
+| Serving | Caddy inside the frontend image, Podman/Docker Compose | `compose.full.yml` = db + s3 + backend + worker + frontend |

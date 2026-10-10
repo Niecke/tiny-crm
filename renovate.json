@@ -81,6 +81,19 @@
       "semanticCommitType": "fix"
     },
     {
+      "description": "procrastinate's schema changes are applied by Alembic revisions that name its migration files, so an update may need a revision written by hand. Never automerged, and the PR says what to check.",
+      "matchManagers": [
+        "pep621"
+      ],
+      "matchPackageNames": [
+        "procrastinate"
+      ],
+      "automerge": false,
+      "prBodyNotes": [
+        ":warning: **procrastinate's schema is migrated by Alembic.** If this release ships new migration files, `tests/test_jobs.py` fails and lists them; the update then needs an Alembic revision applying them — see the docstring of `backend/alembic/versions/v2w3x4y5z6a7_procrastinate_schema.py`."
+      ]
+    },
+    {
       "description": "Backend runtime dependencies ship in the image too. Dev dependency groups stay chore(deps). npm `dependencies` in frontend-next/ already get fix from config:recommended.",
       "matchManagers": [
         "pep621"

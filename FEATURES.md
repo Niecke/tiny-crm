@@ -675,7 +675,13 @@ shows an archived row.
   those accounts sign in with a recovery code. Last resort:
   `python -m app.cli disable-mfa <email>`.
 - **Password reset** (#128): `/auth/forgot-password` mails a link through
-  Brevo (`app/mail.py`); `/auth/reset-password` redeems it. The pages are
+  Brevo (`app/mail.py`); `/auth/reset-password` redeems it. The request only
+  queues the mail and answers 202 at once, in the same time for a known and an
+  unknown address; the background worker sends it (#206, `app/jobs/mail.py`).
+  The job carries the account's id, never the token — that is minted when the
+  mail leaves. A network error, a 5xx or a 429 from Brevo is retried four times
+  over six minutes; a refused key or sender fails the job at once; a mail still
+  queued after 30 minutes (`MAIL_MAX_AGE_SECONDS`) is dropped. The pages are
   frontend-next only: `/next/forgot-password` (linked from sign-in) and
   `/next/reset-password#token=…` — the token in the fragment, so it never
   reaches a server log. Invites use the same
