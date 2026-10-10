@@ -11,7 +11,7 @@ FROM ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie@sha256:3e89ea90485ffda
 #
 # rclone replaced mc once MinIO withdrew its images from Docker Hub and then
 # quay.io (#112).
-COPY --from=docker.io/rclone/rclone:1.75.1@sha256:45401ad7410db1d67ffdb58e19059ad20b0d8e0285a60e38bbec55cc1019c7a5 /usr/local/bin/rclone /usr/local/bin/rclone
+COPY --from=docker.io/rclone/rclone:1.75.2@sha256:2687085f718d3c628f7fdfb77c52a1d344332aed543110bb88088f2c70d43eb5 /usr/local/bin/rclone /usr/local/bin/rclone
 
 # The upgrade takes Debian security updates that landed after the CNPG image was
 # last rebuilt, the same as the backend image does.
