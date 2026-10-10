@@ -7545,8 +7545,7 @@
                 "minimum": 0.0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -7813,8 +7812,7 @@
           "known_day_rate": {
             "anyOf": [
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -8149,8 +8147,7 @@
                 "minimum": 0.0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -8265,8 +8262,7 @@
                 "minimum": 0.0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -8281,8 +8277,7 @@
                 "minimum": 0.0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -8314,8 +8309,7 @@
                 "minimum": 0.0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,10}|(?=[\\d.]{1,13}0*$)\\d{0,10}\\.\\d{0,2}0*$)"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -8467,8 +8461,7 @@
           "fixed_value": {
             "anyOf": [
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -8479,8 +8472,7 @@
           "rate": {
             "anyOf": [
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -8508,8 +8500,7 @@
           "estimated_volume": {
             "anyOf": [
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -8537,8 +8528,7 @@
           "expected_value": {
             "anyOf": [
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -8837,8 +8827,7 @@
                 "minimum": 0.0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -8853,8 +8842,7 @@
                 "minimum": 0.0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -8886,8 +8874,7 @@
                 "minimum": 0.0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,10}|(?=[\\d.]{1,13}0*$)\\d{0,10}\\.\\d{0,2}0*$)"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -9924,7 +9911,6 @@
           },
           "value": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Value"
           },
           "open_ended": {
@@ -11341,7 +11327,6 @@
           },
           "value": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Value"
           },
           "open_ended": {
