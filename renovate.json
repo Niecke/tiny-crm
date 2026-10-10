@@ -22,10 +22,7 @@
   "prConcurrentLimit": 5,
   "prHourlyLimit": 2,
   "lockFileMaintenance": {
-    "enabled": true,
-    "schedule": [
-      "before 5am on monday"
-    ]
+    "enabled": false
   },
   "vulnerabilityAlerts": {
     "enabled": true,
