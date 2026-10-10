@@ -75,6 +75,41 @@ async def test_a_document_round_trips_through_the_store(
     assert "attachment" in downloaded.headers["content-disposition"]
 
 
+async def test_content_disposition_sanitizes_control_chars_and_supports_utf8(
+    client: AsyncClient, alice: Account, object_store: dict[str, bytes]
+) -> None:
+    # Title with newlines, quotes, backslashes, and German umlauts
+    title = 'Vertrag\r\n"Entwurf"\\2026 Überweisung'
+    document = await _upload(client, alice, title=title)
+
+    downloaded = await client.get(f"/documents/{document['id']}/content", headers=alice.headers)
+    assert downloaded.status_code == 200
+
+    disposition = downloaded.headers["content-disposition"]
+    # No raw CR or LF in headers
+    assert "\r" not in disposition
+    assert "\n" not in disposition
+    # Check ASCII fallback excludes quotes, backslashes and control chars
+    assert 'filename="VertragEntwurf2026 berweisung.txt"' in disposition
+    # Check UTF-8 RFC 5987 encoding
+    assert (
+        "filename*=UTF-8''Vertrag%0D%0A%22Entwurf%22%5C2026%20%C3%9Cberweisung.txt" in disposition
+    )
+
+
+async def test_content_disposition_fallback_for_purely_non_ascii_title(
+    client: AsyncClient, alice: Account, object_store: dict[str, bytes]
+) -> None:
+    document = await _upload(client, alice, title="🚀✨")
+
+    downloaded = await client.get(f"/documents/{document['id']}/content", headers=alice.headers)
+    assert downloaded.status_code == 200
+
+    disposition = downloaded.headers["content-disposition"]
+    assert 'filename="document.txt"' in disposition
+    assert "filename*=UTF-8''%F0%9F%9A%80%E2%9C%A8.txt" in disposition
+
+
 async def test_replacing_the_content_updates_the_row_and_the_store(
     client: AsyncClient, alice: Account, object_store: dict[str, bytes]
 ) -> None:

@@ -4,6 +4,7 @@ import json
 import logging
 import os
 from typing import cast
+from urllib.parse import quote
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile
@@ -254,12 +255,24 @@ async def get_document_content(
     # Archived or not: putting a contract away must not make it unreadable.
     doc = await _get_owned(session, document_id, user)
 
-    safe_title = doc.title.replace('"', "").replace("\\", "")
+    safe_ascii = (
+        "".join(
+            c
+            for c in doc.title.encode("ascii", "ignore").decode()
+            if 32 <= ord(c) < 127 and c not in ('"', "\\")
+        ).strip()
+        or "document"
+    )
     ext = {"pdf": "pdf", "markdown": "md", "txt": "txt"}[doc.format]
+    encoded_filename = quote(f"{doc.title}.{ext}")
     return StreamingResponse(
         get_object_stream(doc.storage_key),
         media_type=_content_type(doc.format),
-        headers={"Content-Disposition": f'attachment; filename="{safe_title}.{ext}"'},
+        headers={
+            "Content-Disposition": (
+                f"attachment; filename=\"{safe_ascii}.{ext}\"; filename*=UTF-8''{encoded_filename}"
+            )
+        },
     )
 
 
