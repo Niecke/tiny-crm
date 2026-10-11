@@ -22,13 +22,14 @@ export function ImportVCardDialog({ api }: { api: Api }) {
   }
 
   const handleClose = () => {
+    if (isUploading) return
     reset()
     setIsOpen(false)
   }
 
   const handleImport = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!file) return
+    if (!file || isUploading) return
     setIsUploading(true)
     setError(null)
     try {
@@ -48,7 +49,11 @@ export function ImportVCardDialog({ api }: { api: Api }) {
         Import vCard
       </Button>
 
-      <Modal title="Import Contacts" isOpen={isOpen} onOpenChange={(open) => !open && handleClose()}>
+      <Modal
+        title="Import Contacts"
+        isOpen={isOpen}
+        onOpenChange={(open) => !open && handleClose()}
+      >
         {summary ? (
           <div className="quick-form">
             <p>

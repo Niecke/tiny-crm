@@ -149,13 +149,14 @@ export async function exportContactVcard(api: Api, contactId: string, filename =
   triggerDownload(blob, filename)
 }
 
-export async function exportAllContactsVcard(api: Api) {
+export async function exportAllContactsVcard(api: Api, archived = false) {
   const res = await api.GET('/contacts/vcard', {
+    params: { query: { archived } },
     parseAs: 'blob',
   })
   if (!res.response.ok) throw new Error('Failed to export vCards')
   const blob = res.data as unknown as Blob
-  triggerDownload(blob, 'contacts.vcf')
+  triggerDownload(blob, archived ? 'contacts-archived.vcf' : 'contacts.vcf')
 }
 
 // A contact write changes every contact list, and the contact count on its

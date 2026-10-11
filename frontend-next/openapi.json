@@ -288,10 +288,12 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Export all contacts in vCard format.",
             "content": {
-              "application/json": {
-                "schema": {}
+              "text/vcard": {
+                "schema": {
+                  "type": "string"
+                }
               }
             }
           },
@@ -382,10 +384,12 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Export single contact in vCard format.",
             "content": {
-              "application/json": {
-                "schema": {}
+              "text/vcard": {
+                "schema": {
+                  "type": "string"
+                }
               }
             }
           },

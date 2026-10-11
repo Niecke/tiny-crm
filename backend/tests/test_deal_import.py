@@ -89,9 +89,8 @@ async def test_import_deals_handles_invalid_csv(client: AsyncClient, alice: Acco
 async def test_import_actual_hot_leads_file(client: AsyncClient, alice: Account) -> None:
     from pathlib import Path
 
-    hot_leads_path = Path("/home/niecke/git/niecke-it-consulting/lead_generation/hot_leads.csv")
-    if not hot_leads_path.exists():
-        return
+    hot_leads_path = Path(__file__).parent / "fixtures" / "hot_leads.csv"
+    assert hot_leads_path.exists(), "Test fixture hot_leads.csv must exist"
     content = hot_leads_path.read_bytes()
     files = {"file": ("hot_leads.csv", io.BytesIO(content), "text/csv")}
     response = await client.post(

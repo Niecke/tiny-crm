@@ -59,6 +59,16 @@ function ContactDetail() {
   const documents = useQuery(linkedDocumentsQuery(api, { contact_id: contactId }))
   const [now] = useState(() => Date.now())
   const tabsRef = useSelectedTabInView(tab, contact.isSuccess)
+  const [exportError, setExportError] = useState<string | null>(null)
+
+  const handleExport = async (name: string) => {
+    setExportError(null)
+    try {
+      await exportContactVcard(api, contactId, `${name}.vcf`)
+    } catch (err: unknown) {
+      setExportError(err instanceof Error ? err.message : 'Export failed')
+    }
+  }
 
   const archiving = useArchive({
     queryKey: contactQuery(api, contactId).queryKey,
@@ -125,7 +135,7 @@ function ContactDetail() {
           <div className="header-actions">
             <Button
               variant="quiet"
-              onPress={() => void exportContactVcard(api, contactId, `${c.name}.vcf`)}
+              onPress={() => void handleExport(c.name)}
             >
               Export vCard
             </Button>
@@ -141,6 +151,8 @@ function ContactDetail() {
           </div>
         )}
       </header>
+
+      {exportError && <p className="form-error">{exportError}</p>}
 
       <div className="profile">
         <ContactFacts contact={c} />

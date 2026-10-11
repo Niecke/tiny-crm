@@ -35,6 +35,7 @@ _COUNTRY_MAP: dict[str, str] = {
     "usa": "US",
     "united kingdom": "GB",
     "uk": "GB",
+    "great britain": "GB",
     "liechtenstein": "LI",
     "italy": "IT",
     "italien": "IT",
@@ -42,6 +43,66 @@ _COUNTRY_MAP: dict[str, str] = {
     "frankreich": "FR",
     "netherlands": "NL",
     "niederlande": "NL",
+    "belgium": "BE",
+    "belgien": "BE",
+    "spain": "ES",
+    "spanien": "ES",
+    "portugal": "PT",
+    "canada": "CA",
+    "kanada": "CA",
+    "australia": "AU",
+    "australien": "AU",
+    "new zealand": "NZ",
+    "ireland": "IE",
+    "irland": "IE",
+    "poland": "PL",
+    "polen": "PL",
+    "czech republic": "CZ",
+    "czechia": "CZ",
+    "tschechien": "CZ",
+    "slovakia": "SK",
+    "slowakei": "SK",
+    "slovenia": "SI",
+    "slowenien": "SI",
+    "hungary": "HU",
+    "ungarn": "HU",
+    "croatia": "HR",
+    "kroatien": "HR",
+    "sweden": "SE",
+    "schweden": "SE",
+    "norway": "NO",
+    "norwegen": "NO",
+    "denmark": "DK",
+    "dänemark": "DK",
+    "finland": "FI",
+    "finnland": "FI",
+    "greece": "GR",
+    "griechenland": "GR",
+    "luxembourg": "LU",
+    "luxemburg": "LU",
+    "romania": "RO",
+    "rumänien": "RO",
+    "bulgaria": "BG",
+    "bulgarien": "BG",
+    "cyprus": "CY",
+    "zypern": "CY",
+    "malta": "MT",
+    "estonia": "EE",
+    "estland": "EE",
+    "latvia": "LV",
+    "lettland": "LV",
+    "lithuania": "LT",
+    "litauen": "LT",
+    "japan": "JP",
+    "china": "CN",
+    "india": "IN",
+    "indien": "IN",
+    "brazil": "BR",
+    "brasilien": "BR",
+    "mexico": "MX",
+    "mexiko": "MX",
+    "singapore": "SG",
+    "singapur": "SG",
 }
 
 
@@ -306,7 +367,15 @@ def parse_vcards(text: str) -> list[ParsedVCard]:
             if len(adr_parts) > 5 and adr_parts[5]:
                 current_card.postal_code = adr_parts[5]
             if len(adr_parts) > 6 and adr_parts[6]:
-                current_card.country = _normalize_country(adr_parts[6])
+                norm_country = _normalize_country(adr_parts[6])
+                if norm_country:
+                    current_card.country = norm_country
+                else:
+                    raw_country = adr_parts[6].strip()
+                    if current_card.city:
+                        current_card.city = f"{current_card.city}, {raw_country}"
+                    else:
+                        current_card.city = raw_country
 
         elif prop_name == "BDAY":
             val = _unescape(prop_val).strip()

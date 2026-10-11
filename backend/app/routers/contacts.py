@@ -162,7 +162,16 @@ def _checked_import_size(file: UploadFile) -> int:
     return size
 
 
-@router.get("/vcard")
+@router.get(
+    "/vcard",
+    response_class=Response,
+    responses={
+        200: {
+            "content": {"text/vcard": {"schema": {"type": "string"}}},
+            "description": "Export all contacts in vCard format.",
+        }
+    },
+)
 async def export_vcards(
     archived: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
@@ -203,7 +212,16 @@ async def import_contacts_vcard(
     return await import_vcards(session, user, text)
 
 
-@router.get("/{contact_id}/vcard")
+@router.get(
+    "/{contact_id}/vcard",
+    response_class=Response,
+    responses={
+        200: {
+            "content": {"text/vcard": {"schema": {"type": "string"}}},
+            "description": "Export single contact in vCard format.",
+        }
+    },
+)
 async def export_contact_vcard(
     contact_id: UUID,
     session: AsyncSession = Depends(get_session),

@@ -40,14 +40,24 @@ function ContactsList() {
   const { data, error, isPending, isPlaceholderData } = useQuery(
     contactsQuery(api, { q: search, status, relation, archived, page }),
   )
+  const [exportError, setExportError] = useState<string | null>(null)
   const filtered = Boolean(search || status || relation)
+
+  const handleExport = async () => {
+    setExportError(null)
+    try {
+      await exportAllContactsVcard(api, archived)
+    } catch (err: unknown) {
+      setExportError(err instanceof Error ? err.message : 'Export failed')
+    }
+  }
 
   return (
     <div className="page">
       <header className="page-header page-header-row">
         <h1>Contacts</h1>
         <div className="header-actions">
-          <Button variant="quiet" onPress={() => void exportAllContactsVcard(api)}>
+          <Button variant="quiet" onPress={() => void handleExport()}>
             Export vCards
           </Button>
           <ImportVCardDialog api={api} />
@@ -59,6 +69,8 @@ function ContactsList() {
           </Link>
         </div>
       </header>
+
+      {exportError && <p className="form-error">{exportError}</p>}
 
       <div className="toolbar filters">
         <SearchField label="Search contacts" placeholder="Search name or email" value={input} onChange={setInput} />

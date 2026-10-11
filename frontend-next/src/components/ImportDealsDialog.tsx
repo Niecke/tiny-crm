@@ -22,19 +22,23 @@ export function ImportDealsDialog({ api }: { api: Api }) {
   }
 
   const handleClose = () => {
+    if (isUploading) return
     reset()
     setIsOpen(false)
   }
 
   const handleImport = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!file) return
+    if (!file || isUploading) return
     setIsUploading(true)
     setError(null)
     try {
       const res = await importDeals(api, file, 'lead_generation')
       setSummary(res)
-      await invalidateDeals(queryClient)
+      await Promise.all([
+        invalidateDeals(queryClient),
+        queryClient.invalidateQueries({ queryKey: ['organizations'] }),
+      ])
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Import failed')
     } finally {
@@ -48,7 +52,11 @@ export function ImportDealsDialog({ api }: { api: Api }) {
         Import leads
       </Button>
 
-      <Modal title="Import Deals" isOpen={isOpen} onOpenChange={(open) => !open && handleClose()}>
+      <Modal
+        title="Import Deals"
+        isOpen={isOpen}
+        onOpenChange={(open) => !open && handleClose()}
+      >
         {summary ? (
           <div className="quick-form">
             <p>

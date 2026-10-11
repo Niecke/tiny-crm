@@ -4002,13 +4002,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description Export all contacts in vCard format. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "text/vcard": string;
                 };
             };
             /** @description Validation Error */
@@ -4066,13 +4066,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description Export single contact in vCard format. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "text/vcard": string;
                 };
             };
             /** @description Validation Error */

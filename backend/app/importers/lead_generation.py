@@ -8,9 +8,10 @@ from __future__ import annotations
 
 import csv
 import io
+import sys
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.archive import live
@@ -20,6 +21,9 @@ from app.schemas.import_export import DealImportSummary
 
 if TYPE_CHECKING:
     from app.auth.users import User
+
+# Accommodate large CSV cells up to 10 MB without crashing
+csv.field_size_limit(min(sys.maxsize, 10 * 1024 * 1024))
 
 
 def _clean(val: Any) -> str:
@@ -118,80 +122,87 @@ async def import_lead_generation_deals(
     skipped_duplicates = 0
     errors: list[str] = []
 
-    for raw_row in reader:
-        row = {k.strip().lower(): _clean(v) for k, v in raw_row.items() if k}
-        company = row.get("company") or row.get("company_name", "")
-        if not company:
-            continue
+    try:
+        for row_idx, raw_row in enumerate(reader, start=2):
+            if not any(raw_row.values()):
+                continue
 
-        total_rows += 1
-        domain = row.get("domain") or row.get("website", "")
-        fn = row.get("fn", "")
-        legal_form = row.get("legal_form", "")
-        plz = row.get("plz", "")
+            row = {k.strip().lower(): _clean(v) for k, v in raw_row.items() if k}
+            company = row.get("company") or row.get("company_name", "")
+            if not company:
+                errors.append(f"Row {row_idx}: Missing required company name.")
+                continue
 
-        # 1. Resolve or create Organization
-        org = orgs_by_name.get(company.lower())
-        if org is None and domain:
-            org = orgs_by_domain.get(domain.lower())
+            total_rows += 1
+            domain = row.get("domain") or row.get("website", "")
+            fn = row.get("fn", "")
+            legal_form = row.get("legal_form", "")
+            plz = row.get("plz", "")
 
-        if org is None:
-            notes_parts = []
-            if fn:
-                notes_parts.append(f"Firmenbuch: {fn}")
-            if legal_form:
-                notes_parts.append(f"Rechtsform: {legal_form}")
-            if plz:
-                notes_parts.append(f"PLZ: {plz}")
+            # 1. Resolve or create Organization
+            org = orgs_by_name.get(company.lower())
+            if org is None and domain:
+                org = orgs_by_domain.get(domain.lower())
 
-            org = Organization(
-                name=company,
-                domain=domain or None,
-                notes=" | ".join(notes_parts) if notes_parts else None,
-                user_id=user.id,
+            if org is None:
+                notes_parts = []
+                if fn:
+                    notes_parts.append(f"Firmenbuch: {fn}")
+                if legal_form:
+                    notes_parts.append(f"Rechtsform: {legal_form}")
+                if plz:
+                    notes_parts.append(f"PLZ: {plz}")
+
+                org = Organization(
+                    name=company,
+                    domain=domain or None,
+                    notes=" | ".join(notes_parts) if notes_parts else None,
+                    user_id=user.id,
+                )
+                session.add(org)
+                await session.flush()
+                orgs_by_name[company.lower()] = org
+                if domain:
+                    orgs_by_domain[domain.lower()] = org
+                created_organizations += 1
+            elif domain and not org.domain:
+                org.domain = domain
+
+            # 2. Derive Deal title
+            entry_angle = row.get("entry_angle", "")
+            if entry_angle:
+                deal_title = entry_angle if len(entry_angle) <= 160 else entry_angle[:157] + "..."
+            else:
+                deal_title = f"{company} Consulting"
+
+            # 3. Check for duplicate Deal for this organization
+            existing_deal_query = select(Deal).where(
+                Deal.user_id == user.id,
+                Deal.organization_id == org.id,
+                live(Deal),
+                Deal.title == deal_title,
             )
-            session.add(org)
-            await session.flush()
-            orgs_by_name[company.lower()] = org
-            if domain:
-                orgs_by_domain[domain.lower()] = org
-            created_organizations += 1
-        elif domain and not org.domain:
-            org.domain = domain
+            existing_deal = await session.scalar(existing_deal_query)
+            if existing_deal is not None:
+                skipped_duplicates += 1
+                continue
 
-        # 2. Derive Deal title
-        entry_angle = row.get("entry_angle", "")
-        if entry_angle:
-            deal_title = entry_angle if len(entry_angle) <= 160 else entry_angle[:157] + "..."
-        else:
-            deal_title = f"{company} Consulting"
+            # 4. Create new Deal in 'lead' stage
+            notes = _format_deal_notes(row)
+            deal = Deal(
+                title=deal_title,
+                organization_id=org.id,
+                notes=notes,
+                user_id=user.id,
+                value_type="fixed",
+            )
+            apply_stage(deal, "lead", None)
+            session.add(deal)
+            imported_deals += 1
 
-        # 3. Check for duplicate Deal for this organization
-        existing_deal_query = select(Deal).where(
-            Deal.user_id == user.id,
-            Deal.organization_id == org.id,
-            live(Deal),
-            func.lower(Deal.title) == func.lower(deal_title),
-        )
-        existing_deal = await session.scalar(existing_deal_query)
-        if existing_deal is not None:
-            skipped_duplicates += 1
-            continue
-
-        # 4. Create new Deal in 'lead' stage
-        notes = _format_deal_notes(row)
-        deal = Deal(
-            title=deal_title,
-            organization_id=org.id,
-            notes=notes,
-            user_id=user.id,
-            value_type="fixed",
-        )
-        apply_stage(deal, "lead", None)
-        session.add(deal)
-        imported_deals += 1
-
-    await session.commit()
+        await session.commit()
+    except csv.Error as exc:
+        errors.append(f"CSV format error: {exc}")
 
     return DealImportSummary(
         format="lead_generation",
