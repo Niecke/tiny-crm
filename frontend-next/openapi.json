@@ -261,6 +261,147 @@
         }
       }
     },
+    "/contacts/vcard": {
+      "get": {
+        "tags": [
+          "contacts"
+        ],
+        "summary": "Export Vcards",
+        "description": "Export all active (or archived) contacts as a multi-vCard .vcf file.",
+        "operationId": "export_vcards_contacts_vcard_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Archived"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contacts/import/vcard": {
+      "post": {
+        "tags": [
+          "contacts"
+        ],
+        "summary": "Import Contacts Vcard",
+        "description": "Import contacts from a vCard (.vcf) file.",
+        "operationId": "import_contacts_vcard_contacts_import_vcard_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_import_contacts_vcard_contacts_import_vcard_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VCardImportSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/contacts/{contact_id}/vcard": {
+      "get": {
+        "tags": [
+          "contacts"
+        ],
+        "summary": "Export Contact Vcard",
+        "description": "Export a single contact as a .vcf file.",
+        "operationId": "export_contact_vcard_contacts__contact_id__vcard_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "contact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Contact Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/contacts/{contact_id}": {
       "get": {
         "tags": [
@@ -1740,6 +1881,65 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DealRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/deals/import": {
+      "post": {
+        "tags": [
+          "deals"
+        ],
+        "summary": "Import Deals",
+        "description": "Import deals from a batch CSV file.\n\nSupported formats:\n- `lead_generation` (v1): CSV produced by the cc lead_generation tool (hot_leads.csv).",
+        "operationId": "import_deals_deals_import_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "lead_generation",
+              "title": "Format"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_import_deals_deals_import_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DealImportSummary"
                 }
               }
             }
@@ -5685,6 +5885,34 @@
         ],
         "title": "AuditEventRead"
       },
+      "Body_import_contacts_vcard_contacts_import_vcard_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_import_contacts_vcard_contacts_import_vcard_post"
+      },
+      "Body_import_deals_deals_import_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_import_deals_deals_import_post"
+      },
       "Body_login_auth_jwt_login_post": {
         "properties": {
           "grant_type": {
@@ -8443,6 +8671,48 @@
           "title"
         ],
         "title": "DealCreate"
+      },
+      "DealImportSummary": {
+        "properties": {
+          "format": {
+            "type": "string",
+            "title": "Format"
+          },
+          "total_rows": {
+            "type": "integer",
+            "title": "Total Rows"
+          },
+          "imported_deals": {
+            "type": "integer",
+            "title": "Imported Deals"
+          },
+          "created_organizations": {
+            "type": "integer",
+            "title": "Created Organizations"
+          },
+          "skipped_duplicates": {
+            "type": "integer",
+            "title": "Skipped Duplicates"
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Errors",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "format",
+          "total_rows",
+          "imported_deals",
+          "created_organizations",
+          "skipped_duplicates"
+        ],
+        "title": "DealImportSummary",
+        "description": "Result of importing deals from a batch file (e.g. lead_generation)."
       },
       "DealRead": {
         "properties": {
@@ -12274,6 +12544,38 @@
           "email"
         ],
         "title": "UserRead"
+      },
+      "VCardImportSummary": {
+        "properties": {
+          "total_cards": {
+            "type": "integer",
+            "title": "Total Cards"
+          },
+          "imported_contacts": {
+            "type": "integer",
+            "title": "Imported Contacts"
+          },
+          "created_organizations": {
+            "type": "integer",
+            "title": "Created Organizations"
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Errors",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_cards",
+          "imported_contacts",
+          "created_organizations"
+        ],
+        "title": "VCardImportSummary",
+        "description": "Result of importing contacts from a vCard (.vcf) file."
       },
       "ValidationError": {
         "properties": {

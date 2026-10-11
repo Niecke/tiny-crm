@@ -13,6 +13,7 @@ import {
   archiveContact,
   contactQuery,
   deleteContact,
+  exportContactVcard,
   freelancerAnswer,
   labelOf,
   lifecycleOptions,
@@ -23,6 +24,7 @@ import {
 import { formatDay, localDay } from '../../../../format'
 import { linkedTasksQuery, useToggleDone } from '../../../../tasks'
 import { TaskList } from '../../../../components/TaskList'
+import { Button } from '../../../../components/ui/Button'
 import { Checkbox } from '../../../../components/ui/Checkbox'
 import { DocumentRows } from '../../../../components/DocumentRows'
 import { linkedDocumentsQuery } from '../../../../documents'
@@ -121,6 +123,12 @@ function ContactDetail() {
         </div>
         {!c.archived_at && (
           <div className="header-actions">
+            <Button
+              variant="quiet"
+              onPress={() => void exportContactVcard(api, contactId, `${c.name}.vcf`)}
+            >
+              Export vCard
+            </Button>
             <ArchiveButton archiving={archiving} />
             <Link
               to="/contacts/$contactId/edit"

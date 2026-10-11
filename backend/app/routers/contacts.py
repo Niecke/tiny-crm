@@ -1,8 +1,9 @@
+import os
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,6 +12,7 @@ from app.audit import check_version, erase_history, record_update, snapshot
 from app.auth import current_active_user
 from app.auth.users import User
 from app.db import contains, count_rows, get_session
+from app.importers.vcard import contact_to_vcard, contacts_to_vcards, import_vcards
 from app.models.contact import Contact
 from app.models.organization import Organization
 from app.schemas.contact import (
@@ -22,6 +24,7 @@ from app.schemas.contact import (
     LifecycleStatus,
     RelationType,
 )
+from app.schemas.import_export import VCardImportSummary
 from app.schemas.page import Page
 
 router = APIRouter(prefix="/contacts", tags=["contacts"])
@@ -143,6 +146,78 @@ async def list_contacts(
         total=total,
         skip=skip,
         limit=limit,
+    )
+
+
+MAX_IMPORT_BYTES = 10 * 1024 * 1024  # 10 MB
+
+
+def _checked_import_size(file: UploadFile) -> int:
+    size = file.size
+    if size is None:
+        size = file.file.seek(0, os.SEEK_END)
+        file.file.seek(0)
+    if size > MAX_IMPORT_BYTES:
+        raise HTTPException(status_code=413, detail="File exceeds 10 MB limit")
+    return size
+
+
+@router.get("/vcard")
+async def export_vcards(
+    archived: bool = Query(default=False),
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_active_user),
+) -> Response:
+    """Export all active (or archived) contacts as a multi-vCard .vcf file."""
+    q = (
+        select(Contact)
+        .where(Contact.user_id == user.id, archived_is(Contact, archived))
+        .order_by(Contact.name.asc(), Contact.id.asc())
+    )
+    result = await session.execute(q)
+    contacts = result.scalars().all()
+    vcard_text = contacts_to_vcards(contacts)
+    return Response(
+        content=vcard_text,
+        media_type="text/vcard; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="contacts.vcf"'},
+    )
+
+
+@router.post("/import/vcard", response_model=VCardImportSummary)
+async def import_contacts_vcard(
+    file: UploadFile = File(...),
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_active_user),
+) -> VCardImportSummary:
+    """Import contacts from a vCard (.vcf) file."""
+    _checked_import_size(file)
+    try:
+        content_bytes = await file.read()
+        text = content_bytes.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        raise HTTPException(
+            status_code=422, detail="File must be valid UTF-8 encoded vCard."
+        ) from None
+
+    return await import_vcards(session, user, text)
+
+
+@router.get("/{contact_id}/vcard")
+async def export_contact_vcard(
+    contact_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_active_user),
+) -> Response:
+    """Export a single contact as a .vcf file."""
+    contact = await _get_owned(session, contact_id, user)
+    vcard_text = contact_to_vcard(contact)
+    safe_name = "".join(c for c in contact.name if c.isalnum() or c in ("-", "_", " ")).strip()
+    safe_name = safe_name.replace(" ", "_") or "contact"
+    return Response(
+        content=vcard_text,
+        media_type="text/vcard; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{safe_name}.vcf"'},
     )
 
 

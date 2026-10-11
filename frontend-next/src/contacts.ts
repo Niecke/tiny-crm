@@ -1,6 +1,6 @@
 import { keepPreviousData, type QueryClient, queryOptions } from '@tanstack/react-query'
 import { type Api, unwrap } from './api/client'
-import type { ContactCreate } from './api/types'
+import type { ContactCreate, VCardImportSummary } from './api/types'
 
 // Rows per page on every paged list (FRONTEND.md, "Paging").
 export const PAGE_SIZE = 25
@@ -116,6 +116,47 @@ export const archiveContact = (api: Api, id: string) =>
 
 export const restoreContact = (api: Api, id: string) =>
   unwrap(api.POST('/contacts/{contact_id}/restore', { params: { path: { contact_id: id } } }))
+
+export async function importContactsVcard(api: Api, file: File): Promise<VCardImportSummary> {
+  const form = new FormData()
+  form.append('file', file)
+  return unwrap(
+    api.POST('/contacts/import/vcard', {
+      body: {} as never,
+      bodySerializer: () => form,
+    }),
+  )
+}
+
+function triggerDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+export async function exportContactVcard(api: Api, contactId: string, filename = 'contact.vcf') {
+  const res = await api.GET('/contacts/{contact_id}/vcard', {
+    params: { path: { contact_id: contactId } },
+    parseAs: 'blob',
+  })
+  if (!res.response.ok) throw new Error('Failed to export vCard')
+  const blob = res.data as unknown as Blob
+  triggerDownload(blob, filename)
+}
+
+export async function exportAllContactsVcard(api: Api) {
+  const res = await api.GET('/contacts/vcard', {
+    parseAs: 'blob',
+  })
+  if (!res.response.ok) throw new Error('Failed to export vCards')
+  const blob = res.data as unknown as Blob
+  triggerDownload(blob, 'contacts.vcf')
+}
 
 // A contact write changes every contact list, and the contact count on its
 // organization (old and new, after a move), so organizations go too.

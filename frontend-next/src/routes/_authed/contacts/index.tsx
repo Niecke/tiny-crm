@@ -3,10 +3,19 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { Cell, Column, Row, Table, TableBody, TableHeader } from 'react-aria-components'
 import { ArchivedToggle } from '../../../components/Archive'
+import { ImportVCardDialog } from '../../../components/ImportVCardDialog'
+import { Button } from '../../../components/ui/Button'
 import { Pagination } from '../../../components/ui/Pagination'
 import { SearchField } from '../../../components/ui/SearchField'
 import { Select } from '../../../components/ui/Select'
-import { contactsQuery, labelOf, lifecycleOptions, PAGE_SIZE, relationOptions } from '../../../contacts'
+import {
+  contactsQuery,
+  exportAllContactsVcard,
+  labelOf,
+  lifecycleOptions,
+  PAGE_SIZE,
+  relationOptions,
+} from '../../../contacts'
 import { useDebounced } from '../../../useDebounced'
 
 export const Route = createFileRoute('/_authed/contacts/')({
@@ -38,6 +47,10 @@ function ContactsList() {
       <header className="page-header page-header-row">
         <h1>Contacts</h1>
         <div className="header-actions">
+          <Button variant="quiet" onPress={() => void exportAllContactsVcard(api)}>
+            Export vCards
+          </Button>
+          <ImportVCardDialog api={api} />
           <Link to="/contacts/scan" search={filters} className="button button-quiet">
             Scan card
           </Link>

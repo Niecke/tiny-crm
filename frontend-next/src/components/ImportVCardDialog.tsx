@@ -1,0 +1,101 @@
+import { useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
+import type { Api } from '../api/client'
+import type { VCardImportSummary } from '../api/types'
+import { importContactsVcard, invalidateContacts } from '../contacts'
+import { Button } from './ui/Button'
+import { Modal } from './ui/Modal'
+
+export function ImportVCardDialog({ api }: { api: Api }) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [file, setFile] = useState<File | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
+  const [summary, setSummary] = useState<VCardImportSummary | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const queryClient = useQueryClient()
+
+  const reset = () => {
+    setFile(null)
+    setIsUploading(false)
+    setSummary(null)
+    setError(null)
+  }
+
+  const handleClose = () => {
+    reset()
+    setIsOpen(false)
+  }
+
+  const handleImport = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!file) return
+    setIsUploading(true)
+    setError(null)
+    try {
+      const res = await importContactsVcard(api, file)
+      setSummary(res)
+      await invalidateContacts(queryClient)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Import failed')
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  return (
+    <>
+      <Button variant="quiet" onPress={() => setIsOpen(true)}>
+        Import vCard
+      </Button>
+
+      <Modal title="Import Contacts" isOpen={isOpen} onOpenChange={(open) => !open && handleClose()}>
+        {summary ? (
+          <div className="quick-form">
+            <p>
+              <strong>Import completed!</strong>
+            </p>
+            <ul>
+              <li>Contacts imported: {summary.imported_contacts}</li>
+              <li>Organizations created: {summary.created_organizations}</li>
+            </ul>
+            {summary.errors.length > 0 && (
+              <div className="form-error">
+                {summary.errors.map((err, i) => (
+                  <p key={i}>{err}</p>
+                ))}
+              </div>
+            )}
+            <div className="form-actions">
+              <Button onPress={handleClose}>Done</Button>
+            </div>
+          </div>
+        ) : (
+          <form className="quick-form" onSubmit={(e) => void handleImport(e)}>
+            <p className="muted">Upload contacts from a vCard file (<code>.vcf</code>).</p>
+
+            <div style={{ margin: '1rem 0' }}>
+              <input
+                type="file"
+                accept=".vcf,text/vcard"
+                onChange={(e) => setFile(e.target.files?.[0] || null)}
+                disabled={isUploading}
+                required
+              />
+            </div>
+
+            {error && <p className="form-error">{error}</p>}
+
+            <div className="form-actions">
+              <Button variant="quiet" onPress={handleClose} isDisabled={isUploading}>
+                Cancel
+              </Button>
+              <Button type="submit" isDisabled={!file || isUploading}>
+                {isUploading ? 'Importing…' : 'Import'}
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
+    </>
+  )
+}
