@@ -59,8 +59,20 @@ spec:
           {{- with .Values.priorityClassName }}
           priorityClassName: {{ . | quote }}
           {{- end }}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            seccompProfile:
+              type: RuntimeDefault
           containers:
             - name: briefing
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
               # The same image the API runs: the script imports the models, so
               # the two can never disagree about what "overdue" means.
               image: {{ include "tinycrm.image" (list "backend" .Values.backend.image) | quote }}
@@ -81,4 +93,10 @@ spec:
                 {{- end }}
               resources:
                 {{- toYaml .Values.briefing.resources | nindent 16 }}
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
 {{- end }}

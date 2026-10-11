@@ -56,8 +56,20 @@ spec:
       {{- with .Values.priorityClassName }}
       priorityClassName: {{ . | quote }}
       {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: frontend
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           image: {{ include "tinycrm.image" (list "frontend" .Values.frontend.image) | quote }}
           imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
           ports:
@@ -69,6 +81,8 @@ spec:
               mountPath: /srv/config.json
               subPath: config.json
               readOnly: true
+            - name: tmp
+              mountPath: /tmp
           readinessProbe:
             httpGet:
               path: /
@@ -87,3 +101,5 @@ spec:
         - name: config
           configMap:
             name: {{ include "tinycrm.fullname" . }}-frontend
+        - name: tmp
+          emptyDir: {}

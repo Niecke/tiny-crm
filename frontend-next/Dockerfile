@@ -17,7 +17,15 @@ RUN echo "{\"version\":\"$GIT_COMMIT\"}" > public/version.json && \
 
 # Static files only: Node exists in the build stage and nowhere after it.
 FROM caddy:alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
+
+RUN addgroup -g 10001 -S caddy && adduser -u 10001 -D -S -G caddy caddy
+
+ENV XDG_CONFIG_HOME=/tmp/config \
+    XDG_DATA_HOME=/tmp/data
+
 COPY --from=builder /app/dist /srv
 COPY Caddyfile /etc/caddy/Caddyfile
+
+USER 10001
 
 EXPOSE 8080
