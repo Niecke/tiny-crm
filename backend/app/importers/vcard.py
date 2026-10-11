@@ -2,10 +2,14 @@
 
 Supports RFC 2426 / RFC 6350 vCard formatting with proper line unfolding,
 escaping/unescaping, multi-contact streams, and organization resolution.
+Reading is more forgiving than writing: what phones and address books export
+is as often vCard 2.1 (quoted-printable values) or grouped (`item1.EMAIL`) as
+it is the 3.0 written here.
 """
 
 from __future__ import annotations
 
+import quopri
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -16,6 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.archive import live
+from app.db import one_at_a_time
 from app.models.contact import Contact
 from app.models.organization import Organization
 from app.schemas.import_export import VCardImportSummary
@@ -241,11 +246,32 @@ class ParsedVCard:
     tags: list[str] = field(default_factory=list)
 
 
+def _is_quoted_printable(header: str) -> bool:
+    return "QUOTED-PRINTABLE" in header.upper()
+
+
 def _unfold_lines(text: str) -> list[str]:
-    """Unfold lines per RFC: remove newline followed immediately by whitespace."""
-    normalized = text.replace("\r\n", "\n").replace("\r", "\n")
-    unfolded = re.sub(r"\n[ \t]", "", normalized)
-    return [line.strip() for line in unfolded.split("\n") if line.strip()]
+    """Unfold lines per RFC: remove newline followed immediately by whitespace.
+
+    A quoted-printable value (vCard 2.1) continues differently: a trailing `=`
+    is a soft line break and the next line carries on from its first character,
+    so those are rejoined here as well.
+    """
+    lines: list[str] = []
+    soft_break = False
+    for raw_line in text.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+        if soft_break:
+            lines[-1] = lines[-1].rstrip()[:-1] + raw_line
+        elif lines and raw_line[:1] in (" ", "\t"):
+            lines[-1] += raw_line[1:]
+        elif raw_line.strip():
+            lines.append(raw_line)
+        else:
+            continue
+        soft_break = lines[-1].rstrip().endswith("=") and _is_quoted_printable(
+            lines[-1].split(":", 1)[0]
+        )
+    return [line.strip() for line in lines if line.strip()]
 
 
 def _split_unescaped(text: str, delimiter: str = ";") -> list[str]:
@@ -270,35 +296,109 @@ def _split_unescaped(text: str, delimiter: str = ";") -> list[str]:
     return parts
 
 
+def _qp_charset(params: list[str]) -> str | None:
+    """The charset of a quoted-printable value, or None for a plain one.
+
+    vCard 2.1 only — what Android still exports by default:
+    `FN;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:J=C3=BCrgen`.
+    """
+    if not any(_is_quoted_printable(p) for p in params):
+        return None
+    for param in params:
+        if param.startswith("CHARSET="):
+            return param.removeprefix("CHARSET=")
+    return "UTF-8"
+
+
+def _text(raw: str, charset: str | None) -> str:
+    """One value as it was meant: quoted-printable decoded if it is, then unescaped."""
+    if charset is not None:
+        decoded = quopri.decodestring(raw.encode("utf-8"))
+        try:
+            raw = decoded.decode(charset, errors="replace")
+        except LookupError:  # a charset Python has never heard of
+            raw = decoded.decode("utf-8", errors="replace")
+    return _unescape(raw).strip()
+
+
+def _parts(raw: str, delimiter: str, charset: str | None) -> list[str]:
+    """A structured value's components. Split first: an encoded `;` is not a separator."""
+    return [_text(part, charset) for part in _split_unescaped(raw, delimiter)]
+
+
+def _is_preferred(params: list[str]) -> bool:
+    """`TYPE=WORK,PREF` (3.0), a bare `PREF` (2.1) or `PREF=1` (4.0)."""
+    return any("PREF" in param for param in params)
+
+
 def _normalize_country(raw: str | None) -> str | None:
     if not raw:
         return None
     cleaned = raw.strip()
-    if len(cleaned) == 2 and cleaned.isalpha():
+    # The map first, so "UK" becomes GB rather than passing as a code of its own.
+    mapped = _COUNTRY_MAP.get(cleaned.lower())
+    if mapped:
+        return mapped
+    # ASCII only, like the schema's pattern: str.isalpha() is true of "日本",
+    # which would be stored and then fail every read of the contact.
+    if re.fullmatch(r"[A-Za-z]{2}", cleaned):
         return cleaned.upper()
-    lower = cleaned.lower()
-    return _COUNTRY_MAP.get(lower)
+    return None
+
+
+def _pick_emails(emails: list[tuple[bool, str]]) -> tuple[str | None, str | None]:
+    """Primary and secondary address: the preferred one first, then file order."""
+    ordered = list(dict.fromkeys(address for _, address in sorted(emails, key=lambda e: not e[0])))
+    first, second, *_ = [*ordered, None, None]
+    return first, second
+
+
+def _pick_phones(phones: list[tuple[bool, bool, str]]) -> tuple[str | None, str | None]:
+    """Primary and secondary number from (preferred, is_cell, number) in file order.
+
+    The preferred number is the primary one; without one it is the first that
+    is not a mobile, which is how contact_to_vcard writes the pair out. Whatever
+    comes next is the secondary — so a card with nothing but a mobile number
+    keeps it there, and an exported contact reads back as it was.
+    """
+    primary = next((p for p in phones if p[0]), None) or next((p for p in phones if not p[1]), None)
+    rest = [p[2] for p in phones if p is not primary]
+    if primary is not None:
+        return primary[2], rest[0] if rest else None
+    return (rest[1] if len(rest) > 1 else None), (rest[0] if rest else None)
 
 
 def parse_vcards(text: str) -> list[ParsedVCard]:
-    """Parse single or multi-vCard text into a list of ParsedVCard dataclasses."""
+    """Parse single or multi-vCard text into a list of ParsedVCard dataclasses.
+
+    A card with neither FN nor N comes back with an empty name rather than
+    being dropped, so the caller can say that it was there.
+    """
     lines = _unfold_lines(text)
     results: list[ParsedVCard] = []
     current_card: ParsedVCard | None = None
     n_field_fallback: str | None = None
+    emails: list[tuple[bool, str]] = []
+    phones: list[tuple[bool, bool, str]] = []
+    # None until an address is taken, then whether that one was marked preferred.
+    address_preferred: bool | None = None
 
     for line in lines:
         if line.upper() == "BEGIN:VCARD":
             current_card = ParsedVCard()
             n_field_fallback = None
+            emails = []
+            phones = []
+            address_preferred = None
             continue
 
         if line.upper() == "END:VCARD":
             if current_card is not None:
                 if not current_card.name and n_field_fallback:
                     current_card.name = n_field_fallback
-                if current_card.name:
-                    results.append(current_card)
+                current_card.email, current_card.email_secondary = _pick_emails(emails)
+                current_card.phone, current_card.phone_secondary = _pick_phones(phones)
+                results.append(current_card)
             current_card = None
             n_field_fallback = None
             continue
@@ -311,15 +411,18 @@ def parse_vcards(text: str) -> list[ParsedVCard]:
 
         prop_header, prop_val = line.split(":", 1)
         prop_parts = prop_header.upper().split(";")
-        prop_name = prop_parts[0]
-        params = prop_parts[1:] if len(prop_parts) > 1 else []
+        # `item1.EMAIL` is an EMAIL: the group prefix only ties properties
+        # together (Apple and Google use it to hang a label on one).
+        prop_name = prop_parts[0].rsplit(".", 1)[-1]
+        params = prop_parts[1:]
+        charset = _qp_charset(params)
 
         if prop_name == "FN":
-            current_card.name = _unescape(prop_val).strip()
+            current_card.name = _text(prop_val, charset)
 
         elif prop_name == "N":
             # N:Family;Given;Additional;Prefix;Suffix
-            n_parts = [_unescape(p).strip() for p in _split_unescaped(prop_val, ";")]
+            n_parts = _parts(prop_val, ";", charset)
             family = n_parts[0] if len(n_parts) > 0 else ""
             given = n_parts[1] if len(n_parts) > 1 else ""
             name = f"{given} {family}".strip()
@@ -328,57 +431,55 @@ def parse_vcards(text: str) -> list[ParsedVCard]:
 
         elif prop_name == "ORG":
             # ORG can contain sub-units separated by semicolon
-            org_parts = [_unescape(p).strip() for p in _split_unescaped(prop_val, ";")]
+            org_parts = _parts(prop_val, ";", charset)
             if org_parts and org_parts[0]:
                 current_card.organization_name = org_parts[0]
 
         elif prop_name == "TITLE":
-            current_card.job_title = _unescape(prop_val).strip() or None
+            current_card.job_title = _text(prop_val, charset) or None
 
         elif prop_name == "EMAIL":
-            val = _unescape(prop_val).strip()
+            val = _text(prop_val, charset)
             if val:
-                if current_card.email is None:
-                    current_card.email = val
-                elif current_card.email_secondary is None and val != current_card.email:
-                    current_card.email_secondary = val
+                emails.append((_is_preferred(params), val))
 
         elif prop_name == "TEL":
-            val = _unescape(prop_val).strip()
+            val = _text(prop_val, charset)
             if val:
                 is_cell = any("CELL" in p for p in params)
-                if current_card.phone is None and not is_cell:
-                    current_card.phone = val
-                elif current_card.phone_secondary is None:
-                    current_card.phone_secondary = val
-                elif current_card.phone is None:
-                    current_card.phone = val
+                phones.append((_is_preferred(params), is_cell, val))
 
         elif prop_name == "URL":
-            current_card.website = _unescape(prop_val).strip() or None
+            current_card.website = _text(prop_val, charset) or None
 
         elif prop_name == "ADR":
-            adr_parts = [_unescape(p).strip() for p in _split_unescaped(prop_val, ";")]
             # pobox;ext;street;city;region;postal;country
-            if len(adr_parts) > 2 and adr_parts[2]:
-                current_card.street = adr_parts[2]
-            if len(adr_parts) > 3 and adr_parts[3]:
-                current_card.city = adr_parts[3]
-            if len(adr_parts) > 5 and adr_parts[5]:
-                current_card.postal_code = adr_parts[5]
-            if len(adr_parts) > 6 and adr_parts[6]:
-                norm_country = _normalize_country(adr_parts[6])
-                if norm_country:
-                    current_card.country = norm_country
-                else:
-                    raw_country = adr_parts[6].strip()
-                    if current_card.city:
-                        current_card.city = f"{current_card.city}, {raw_country}"
-                    else:
-                        current_card.city = raw_country
+            adr_parts = _parts(prop_val, ";", charset) + [""] * 7
+            street, city, postal, raw_country = (
+                adr_parts[2],
+                adr_parts[3],
+                adr_parts[5],
+                adr_parts[6],
+            )
+            preferred = _is_preferred(params)
+            # One address, taken whole: the first, unless a later one is marked
+            # preferred. Filling the four fields from whichever ADR happens to
+            # have each makes an address that exists nowhere.
+            wanted = address_preferred is None or (preferred and not address_preferred)
+            if wanted and any((street, city, postal, raw_country)):
+                country = _normalize_country(raw_country)
+                if raw_country and country is None:
+                    # No code for it, and the column holds nothing else: kept
+                    # on the city line rather than dropped.
+                    city = f"{city}, {raw_country}" if city else raw_country
+                current_card.street = street or None
+                current_card.city = city or None
+                current_card.postal_code = postal or None
+                current_card.country = country
+                address_preferred = preferred
 
         elif prop_name == "BDAY":
-            val = _unescape(prop_val).strip()
+            val = _text(prop_val, charset)
             try:
                 # ISO YYYY-MM-DD or YYYYMMDD
                 clean_date = val.replace("-", "")
@@ -390,15 +491,26 @@ def parse_vcards(text: str) -> list[ParsedVCard]:
                 pass
 
         elif prop_name == "NOTE":
-            unescaped_note = _unescape(prop_val).strip()
+            unescaped_note = _text(prop_val, charset)
             if unescaped_note:
                 current_card.notes = unescaped_note
 
         elif prop_name == "CATEGORIES":
-            cat_parts = [_unescape(p).strip() for p in _split_unescaped(prop_val, ",")]
-            current_card.tags.extend([p for p in cat_parts if p])
+            current_card.tags.extend(p for p in _parts(prop_val, ",", charset) if p)
 
     return results
+
+
+def _identities(name: str, *emails: str | None) -> set[tuple[str, str]]:
+    """What a contact is recognised by on a re-import: its name with each address.
+
+    Name alone would merge two people called the same; address alone would merge
+    everyone behind one office@. A contact with no address is its name and
+    nothing else, which only another one without an address can match.
+    """
+    key = name.strip().casefold()
+    addresses = {e.strip().casefold() for e in emails if e and e.strip()}
+    return {(key, address) for address in addresses} or {(key, "")}
 
 
 async def import_vcards(
@@ -406,28 +518,56 @@ async def import_vcards(
     user: User,
     text: str,
 ) -> VCardImportSummary:
-    """Ingest vCard text into Contact and Organization records for `user`."""
+    """Ingest vCard text into Contact and Organization records for `user`.
+
+    A card whose name and e-mail address already belong to a contact — live or
+    archived, or earlier in the same file — is skipped, so sending the same
+    file twice, or importing what was just exported, changes nothing.
+    """
     parsed = parse_vcards(text)
     if not parsed:
         return VCardImportSummary(
             total_cards=0,
             imported_contacts=0,
             created_organizations=0,
+            skipped_duplicates=0,
             errors=["No valid vCards found in file."],
         )
+
+    # Two uploads of one file must not both find the contacts missing.
+    await one_at_a_time(session, f"import:{user.id}")
 
     # Cache user organizations to avoid redundant queries during bulk import
     org_query = select(Organization).where(Organization.user_id == user.id, live(Organization))
     org_res = await session.execute(org_query)
     existing_orgs = {org.name.lower(): org for org in org_res.scalars().all()}
 
+    # Archived contacts included: one that was put away is not to come back
+    # as a second, live copy of itself.
+    contact_res = await session.execute(
+        select(Contact.name, Contact.email, Contact.email_secondary).where(
+            Contact.user_id == user.id
+        )
+    )
+    known: set[tuple[str, str]] = set()
+    for name, email, email_secondary in contact_res.all():
+        known |= _identities(name, email, email_secondary)
+
     imported_contacts = 0
     created_organizations = 0
+    skipped_duplicates = 0
     errors: list[str] = []
 
-    for item in parsed:
+    for card_number, item in enumerate(parsed, start=1):
         if not item.name:
+            errors.append(f"Card {card_number}: no name (FN or N), skipped.")
             continue
+
+        identities = _identities(item.name, item.email, item.email_secondary)
+        if identities & known:
+            skipped_duplicates += 1
+            continue
+        known |= identities
 
         org_id = None
         if item.organization_name:
@@ -472,5 +612,6 @@ async def import_vcards(
         total_cards=len(parsed),
         imported_contacts=imported_contacts,
         created_organizations=created_organizations,
+        skipped_duplicates=skipped_duplicates,
         errors=errors,
     )

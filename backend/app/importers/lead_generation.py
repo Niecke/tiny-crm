@@ -14,7 +14,8 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.archive import live
+from app.audit import record_update, snapshot
+from app.db import one_at_a_time
 from app.models.deal import Deal
 from app.models.organization import Organization
 from app.schemas.import_export import DealImportSummary
@@ -78,43 +79,68 @@ def _format_deal_notes(row: dict[str, str]) -> str:
     return "\n".join(lines)
 
 
+def _nothing_imported(errors: list[str], total_rows: int = 0) -> DealImportSummary:
+    return DealImportSummary(
+        format="lead_generation",
+        total_rows=total_rows,
+        imported_deals=0,
+        created_organizations=0,
+        skipped_duplicates=0,
+        errors=errors,
+    )
+
+
 async def import_lead_generation_deals(
     session: AsyncSession,
     user: User,
     csv_text: str,
 ) -> DealImportSummary:
-    """Ingest CSV formatted by the cc lead_generation tool into Organizations and Deals."""
+    """Ingest CSV formatted by the cc lead_generation tool into Organizations and Deals.
+
+    One deal per company, and only once: a row whose organization already has a
+    deal — in any stage, renamed or archived since — is skipped, and so is a row
+    for an organization that was archived. The tool rewords its entry angles
+    between runs, so the deal title cannot say whether a lead was imported
+    before; the company can.
+    """
     from app.routers.deals import apply_stage
 
-    reader = csv.DictReader(io.StringIO(csv_text))
-    if not reader.fieldnames:
-        return DealImportSummary(
-            format="lead_generation",
-            total_rows=0,
-            imported_deals=0,
-            created_organizations=0,
-            skipped_duplicates=0,
-            errors=["Empty or invalid CSV file."],
-        )
+    # newline="" leaves line endings to the csv module, as its documentation
+    # asks: a file with bare CRs (old Mac, some Excel exports) is then rows, not
+    # one line with "new-line character seen in unquoted field".
+    reader = csv.DictReader(io.StringIO(csv_text, newline=""))
+    try:
+        fieldnames = reader.fieldnames
+    except csv.Error as exc:
+        return _nothing_imported([f"CSV format error: {exc}"])
+    if not fieldnames:
+        return _nothing_imported(["Empty or invalid CSV file."])
 
     # Normalize header mapping
-    headers = {h.strip().lower(): h for h in reader.fieldnames if h}
+    headers = {h.strip().lower(): h for h in fieldnames if h}
     if not any(k in headers for k in ("company", "company_name")):
-        return DealImportSummary(
-            format="lead_generation",
-            total_rows=0,
-            imported_deals=0,
-            created_organizations=0,
-            skipped_duplicates=0,
-            errors=["Missing required 'company' column in CSV."],
-        )
+        return _nothing_imported(["Missing required 'company' column in CSV."])
 
-    # Cache existing organizations to minimize queries
-    org_stmt = select(Organization).where(Organization.user_id == user.id, live(Organization))
-    org_res = await session.execute(org_stmt)
-    existing_orgs = list(org_res.scalars().all())
+    # The same file sent from two tabs would otherwise pass each other's
+    # duplicate check: both read "not there yet" before either commits.
+    await one_at_a_time(session, f"import:{user.id}")
+
+    # Cache existing organizations to minimize queries. Archived ones included,
+    # so a company that was put away is recognised rather than created again.
+    # Sorted archived-first: where two share a name, the live one wins the key.
+    org_res = await session.execute(select(Organization).where(Organization.user_id == user.id))
+    existing_orgs = sorted(org_res.scalars().all(), key=lambda o: o.archived_at is None)
     orgs_by_name = {o.name.lower(): o for o in existing_orgs}
     orgs_by_domain = {o.domain.lower(): o for o in existing_orgs if o.domain}
+
+    # Archived deals count too: archiving a lead is a decision about it, and a
+    # re-import must not undo that by creating it afresh.
+    deal_res = await session.execute(
+        select(Deal.organization_id)
+        .where(Deal.user_id == user.id, Deal.organization_id.is_not(None))
+        .distinct()
+    )
+    orgs_with_deal = set(deal_res.scalars().all())
 
     total_rows = 0
     imported_deals = 0
@@ -144,6 +170,10 @@ async def import_lead_generation_deals(
             if org is None and domain:
                 org = orgs_by_domain.get(domain.lower())
 
+            if org is not None and org.archived_at is not None:
+                skipped_duplicates += 1
+                continue
+
             if org is None:
                 notes_parts = []
                 if fn:
@@ -161,31 +191,32 @@ async def import_lead_generation_deals(
                 )
                 session.add(org)
                 await session.flush()
-                orgs_by_name[company.lower()] = org
-                if domain:
-                    orgs_by_domain[domain.lower()] = org
                 created_organizations += 1
             elif domain and not org.domain:
+                # An edit like any other, so it gets its history entry: a form
+                # opened before the import is refused as stale, and the history
+                # has to be able to say why.
+                before = snapshot(org)
                 org.domain = domain
+                record_update(session, user, org, before)
 
-            # 2. Derive Deal title
+            # Both keys, every time: a later row may name this company by the
+            # spelling or the domain that only this row brought along.
+            orgs_by_name.setdefault(company.lower(), org)
+            if org.domain:
+                orgs_by_domain.setdefault(org.domain.lower(), org)
+
+            # 2. One deal per company
+            if org.id in orgs_with_deal:
+                skipped_duplicates += 1
+                continue
+
+            # 3. Derive Deal title
             entry_angle = row.get("entry_angle", "")
             if entry_angle:
                 deal_title = entry_angle if len(entry_angle) <= 160 else entry_angle[:157] + "..."
             else:
                 deal_title = f"{company} Consulting"
-
-            # 3. Check for duplicate Deal for this organization
-            existing_deal_query = select(Deal).where(
-                Deal.user_id == user.id,
-                Deal.organization_id == org.id,
-                live(Deal),
-                Deal.title == deal_title,
-            )
-            existing_deal = await session.scalar(existing_deal_query)
-            if existing_deal is not None:
-                skipped_duplicates += 1
-                continue
 
             # 4. Create new Deal in 'lead' stage
             notes = _format_deal_notes(row)
@@ -198,11 +229,17 @@ async def import_lead_generation_deals(
             )
             apply_stage(deal, "lead", None)
             session.add(deal)
+            orgs_with_deal.add(org.id)
             imported_deals += 1
 
         await session.commit()
     except csv.Error as exc:
-        errors.append(f"CSV format error: {exc}")
+        # All or nothing. The rows before the broken one were only pending, and
+        # reporting them as imported would send the operator looking for deals
+        # that do not exist.
+        await session.rollback()
+        errors.append(f"CSV format error near line {reader.line_num}: {exc}. Nothing was imported.")
+        return _nothing_imported(errors, total_rows)
 
     return DealImportSummary(
         format="lead_generation",

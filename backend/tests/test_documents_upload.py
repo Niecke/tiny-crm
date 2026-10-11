@@ -9,7 +9,8 @@ import io
 import pytest
 from fastapi import HTTPException, UploadFile
 
-from app.routers.documents import _MAX_BYTES, _checked_size, _detect_format
+from app.routers.documents import _MAX_BYTES, _detect_format
+from app.uploads import checked_size
 
 
 def _upload(data: bytes, *, size: int | None) -> UploadFile:
@@ -34,14 +35,14 @@ def test_unsupported_uploads_are_rejected() -> None:
 
 
 def test_size_within_the_cap_is_returned() -> None:
-    assert _checked_size(_upload(b"x" * 10, size=10)) == 10
+    assert checked_size(_upload(b"x" * 10, size=10), _MAX_BYTES) == 10
 
 
 def test_oversized_uploads_raise_413_without_being_read() -> None:
     file = _upload(b"", size=_MAX_BYTES + 1)
 
     with pytest.raises(HTTPException) as raised:
-        _checked_size(file)
+        checked_size(file, _MAX_BYTES)
 
     assert raised.value.status_code == 413
     # Nothing was consumed: the check never touches the body.
@@ -51,5 +52,5 @@ def test_oversized_uploads_raise_413_without_being_read() -> None:
 def test_a_missing_size_is_measured_and_the_file_rewound() -> None:
     file = _upload(b"abcd", size=None)
 
-    assert _checked_size(file) == 4
+    assert checked_size(file, _MAX_BYTES) == 4
     assert file.file.tell() == 0

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from typing import cast
 from urllib.parse import quote
 from uuid import UUID, uuid4
@@ -31,6 +30,7 @@ from app.models.project import Project, project_documents
 from app.schemas.document import DocumentRead, DocumentUpdate
 from app.schemas.page import Page
 from app.storage import delete_object, get_object_stream, put_object, put_object_stream
+from app.uploads import checked_size
 
 logger = logging.getLogger(__name__)
 
@@ -80,22 +80,6 @@ _ALLOWED_EXTENSIONS = {".pdf": "pdf", ".md": "markdown", ".markdown": "markdown"
 def _detect_format(filename: str, content_type: str) -> str | None:
     ext = "." + filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
     return _ALLOWED_FORMATS.get(content_type) or _ALLOWED_EXTENSIONS.get(ext)
-
-
-def _checked_size(file: UploadFile) -> int:
-    """Size of the upload, checked before any of it is pulled into memory.
-
-    Starlette has already received the body — spooling it to a temp file past
-    1 MB — and recorded its length, so this reads a counter rather than the
-    file. Everything downstream streams, so an oversized upload is rejected
-    without ever becoming a bytes object here."""
-    size = file.size
-    if size is None:  # no Content-Length from the client
-        size = file.file.seek(0, os.SEEK_END)
-        file.file.seek(0)
-    if size > _MAX_BYTES:
-        raise HTTPException(status_code=413, detail="File exceeds 25 MB limit")
-    return size
 
 
 async def _render_preview(file: UploadFile, fmt: str) -> bytes | None:
@@ -180,7 +164,7 @@ async def upload_document(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> Document:
-    size = _checked_size(file)
+    size = checked_size(file, _MAX_BYTES)
 
     fmt = _detect_format(file.filename or "", file.content_type or "")
     if fmt is None:
@@ -298,7 +282,7 @@ async def replace_document_content(
     doc = await _get_owned(session, document_id, user)
     require_live(doc, "Document")
 
-    size = _checked_size(file)
+    size = checked_size(file, _MAX_BYTES)
 
     fmt = _detect_format(file.filename or "", file.content_type or "")
     if fmt is None:

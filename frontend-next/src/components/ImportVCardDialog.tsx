@@ -62,6 +62,7 @@ export function ImportVCardDialog({ api }: { api: Api }) {
             <ul>
               <li>Contacts imported: {summary.imported_contacts}</li>
               <li>Organizations created: {summary.created_organizations}</li>
+              <li>Skipped duplicates: {summary.skipped_duplicates}</li>
             </ul>
             {summary.errors.length > 0 && (
               <div className="form-error">

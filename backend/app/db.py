@@ -36,6 +36,17 @@ async def count_rows(session: AsyncSession, query: Select[tuple[Any]]) -> int:
     return total or 0
 
 
+async def one_at_a_time(session: AsyncSession, key: str) -> None:
+    """Wait for any other transaction holding `key`, then hold it until this one ends.
+
+    For work that reads "is this already there?" and then inserts: two requests
+    doing that side by side both read "no". A transaction-level advisory lock
+    needs no table to lock and no unlock to forget — commit or rollback
+    releases it. Two keys hashing alike only wait for each other needlessly.
+    """
+    await session.execute(select(func.pg_advisory_xact_lock(func.hashtext(key))))
+
+
 def escape_like(text: str) -> str:
     """`text` with its own `%`, `_` and `\\` taken literally in a LIKE.
 

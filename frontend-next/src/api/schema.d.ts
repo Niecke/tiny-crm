@@ -3653,6 +3653,8 @@ export interface components {
             imported_contacts: number;
             /** Created Organizations */
             created_organizations: number;
+            /** Skipped Duplicates */
+            skipped_duplicates: number;
             /**
              * Errors
              * @default []

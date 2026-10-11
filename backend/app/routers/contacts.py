@@ -1,6 +1,6 @@
-import os
 from decimal import Decimal
 from typing import Any
+from urllib.parse import quote
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile
@@ -26,6 +26,7 @@ from app.schemas.contact import (
 )
 from app.schemas.import_export import VCardImportSummary
 from app.schemas.page import Page
+from app.uploads import checked_size
 
 router = APIRouter(prefix="/contacts", tags=["contacts"])
 
@@ -152,16 +153,6 @@ async def list_contacts(
 MAX_IMPORT_BYTES = 10 * 1024 * 1024  # 10 MB
 
 
-def _checked_import_size(file: UploadFile) -> int:
-    size = file.size
-    if size is None:
-        size = file.file.seek(0, os.SEEK_END)
-        file.file.seek(0)
-    if size > MAX_IMPORT_BYTES:
-        raise HTTPException(status_code=413, detail="File exceeds 10 MB limit")
-    return size
-
-
 @router.get(
     "/vcard",
     response_class=Response,
@@ -200,7 +191,7 @@ async def import_contacts_vcard(
     user: User = Depends(current_active_user),
 ) -> VCardImportSummary:
     """Import contacts from a vCard (.vcf) file."""
-    _checked_import_size(file)
+    checked_size(file, MAX_IMPORT_BYTES)
     try:
         content_bytes = await file.read()
         text = content_bytes.decode("utf-8-sig")
@@ -230,12 +221,22 @@ async def export_contact_vcard(
     """Export a single contact as a .vcf file."""
     contact = await _get_owned(session, contact_id, user)
     vcard_text = contact_to_vcard(contact)
-    safe_name = "".join(c for c in contact.name if c.isalnum() or c in ("-", "_", " ")).strip()
+    # Headers are Latin-1, so the plain filename is ASCII only — str.isalnum()
+    # alone would let "Jiří" through and fail the response. The real name
+    # travels in filename*, as it does for a document download.
+    safe_name = "".join(
+        c for c in contact.name if c.isascii() and (c.isalnum() or c in ("-", "_", " "))
+    ).strip()
     safe_name = safe_name.replace(" ", "_") or "contact"
+    encoded_filename = quote(f"{contact.name.strip()}.vcf", safe="")
     return Response(
         content=vcard_text,
         media_type="text/vcard; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="{safe_name}.vcf"'},
+        headers={
+            "Content-Disposition": (
+                f"attachment; filename=\"{safe_name}.vcf\"; filename*=UTF-8''{encoded_filename}"
+            )
+        },
     )
 
 

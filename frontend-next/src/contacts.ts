@@ -1,6 +1,7 @@
 import { keepPreviousData, type QueryClient, queryOptions } from '@tanstack/react-query'
 import { type Api, unwrap } from './api/client'
 import type { ContactCreate, VCardImportSummary } from './api/types'
+import { saveBlob } from './download'
 
 // Rows per page on every paged list (FRONTEND.md, "Paging").
 export const PAGE_SIZE = 25
@@ -128,35 +129,26 @@ export async function importContactsVcard(api: Api, file: File): Promise<VCardIm
   )
 }
 
-function triggerDownload(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
-}
-
+// The cards are behind the login, so they are fetched with the token as blobs
+// and saved from there, like a document's file.
 export async function exportContactVcard(api: Api, contactId: string, filename = 'contact.vcf') {
-  const res = await api.GET('/contacts/{contact_id}/vcard', {
-    params: { path: { contact_id: contactId } },
-    parseAs: 'blob',
-  })
-  if (!res.response.ok) throw new Error('Failed to export vCard')
-  const blob = res.data as unknown as Blob
-  triggerDownload(blob, filename)
+  const blob = (await unwrap(
+    api.GET('/contacts/{contact_id}/vcard', {
+      params: { path: { contact_id: contactId } },
+      parseAs: 'blob',
+    }),
+  )) as unknown as Blob
+  saveBlob(blob, filename)
 }
 
 export async function exportAllContactsVcard(api: Api, archived = false) {
-  const res = await api.GET('/contacts/vcard', {
-    params: { query: { archived } },
-    parseAs: 'blob',
-  })
-  if (!res.response.ok) throw new Error('Failed to export vCards')
-  const blob = res.data as unknown as Blob
-  triggerDownload(blob, archived ? 'contacts-archived.vcf' : 'contacts.vcf')
+  const blob = (await unwrap(
+    api.GET('/contacts/vcard', {
+      params: { query: { archived } },
+      parseAs: 'blob',
+    }),
+  )) as unknown as Blob
+  saveBlob(blob, archived ? 'contacts-archived.vcf' : 'contacts.vcf')
 }
 
 // A contact write changes every contact list, and the contact count on its

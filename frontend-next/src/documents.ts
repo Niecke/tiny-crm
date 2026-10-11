@@ -138,19 +138,6 @@ export const invalidateDocuments = (queryClient: QueryClient) =>
     predicate: (q) => q.queryKey[1] !== 'content' && q.queryKey[1] !== 'preview',
   })
 
-// Saves a blob under a name, through a temporary link. The Flutter app's
-// version needed a typed array (#51); a Blob from fetch is already one.
-export function saveBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  document.body.append(a)
-  a.click()
-  a.remove()
-  setTimeout(() => URL.revokeObjectURL(url), 10_000)
-}
-
 // A filename that is safe on every OS, from the document's title.
 export const filenameFor = (doc: Pick<DocumentRead, 'title' | 'format'>) =>
   `${doc.title.replace(/[\\/:*?"<>|]+/g, '-').trim() || 'document'}.${extensionFor(doc.format)}`

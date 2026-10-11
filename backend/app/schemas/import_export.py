@@ -18,4 +18,5 @@ class VCardImportSummary(BaseModel):
     total_cards: int
     imported_contacts: int
     created_organizations: int
+    skipped_duplicates: int
     errors: list[str] = []

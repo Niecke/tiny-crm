@@ -12563,6 +12563,10 @@
             "type": "integer",
             "title": "Created Organizations"
           },
+          "skipped_duplicates": {
+            "type": "integer",
+            "title": "Skipped Duplicates"
+          },
           "errors": {
             "items": {
               "type": "string"
@@ -12576,7 +12580,8 @@
         "required": [
           "total_cards",
           "imported_contacts",
-          "created_organizations"
+          "created_organizations",
+          "skipped_duplicates"
         ],
         "title": "VCardImportSummary",
         "description": "Result of importing contacts from a vCard (.vcf) file."

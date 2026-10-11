@@ -1,4 +1,3 @@
-import os
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
@@ -42,6 +41,7 @@ from app.schemas.deal import (
 )
 from app.schemas.import_export import DealImportSummary
 from app.schemas.page import Page
+from app.uploads import checked_size
 
 router = APIRouter(prefix="/deals", tags=["deals"])
 
@@ -270,16 +270,6 @@ async def list_deals(
 MAX_IMPORT_BYTES = 10 * 1024 * 1024  # 10 MB
 
 
-def _checked_import_size(file: UploadFile) -> int:
-    size = file.size
-    if size is None:
-        size = file.file.seek(0, os.SEEK_END)
-        file.file.seek(0)
-    if size > MAX_IMPORT_BYTES:
-        raise HTTPException(status_code=413, detail="File exceeds 10 MB limit")
-    return size
-
-
 @router.post("/import", response_model=DealImportSummary)
 async def import_deals(
     file: UploadFile = File(...),
@@ -298,7 +288,7 @@ async def import_deals(
             detail=f"Unsupported format '{format}'. Supported formats: lead_generation",
         )
 
-    _checked_import_size(file)
+    checked_size(file, MAX_IMPORT_BYTES)
     try:
         content_bytes = await file.read()
         text = content_bytes.decode("utf-8-sig")
