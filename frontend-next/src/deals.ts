@@ -1,6 +1,6 @@
 import { keepPreviousData, type QueryClient, queryOptions } from '@tanstack/react-query'
 import { type Api, unwrap } from './api/client'
-import type { DealCreate, DealRead, DealUpdate } from './api/types'
+import type { DealCreate, DealImportSummary, DealRead, DealUpdate } from './api/types'
 import { PAGE_SIZE, PICKER_LIMIT } from './contacts'
 
 export type Stage = DealRead['stage']
@@ -186,6 +186,18 @@ export const moveDeal = (api: Api, id: string, stage: Stage, lostReason?: string
       body: { stage, lost_reason: stage === 'lost' ? lostReason || null : null },
     }),
   )
+
+export async function importDeals(api: Api, file: File, format = 'lead_generation'): Promise<DealImportSummary> {
+  const form = new FormData()
+  form.append('file', file)
+  return unwrap(
+    api.POST('/deals/import', {
+      params: { query: { format } },
+      body: {} as never,
+      bodySerializer: () => form,
+    }),
+  )
+}
 
 // Deal titles also show on tasks and in the briefing.
 export const invalidateDeals = (queryClient: QueryClient) =>

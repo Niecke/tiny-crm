@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Cell, Column, Row, Table, TableBody, TableHeader } from 'react-aria-components'
 import { ArchivedToggle } from '../../../components/Archive'
 import { DealBoard } from '../../../components/DealBoard'
+import { ImportDealsDialog } from '../../../components/ImportDealsDialog'
 import { LostReasonDialog } from '../../../components/LostReasonDialog'
 import { Pagination } from '../../../components/ui/Pagination'
 import { SearchField } from '../../../components/ui/SearchField'
@@ -54,9 +55,12 @@ function Deals() {
     <div className="page page-wide">
       <header className="page-header page-header-row">
         <h1>Deals</h1>
-        <Link to="/deals/new" search={filters} className="button">
-          New deal
-        </Link>
+        <div className="header-actions">
+          <ImportDealsDialog api={api} />
+          <Link to="/deals/new" search={filters} className="button">
+            New deal
+          </Link>
+        </div>
       </header>
 
       <div className="toolbar filters">

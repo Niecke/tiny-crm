@@ -22,6 +22,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/contacts/vcard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Vcards
+         * @description Export all active (or archived) contacts as a multi-vCard .vcf file.
+         */
+        get: operations["export_vcards_contacts_vcard_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/contacts/import/vcard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Contacts Vcard
+         * @description Import contacts from a vCard (.vcf) file.
+         */
+        post: operations["import_contacts_vcard_contacts_import_vcard_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/contacts/{contact_id}/vcard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Contact Vcard
+         * @description Export a single contact as a .vcf file.
+         */
+        get: operations["export_contact_vcard_contacts__contact_id__vcard_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/contacts/{contact_id}": {
         parameters: {
             query?: never;
@@ -409,6 +469,29 @@ export interface paths {
         put?: never;
         /** Create Deal */
         post: operations["create_deal_deals__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/deals/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Deals
+         * @description Import deals from a batch CSV file.
+         *
+         *     Supported formats:
+         *     - `lead_generation` (v1): CSV produced by the cc lead_generation tool (hot_leads.csv).
+         */
+        post: operations["import_deals_deals_import_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1472,6 +1555,16 @@ export interface components {
              */
             created_at: string;
         };
+        /** Body_import_contacts_vcard_contacts_import_vcard_post */
+        Body_import_contacts_vcard_contacts_import_vcard_post: {
+            /** File */
+            file: string;
+        };
+        /** Body_import_deals_deals_import_post */
+        Body_import_deals_deals_import_post: {
+            /** File */
+            file: string;
+        };
         /** Body_login_auth_jwt_login_post */
         Body_login_auth_jwt_login_post: {
             /** Grant Type */
@@ -2263,6 +2356,27 @@ export interface components {
             contact_id?: string | null;
             /** Organization Id */
             organization_id?: string | null;
+        };
+        /**
+         * DealImportSummary
+         * @description Result of importing deals from a batch file (e.g. lead_generation).
+         */
+        DealImportSummary: {
+            /** Format */
+            format: string;
+            /** Total Rows */
+            total_rows: number;
+            /** Imported Deals */
+            imported_deals: number;
+            /** Created Organizations */
+            created_organizations: number;
+            /** Skipped Duplicates */
+            skipped_duplicates: number;
+            /**
+             * Errors
+             * @default []
+             */
+            errors: string[];
         };
         /** DealRead */
         DealRead: {
@@ -3528,6 +3642,25 @@ export interface components {
             /** Mfa Enabled At */
             mfa_enabled_at?: string | null;
         };
+        /**
+         * VCardImportSummary
+         * @description Result of importing contacts from a vCard (.vcf) file.
+         */
+        VCardImportSummary: {
+            /** Total Cards */
+            total_cards: number;
+            /** Imported Contacts */
+            imported_contacts: number;
+            /** Created Organizations */
+            created_organizations: number;
+            /** Skipped Duplicates */
+            skipped_duplicates: number;
+            /**
+             * Errors
+             * @default []
+             */
+            errors: string[];
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -3847,6 +3980,101 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ContactRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_vcards_contacts_vcard_get: {
+        parameters: {
+            query?: {
+                archived?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Export all contacts in vCard format. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/vcard": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_contacts_vcard_contacts_import_vcard_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_import_contacts_vcard_contacts_import_vcard_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VCardImportSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_contact_vcard_contacts__contact_id__vcard_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Export single contact in vCard format. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/vcard": string;
                 };
             };
             /** @description Validation Error */
@@ -4679,6 +4907,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DealRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_deals_deals_import_post: {
+        parameters: {
+            query?: {
+                format?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_import_deals_deals_import_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DealImportSummary"];
                 };
             };
             /** @description Validation Error */

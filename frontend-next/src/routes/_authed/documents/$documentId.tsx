@@ -19,9 +19,9 @@ import {
   invalidateDocuments,
   replaceContent,
   restoreDocument,
-  saveBlob,
   updateDocument,
 } from '../../../documents'
+import { saveBlob } from '../../../download'
 import { formatBytes, formatDateTime } from '../../../format'
 import { StaleSaveNotice } from '../../../components/StaleSaveNotice'
 import { formError } from '../../../useEditVersion'

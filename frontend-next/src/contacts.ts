@@ -1,6 +1,7 @@
 import { keepPreviousData, type QueryClient, queryOptions } from '@tanstack/react-query'
 import { type Api, unwrap } from './api/client'
-import type { ContactCreate } from './api/types'
+import type { ContactCreate, VCardImportSummary } from './api/types'
+import { saveBlob } from './download'
 
 // Rows per page on every paged list (FRONTEND.md, "Paging").
 export const PAGE_SIZE = 25
@@ -116,6 +117,39 @@ export const archiveContact = (api: Api, id: string) =>
 
 export const restoreContact = (api: Api, id: string) =>
   unwrap(api.POST('/contacts/{contact_id}/restore', { params: { path: { contact_id: id } } }))
+
+export async function importContactsVcard(api: Api, file: File): Promise<VCardImportSummary> {
+  const form = new FormData()
+  form.append('file', file)
+  return unwrap(
+    api.POST('/contacts/import/vcard', {
+      body: {} as never,
+      bodySerializer: () => form,
+    }),
+  )
+}
+
+// The cards are behind the login, so they are fetched with the token as blobs
+// and saved from there, like a document's file.
+export async function exportContactVcard(api: Api, contactId: string, filename = 'contact.vcf') {
+  const blob = (await unwrap(
+    api.GET('/contacts/{contact_id}/vcard', {
+      params: { path: { contact_id: contactId } },
+      parseAs: 'blob',
+    }),
+  )) as unknown as Blob
+  saveBlob(blob, filename)
+}
+
+export async function exportAllContactsVcard(api: Api, archived = false) {
+  const blob = (await unwrap(
+    api.GET('/contacts/vcard', {
+      params: { query: { archived } },
+      parseAs: 'blob',
+    }),
+  )) as unknown as Blob
+  saveBlob(blob, archived ? 'contacts-archived.vcf' : 'contacts.vcf')
+}
 
 // A contact write changes every contact list, and the contact count on its
 // organization (old and new, after a move), so organizations go too.

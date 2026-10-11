@@ -13,6 +13,7 @@ import {
   archiveContact,
   contactQuery,
   deleteContact,
+  exportContactVcard,
   freelancerAnswer,
   labelOf,
   lifecycleOptions,
@@ -23,6 +24,7 @@ import {
 import { formatDay, localDay } from '../../../../format'
 import { linkedTasksQuery, useToggleDone } from '../../../../tasks'
 import { TaskList } from '../../../../components/TaskList'
+import { Button } from '../../../../components/ui/Button'
 import { Checkbox } from '../../../../components/ui/Checkbox'
 import { DocumentRows } from '../../../../components/DocumentRows'
 import { linkedDocumentsQuery } from '../../../../documents'
@@ -57,6 +59,16 @@ function ContactDetail() {
   const documents = useQuery(linkedDocumentsQuery(api, { contact_id: contactId }))
   const [now] = useState(() => Date.now())
   const tabsRef = useSelectedTabInView(tab, contact.isSuccess)
+  const [exportError, setExportError] = useState<string | null>(null)
+
+  const handleExport = async (name: string) => {
+    setExportError(null)
+    try {
+      await exportContactVcard(api, contactId, `${name}.vcf`)
+    } catch (err: unknown) {
+      setExportError(err instanceof Error ? err.message : 'Export failed')
+    }
+  }
 
   const archiving = useArchive({
     queryKey: contactQuery(api, contactId).queryKey,
@@ -121,6 +133,12 @@ function ContactDetail() {
         </div>
         {!c.archived_at && (
           <div className="header-actions">
+            <Button
+              variant="quiet"
+              onPress={() => void handleExport(c.name)}
+            >
+              Export vCard
+            </Button>
             <ArchiveButton archiving={archiving} />
             <Link
               to="/contacts/$contactId/edit"
@@ -133,6 +151,8 @@ function ContactDetail() {
           </div>
         )}
       </header>
+
+      {exportError && <p className="form-error">{exportError}</p>}
 
       <div className="profile">
         <ContactFacts contact={c} />

@@ -3,10 +3,19 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { Cell, Column, Row, Table, TableBody, TableHeader } from 'react-aria-components'
 import { ArchivedToggle } from '../../../components/Archive'
+import { ImportVCardDialog } from '../../../components/ImportVCardDialog'
+import { Button } from '../../../components/ui/Button'
 import { Pagination } from '../../../components/ui/Pagination'
 import { SearchField } from '../../../components/ui/SearchField'
 import { Select } from '../../../components/ui/Select'
-import { contactsQuery, labelOf, lifecycleOptions, PAGE_SIZE, relationOptions } from '../../../contacts'
+import {
+  contactsQuery,
+  exportAllContactsVcard,
+  labelOf,
+  lifecycleOptions,
+  PAGE_SIZE,
+  relationOptions,
+} from '../../../contacts'
 import { useDebounced } from '../../../useDebounced'
 
 export const Route = createFileRoute('/_authed/contacts/')({
@@ -31,13 +40,27 @@ function ContactsList() {
   const { data, error, isPending, isPlaceholderData } = useQuery(
     contactsQuery(api, { q: search, status, relation, archived, page }),
   )
+  const [exportError, setExportError] = useState<string | null>(null)
   const filtered = Boolean(search || status || relation)
+
+  const handleExport = async () => {
+    setExportError(null)
+    try {
+      await exportAllContactsVcard(api, archived)
+    } catch (err: unknown) {
+      setExportError(err instanceof Error ? err.message : 'Export failed')
+    }
+  }
 
   return (
     <div className="page">
       <header className="page-header page-header-row">
         <h1>Contacts</h1>
         <div className="header-actions">
+          <Button variant="quiet" onPress={() => void handleExport()}>
+            Export vCards
+          </Button>
+          <ImportVCardDialog api={api} />
           <Link to="/contacts/scan" search={filters} className="button button-quiet">
             Scan card
           </Link>
@@ -46,6 +69,8 @@ function ContactsList() {
           </Link>
         </div>
       </header>
+
+      {exportError && <p className="form-error">{exportError}</p>}
 
       <div className="toolbar filters">
         <SearchField label="Search contacts" placeholder="Search name or email" value={input} onChange={setInput} />
