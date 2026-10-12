@@ -92,6 +92,7 @@ export const invalidateInteractions = (queryClient: QueryClient) =>
   Promise.all([
     queryClient.invalidateQueries({ queryKey: ['interactions'] }),
     queryClient.invalidateQueries({ queryKey: ['briefing'] }),
+    queryClient.invalidateQueries({ queryKey: ['contacts', 'timeline'] }),
   ])
 
 // Happened / not happened, from any list.

@@ -107,6 +107,29 @@ export interface paths {
         patch: operations["update_contact_contacts__contact_id__patch"];
         trace?: never;
     };
+    "/contacts/{contact_id}/timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Contact Timeline
+         * @description The contact's unified timeline, newest first.
+         *
+         *     Merges interactions, tasks, deals, documents and contact field changes into
+         *     a single reverse-chronological feed.
+         */
+        get: operations["get_contact_timeline_contacts__contact_id__timeline_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/contacts/{contact_id}/archive": {
         parameters: {
             query?: never;
@@ -3072,6 +3095,17 @@ export interface components {
             /** Limit */
             limit: number;
         };
+        /** Page[TimelineItemRead] */
+        Page_TimelineItemRead_: {
+            /** Items */
+            items: components["schemas"]["TimelineItemRead"][];
+            /** Total */
+            total: number;
+            /** Skip */
+            skip: number;
+            /** Limit */
+            limit: number;
+        };
         /** Page[WatchCheckRead] */
         Page_WatchCheckRead_: {
             /** Items */
@@ -3579,6 +3613,35 @@ export interface components {
             recurrence_interval?: number | null;
             /** Recurrence Until */
             recurrence_until?: string | null;
+        };
+        /** TimelineItemRead */
+        TimelineItemRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Item Type
+             * @enum {string}
+             */
+            item_type: "interaction" | "task" | "deal" | "document" | "change";
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /** Title */
+            title: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Metadata
+             * @default {}
+             */
+            metadata: {
+                [key: string]: unknown;
+            };
         };
         /**
          * TokenPair
@@ -4170,6 +4233,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ContactRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_contact_timeline_contacts__contact_id__timeline_get: {
+        parameters: {
+            query?: {
+                skip?: number;
+                limit?: number;
+                types?: ("interaction" | "task" | "deal" | "document" | "change")[] | null;
+                archived?: boolean;
+            };
+            header?: never;
+            path: {
+                contact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_TimelineItemRead_"];
                 };
             };
             /** @description Validation Error */

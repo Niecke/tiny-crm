@@ -153,6 +153,13 @@ export const dealQuery = (api: Api, id: string) =>
     queryFn: () => unwrap(api.GET('/deals/{deal_id}', { params: { path: { deal_id: id } } })),
   })
 
+export const linkedDealsQuery = (api: Api, link: { contact_id?: string; organization_id?: string }, page = 1) =>
+  queryOptions({
+    queryKey: ['deals', 'linked', link, page],
+    queryFn: () =>
+      unwrap(api.GET('/deals/', { params: { query: { ...link, skip: (page - 1) * PAGE_SIZE, limit: PAGE_SIZE } } })),
+  })
+
 // Suggestions for a deal picker, by title. Ten is plenty for a dropdown.
 export const dealOptionsQuery = (api: Api, search: string) =>
   queryOptions({
@@ -205,4 +212,5 @@ export const invalidateDeals = (queryClient: QueryClient) =>
     queryClient.invalidateQueries({ queryKey: ['deals'] }),
     queryClient.invalidateQueries({ queryKey: ['briefing'] }),
     queryClient.invalidateQueries({ queryKey: ['tasks'] }),
+    queryClient.invalidateQueries({ queryKey: ['contacts', 'timeline'] }),
   ])

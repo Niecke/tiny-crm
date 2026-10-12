@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Tab, TabList, TabPanel, Tabs } from 'react-aria-components'
 import { z } from 'zod'
 import { ApiError } from '../../../../api/client'
-import type { ContactRead } from '../../../../api/types'
+import type { ContactRead, InteractionRead, TaskRead, TimelineItemType } from '../../../../api/types'
 import { ArchiveButton, ArchivedNotice } from '../../../../components/Archive'
 import { useArchive } from '../../../../useArchive'
 import { Fact, Facts } from '../../../../components/RecordPage'
@@ -12,6 +12,7 @@ import { useSelectedTabInView } from '../../../../useSelectedTabInView'
 import {
   archiveContact,
   contactQuery,
+  contactTimelineQuery,
   deleteContact,
   exportContactVcard,
   freelancerAnswer,
@@ -22,19 +23,22 @@ import {
   sourceOptions,
 } from '../../../../contacts'
 import { formatDay, localDay } from '../../../../format'
+import { linkedDealsQuery, stageLabel, stageTone, valueSummary } from '../../../../deals'
 import { linkedTasksQuery, useToggleDone } from '../../../../tasks'
 import { TaskList } from '../../../../components/TaskList'
+import { TimelineFeed } from '../../../../components/TimelineFeed'
 import { Button } from '../../../../components/ui/Button'
 import { Checkbox } from '../../../../components/ui/Checkbox'
+import { Segmented } from '../../../../components/ui/Segmented'
 import { DocumentRows } from '../../../../components/DocumentRows'
 import { linkedDocumentsQuery } from '../../../../documents'
 import { InteractionList } from '../../../../components/InteractionList'
 import { linkedInteractionsQuery, useToggleHappened } from '../../../../interactions'
 
-const tabs = ['tasks', 'interactions', 'documents'] as const
+const tabs = ['timeline', 'tasks', 'interactions', 'deals', 'documents'] as const
 type TabId = (typeof tabs)[number]
 
-// The open tab is part of the URL; Tasks is the default and is left out.
+// The open tab is part of the URL; Timeline is the default and is left out.
 const searchSchema = z.object({
   tab: z.enum(tabs).optional().catch(undefined),
 })
@@ -47,15 +51,19 @@ export const Route = createFileRoute('/_authed/contacts/$contactId/')({
 function ContactDetail() {
   const { api } = Route.useRouteContext()
   const { contactId } = Route.useParams()
-  const { tab = 'tasks', ...filters } = Route.useSearch()
+  const { tab = 'timeline', ...filters } = Route.useSearch()
   const navigate = useNavigate()
   const contact = useQuery(contactQuery(api, contactId))
-  // All three load up front: each tab label shows its count.
+  const [timelineType, setTimelineType] = useState<string>('all')
+  const timelineFilter =
+    timelineType === 'all' ? undefined : { types: [timelineType as TimelineItemType] }
+  const timeline = useQuery(contactTimelineQuery(api, contactId, timelineFilter))
   const [showDone, setShowDone] = useState(false)
   const tasks = useQuery(linkedTasksQuery(api, { contact_id: contactId }, showDone))
   const { toggle, pendingId, error: toggleError, repeated } = useToggleDone(api)
   const interactions = useQuery(linkedInteractionsQuery(api, { contact_id: contactId }))
   const { toggle: toggleInteraction, pendingId: pendingInteraction, error: toggleInteractionError } = useToggleHappened(api)
+  const deals = useQuery(linkedDealsQuery(api, { contact_id: contactId }))
   const documents = useQuery(linkedDocumentsQuery(api, { contact_id: contactId }))
   const [now] = useState(() => Date.now())
   const tabsRef = useSelectedTabInView(tab, contact.isSuccess)
@@ -103,8 +111,10 @@ function ContactDetail() {
 
   const c = contact.data
   const counts: Record<TabId, number | undefined> = {
+    timeline: timeline.data?.total,
     tasks: tasks.data?.total,
     interactions: interactions.data?.total,
+    deals: deals.data?.total,
     documents: documents.data?.total,
   }
 
@@ -161,10 +171,10 @@ function ContactDetail() {
           className="panel"
           selectedKey={tab}
           onSelectionChange={(key) => {
-            const next = tabs.find((t) => t === key) ?? 'tasks'
+            const next = tabs.find((t) => t === key) ?? 'timeline'
             void navigate({
               to: '.',
-              search: { ...filters, tab: next === 'tasks' ? undefined : next },
+              search: { ...filters, tab: next === 'timeline' ? undefined : next },
               replace: true,
             })
           }}
@@ -177,6 +187,67 @@ function ContactDetail() {
               </Tab>
             ))}
           </TabList>
+
+          <TabPanel id="timeline" className="panel-body">
+            <div className="tab-toolbar">
+              <Segmented
+                label="Filter timeline"
+                options={[
+                  { value: 'all', label: 'All' },
+                  { value: 'interaction', label: 'Interactions' },
+                  { value: 'task', label: 'Tasks' },
+                  { value: 'deal', label: 'Deals' },
+                  { value: 'document', label: 'Documents' },
+                  { value: 'change', label: 'Changes' },
+                ]}
+                value={timelineType}
+                onChange={setTimelineType}
+              />
+              <Link to="/interactions/new" search={{ contactId }} className="button button-quiet">
+                Log interaction
+              </Link>
+              <Link
+                to="/tasks/new"
+                search={{ contactId, contactName: c.name }}
+                className="button button-quiet"
+              >
+                Add task
+              </Link>
+            </div>
+            {toggleError && (
+              <p className="form-error" role="alert">
+                Could not update the task: {toggleError.message}
+              </p>
+            )}
+            {toggleInteractionError && (
+              <p className="form-error" role="alert">
+                Could not update the interaction: {toggleInteractionError.message}
+              </p>
+            )}
+            {timeline.isPending ? (
+              <p className="muted">Loading…</p>
+            ) : timeline.error ? (
+              <p className="form-error">{timeline.error.message}</p>
+            ) : (
+              <>
+                <TimelineFeed
+                  items={timeline.data.items}
+                  onToggleTask={(taskId, currentDone) => {
+                    toggle({ id: taskId, done: currentDone } as TaskRead)
+                  }}
+                  onToggleInteraction={(interactionId, currentDone) => {
+                    toggleInteraction({ id: interactionId, done: currentDone } as InteractionRead)
+                  }}
+                  pendingId={pendingId || pendingInteraction}
+                />
+                {timeline.data.total > timeline.data.items.length && (
+                  <p className="muted small">
+                    {timeline.data.total - timeline.data.items.length} older not shown.
+                  </p>
+                )}
+              </>
+            )}
+          </TabPanel>
 
           <TabPanel id="tasks" className="panel-body">
             <div className="tab-toolbar">
@@ -245,6 +316,44 @@ function ContactDetail() {
                   </p>
                 )}
               </>
+            )}
+          </TabPanel>
+
+          <TabPanel id="deals" className="panel-body">
+            <div className="tab-toolbar">
+              <Link to="/deals/new" className="button button-quiet">
+                New deal
+              </Link>
+            </div>
+            {deals.isPending ? (
+              <p className="muted">Loading…</p>
+            ) : deals.error ? (
+              <p className="form-error">{deals.error.message}</p>
+            ) : deals.data.items.length === 0 ? (
+              <p className="muted">No deals with this contact.</p>
+            ) : (
+              <ul className="rows">
+                {deals.data.items.map((d) => (
+                  <li
+                    key={d.id}
+                    className="deal-row"
+                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                  >
+                    <span className="row-main">
+                      <Link to="/deals/$dealId" params={{ dealId: d.id }} className="row-link">
+                        {d.title}
+                      </Link>
+                      <span className="row-meta">
+                        {valueSummary(d) ?? '—'}
+                        {d.expected_close_date ? ` · Expected close ${formatDay(d.expected_close_date)}` : ''}
+                      </span>
+                    </span>
+                    <span className="badge" data-tone={stageTone(d.stage)}>
+                      {stageLabel(d.stage)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             )}
           </TabPanel>
 

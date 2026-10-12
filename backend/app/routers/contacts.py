@@ -4,17 +4,21 @@ from urllib.parse import quote
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile
-from sqlalchemy import select
+from sqlalchemy import DateTime, String, case, cast, func, literal, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.archive import archived_is, require_archived, require_live, set_archived
-from app.audit import check_version, erase_history, record_update, snapshot
+from app.audit import AuditEvent, check_version, erase_history, record_update, snapshot
 from app.auth import current_active_user
 from app.auth.users import User
 from app.db import contains, count_rows, get_session
 from app.importers.vcard import contact_to_vcard, contacts_to_vcards, import_vcards
 from app.models.contact import Contact
+from app.models.deal import Deal
+from app.models.document import Document, document_contacts
+from app.models.interaction import Interaction, interaction_contacts
 from app.models.organization import Organization
+from app.models.task import Task
 from app.schemas.contact import (
     ContactCreate,
     ContactRead,
@@ -26,6 +30,7 @@ from app.schemas.contact import (
 )
 from app.schemas.import_export import VCardImportSummary
 from app.schemas.page import Page
+from app.schemas.timeline import TimelineItemRead, TimelineItemType
 from app.uploads import checked_size
 
 router = APIRouter(prefix="/contacts", tags=["contacts"])
@@ -250,6 +255,183 @@ async def get_contact(
     # still link here, and a link that answered 404 would be the anonymised
     # history archiving exists to prevent.
     return await _get_owned(session, contact_id, user)
+
+
+@router.get("/{contact_id}/timeline", response_model=Page[TimelineItemRead])
+async def get_contact_timeline(
+    contact_id: UUID,
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=100),
+    types: list[TimelineItemType] | None = Query(default=None),
+    archived: bool = Query(default=False),
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_active_user),
+) -> Page[TimelineItemRead]:
+    """The contact's unified timeline, newest first.
+
+    Merges interactions, tasks, deals, documents and contact field changes into
+    a single reverse-chronological feed.
+    """
+    await _get_owned(session, contact_id, user)
+
+    parsed_types = set(types) if types else set()
+
+    subqueries = []
+
+    if not parsed_types or "interaction" in parsed_types:
+        q_interactions = (
+            select(
+                Interaction.id.label("id"),
+                literal("interaction").label("item_type"),
+                Interaction.occurred_at.label("timestamp"),
+                Interaction.subject.label("title"),
+                Interaction.notes.label("description"),
+                func.jsonb_build_object(
+                    "kind",
+                    Interaction.kind,
+                    "done",
+                    Interaction.done,
+                    "duration_minutes",
+                    Interaction.duration_minutes,
+                    "tags",
+                    Interaction.tags,
+                ).label("metadata"),
+            )
+            .join(interaction_contacts, interaction_contacts.c.interaction_id == Interaction.id)
+            .where(
+                interaction_contacts.c.contact_id == contact_id,
+                Interaction.user_id == user.id,
+                archived_is(Interaction, archived),
+            )
+        )
+        subqueries.append(q_interactions)
+
+    if not parsed_types or "task" in parsed_types:
+        q_tasks = select(
+            Task.id.label("id"),
+            literal("task").label("item_type"),
+            func.coalesce(Task.completed_at, Task.due_date, Task.created).label("timestamp"),
+            Task.title.label("title"),
+            Task.description.label("description"),
+            func.jsonb_build_object(
+                "done",
+                Task.done,
+                "priority",
+                Task.priority,
+                "due_date",
+                Task.due_date,
+                "completed_at",
+                Task.completed_at,
+                "tags",
+                Task.tags,
+            ).label("metadata"),
+        ).where(
+            Task.contact_id == contact_id,
+            Task.user_id == user.id,
+            archived_is(Task, archived),
+        )
+        subqueries.append(q_tasks)
+
+    if not parsed_types or "deal" in parsed_types:
+        q_deals = select(
+            Deal.id.label("id"),
+            literal("deal").label("item_type"),
+            func.coalesce(Deal.stage_changed_at, Deal.created_at).label("timestamp"),
+            Deal.title.label("title"),
+            Deal.notes.label("description"),
+            func.jsonb_build_object(
+                "stage",
+                Deal.stage,
+                "expected_value",
+                Deal.expected_value,
+                "currency",
+                Deal.currency,
+                "probability",
+                Deal.probability,
+            ).label("metadata"),
+        ).where(
+            Deal.contact_id == contact_id,
+            Deal.user_id == user.id,
+            archived_is(Deal, archived),
+        )
+        subqueries.append(q_deals)
+
+    if not parsed_types or "document" in parsed_types:
+        q_documents = (
+            select(
+                Document.id.label("id"),
+                literal("document").label("item_type"),
+                cast(Document.created_at, DateTime(timezone=True)).label("timestamp"),
+                Document.title.label("title"),
+                Document.description.label("description"),
+                func.jsonb_build_object(
+                    "format",
+                    Document.format,
+                    "size",
+                    Document.size,
+                    "preview_key",
+                    Document.preview_key,
+                    "tags",
+                    Document.tags,
+                ).label("metadata"),
+            )
+            .join(document_contacts, document_contacts.c.document_id == Document.id)
+            .where(
+                document_contacts.c.contact_id == contact_id,
+                Document.user_id == user.id,
+                archived_is(Document, archived),
+            )
+        )
+        subqueries.append(q_documents)
+
+    if not parsed_types or "change" in parsed_types:
+        q_changes = select(
+            AuditEvent.id.label("id"),
+            literal("change").label("item_type"),
+            AuditEvent.created_at.label("timestamp"),
+            case(
+                (AuditEvent.action == "update", "Contact updated"),
+                (AuditEvent.action == "archive", "Contact archived"),
+                (AuditEvent.action == "restore", "Contact restored"),
+                else_=AuditEvent.action,
+            ).label("title"),
+            cast(None, String).label("description"),
+            func.jsonb_build_object(
+                "action",
+                AuditEvent.action,
+                "actor_id",
+                AuditEvent.actor_id,
+                "changes",
+                AuditEvent.changes,
+            ).label("metadata"),
+        ).where(
+            AuditEvent.entity_type == "contact",
+            AuditEvent.entity_id == contact_id,
+            AuditEvent.user_id == user.id,
+        )
+        subqueries.append(q_changes)
+
+    if not subqueries:
+        return Page[TimelineItemRead](items=[], total=0, skip=skip, limit=limit)
+
+    u = union_all(*subqueries).subquery("timeline")
+    count_q = select(func.count()).select_from(u)
+    total = await session.scalar(count_q) or 0
+
+    final_q = select(u).order_by(u.c.timestamp.desc(), u.c.id.desc()).offset(skip).limit(limit)
+    result = await session.execute(final_q)
+    items = [
+        TimelineItemRead(
+            id=row.id,
+            item_type=row.item_type,
+            timestamp=row.timestamp,
+            title=row.title,
+            description=row.description,
+            metadata=row.metadata or {},
+        )
+        for row in result.all()
+    ]
+    return Page[TimelineItemRead](items=items, total=total, skip=skip, limit=limit)
 
 
 @router.post("/", response_model=ContactRead, status_code=201)
