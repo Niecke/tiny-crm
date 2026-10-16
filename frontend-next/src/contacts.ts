@@ -1,6 +1,6 @@
 import { keepPreviousData, type QueryClient, queryOptions } from '@tanstack/react-query'
 import { type Api, unwrap } from './api/client'
-import type { ContactCreate, VCardImportSummary } from './api/types'
+import type { ContactCreate, TimelineItemType, VCardImportSummary } from './api/types'
 import { saveBlob } from './download'
 
 // Rows per page on every paged list (FRONTEND.md, "Paging").
@@ -92,6 +92,36 @@ export const contactQuery = (api: Api, id: string) =>
   queryOptions({
     queryKey: ['contacts', 'detail', id],
     queryFn: () => unwrap(api.GET('/contacts/{contact_id}', { params: { path: { contact_id: id } } })),
+  })
+
+export type TimelineFilters = {
+  types?: TimelineItemType[]
+  archived?: boolean
+}
+
+export const contactTimelineQuery = (
+  api: Api,
+  contactId: string,
+  filter?: TimelineFilters,
+  page = 1,
+) =>
+  queryOptions({
+    queryKey: ['contacts', 'timeline', contactId, filter, page],
+    queryFn: () =>
+      unwrap(
+        api.GET('/contacts/{contact_id}/timeline', {
+          params: {
+            path: { contact_id: contactId },
+            query: {
+              types: filter?.types,
+              archived: filter?.archived ?? false,
+              skip: (page - 1) * PAGE_SIZE,
+              limit: PAGE_SIZE,
+            },
+          },
+        }),
+      ),
+    placeholderData: keepPreviousData,
   })
 
 // Suggestions for a contact picker, by name.

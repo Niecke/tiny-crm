@@ -2256,6 +2256,43 @@ textarea.input {
   gap: 2px;
 }
 
+.timeline-row {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+}
+
+.timeline-row > .row-main {
+  flex: 1;
+  gap: 2px;
+}
+
+.timeline-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.task-title-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.timeline-changes {
+  margin-top: var(--space-1);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.timeline-change-field {
+  font-size: 0.85rem;
+}
+
+.timeline-audit-title {
+  font-weight: 500;
+}
+
 .interaction-notes {
   margin-top: var(--space-1);
   font-size: 0.9rem;
@@ -2763,7 +2800,8 @@ textarea.input {
   }
 
   /* The row's actions go under its text rather than squeezing it. */
-  .interaction-row {
+  .interaction-row,
+  .timeline-row {
     flex-wrap: wrap;
   }
 

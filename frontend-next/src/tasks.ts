@@ -120,6 +120,7 @@ export const invalidateTasks = (queryClient: QueryClient) =>
     queryClient.invalidateQueries({ queryKey: ['tasks'] }),
     queryClient.invalidateQueries({ queryKey: ['briefing'] }),
     queryClient.invalidateQueries({ queryKey: ['projects'] }),
+    queryClient.invalidateQueries({ queryKey: ['contacts', 'timeline'] }),
   ])
 
 // Ticking a task off, wherever it is listed. Completing a repeating task

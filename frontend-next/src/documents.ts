@@ -133,10 +133,13 @@ export const restoreDocument = (api: Api, id: string) =>
 // so they never go stale; refetching one that was just replaced asks for a
 // preview that may no longer exist (404).
 export const invalidateDocuments = (queryClient: QueryClient) =>
-  queryClient.invalidateQueries({
-    queryKey: ['documents'],
-    predicate: (q) => q.queryKey[1] !== 'content' && q.queryKey[1] !== 'preview',
-  })
+  Promise.all([
+    queryClient.invalidateQueries({
+      queryKey: ['documents'],
+      predicate: (q) => q.queryKey[1] !== 'content' && q.queryKey[1] !== 'preview',
+    }),
+    queryClient.invalidateQueries({ queryKey: ['contacts', 'timeline'] }),
+  ])
 
 // A filename that is safe on every OS, from the document's title.
 export const filenameFor = (doc: Pick<DocumentRead, 'title' | 'format'>) =>
