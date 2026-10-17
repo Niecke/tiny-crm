@@ -20,7 +20,7 @@ services:
   # startup check passes the way it does against Hetzner in production. Replaced
   # MinIO, which stopped publishing images (#112).
   s3:
-    image: docker.io/versity/versitygw:v1.8.0@sha256:97e7d5a35ab758eb1761a9e717644fafc614c5f6026c05482bd1fb77205193a1
+    image: docker.io/versity/versitygw:v1.9.0@sha256:57b45f18ff79cc2fc28aa6eb49920abd96be9786569842b7c5f783cc8ad5a1a4
     # The entrypoint builds the command from VGW_* variables; the directories
     # have to exist before the gateway starts.
     entrypoint: ["/bin/sh", "-ec", "mkdir -p /data/buckets /data/versions && exec /usr/local/bin/docker-entrypoint.sh"]
