@@ -59,7 +59,8 @@ USER 10001
 EXPOSE 8000
 
 # Serve only. `.venv/bin` is on PATH, so uvicorn resolves to the locked
-# environment.
+# environment. The app writes its own access line (app/access_log.py), so
+# uvicorn's is off.
 #
 # Migrations deliberately do not run here. Under a rolling update, or with more
 # than one replica, every starting pod would race the same `alembic upgrade
@@ -67,4 +68,4 @@ EXPOSE 8000
 # Job that must succeed before the new pods start
 # (charts/tinycrm/templates/migrate-job.yaml). The image still carries alembic,
 # which is what that Job runs.
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-config log_config.json"]
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-config log_config.json --no-access-log"]

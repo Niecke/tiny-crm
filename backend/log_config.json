@@ -29,8 +29,7 @@
       "propagate": false
     },
     "uvicorn.access": {
-      "handlers": ["default"],
-      "level": "INFO",
+      "handlers": [],
       "propagate": false
     },
     "sqlalchemy.engine": {
