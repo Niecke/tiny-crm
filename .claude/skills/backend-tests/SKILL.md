@@ -50,15 +50,18 @@ Without arguments, the whole suite in parallel (about 3 minutes on 8 cores; give
 command a 10-minute timeout):
 
 ```bash
-uv run pytest -q -n auto --tb=short 2>&1 | tail -60
+set -o pipefail; uv run pytest -q -n auto --tb=short 2>&1 | tail -60
 ```
 
 With arguments, pass them through. Add `-n auto` only if they select several files;
 one file or one test runs faster serially:
 
 ```bash
-uv run pytest -q --tb=short $ARGUMENTS 2>&1 | tail -60
+set -o pipefail; uv run pytest -q --tb=short $ARGUMENTS 2>&1 | tail -60
 ```
+
+`pipefail` makes the command exit with pytest's code instead of `tail`'s, which
+is always 0. Without it a failed run reports success.
 
 If the tail cuts off a failure you need, re-run only the failing node ids with
 `--tb=long`. Do not re-run the whole suite to see more output.
@@ -68,7 +71,8 @@ between tests in one worker), not flakiness: report it as such.
 
 ## 4. Report
 
-One line per check: passed, or failed with the count. For each failing test, give
+One line per check: passed, or failed with the count. A non-zero exit code is a
+failure, even if the visible tail looks clean. For each failing test, give
 its node id and the assertion or error line, nothing more. Put infrastructure
 problems (step 1) apart from test failures.
 
