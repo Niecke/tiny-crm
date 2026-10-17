@@ -178,6 +178,14 @@ Priorities: **P0** not a CRM without it · **P1** daily friction · **P2** expec
 - [ ] **T33 · P2 · GDPR mechanics**
       Personal data on named individuals in the EU implies an export-everything endpoint, a real erase path (which T26 complicates), and a documented retention period. Mostly satisfied by T19 + T26, plus writing down where it is recorded.
 
+- [ ] **T42 · P2 · Agent API & Pending Change Approval Queue (LLM Integration)** ([#320](https://github.com/Niecke/tiny-crm/issues/320), [#321](https://github.com/Niecke/tiny-crm/issues/321), [#322](https://github.com/Niecke/tiny-crm/issues/322))
+      Allow autonomous AI agents (Pi, Claude Code, background workers) to read CRM context, propose new records or field updates without risk of silent hallucination or unwanted mutation, and enrich CRM records via user-configured LLMs.
+      *Phased Implementation:*
+      · **Part 1 (#320):** API Token authentication (`api_tokens` table, scoped permissions), token-efficient read endpoints, and a Model Context Protocol (MCP) server.
+      · **Part 2 (#321):** Staged mutation engine (`agent_proposals` table) with a Human-in-the-loop review UI (diff visualization, inline edits, 1-click Approve/Reject).
+      · **Part 3 (#322):** In-CRM AI Research & Enrichment (Bring-Your-Own-Key LLM settings to research companies/contacts and submit proposals automatically).
+      *Design doc:* `Nextcloud/pi/notes/tinycrm-agent-api-and-approval-queue.md`.
+
 ---
 
 ## Suggested order

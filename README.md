@@ -44,22 +44,30 @@ uv run alembic revision --autogenerate -m "add phone to contacts"
 Run the backend locally
 ```bash
 cd backend
-uv run uvicorn app.main:app --reload --log-config log_config.json
+uv run uvicorn app.main:app --reload --log-config log_config.json --no-access-log
 ```
 
 The backend logs one JSON object per line. Every line has `timestamp`,
 `timestamp_str`, `log_level`, `logger` and `message`, plus `exception` when
-there is a traceback. Access lines (`"logger": "uvicorn.access"`) carry the
-request as fields of their own:
+there is a traceback. The app writes one access line per request
+(`"logger": "app.access"`, see `backend/app/access_log.py`); uvicorn's own is
+switched off by `--no-access-log`. Access lines carry the request as fields of
+their own:
 
 ```json
-{"timestamp": 1791542947, "timestamp_str": "2026-10-09T10:49:07.656789+00:00", "log_level": "INFO", "logger": "uvicorn.access", "message": "GET /contacts/ 200", "source_ip": "10.42.0.1", "source_port": 38084, "http_method": "GET", "http_path": "/contacts/", "http_query": "search=acme", "http_version": "1.1", "http_status": 200}
+{"timestamp": 1791542947, "timestamp_str": "2026-10-09T10:49:07.656789+00:00", "log_level": "INFO", "logger": "app.access", "message": "GET /contacts/ 200", "source_ip": "10.42.0.1", "source_port": 38084, "http_method": "GET", "http_path": "/contacts/", "http_query": "search=acme", "http_version": "1.1", "http_status": 200, "http_duration_ms": 12.47, "http_user_agent": "Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0"}
 ```
 
 `http_query` is there only when the request has a query string. Behind the
 ingress `source_ip` is the browser's address, not the proxy's, as long as
 `FORWARDED_ALLOW_IPS` covers the proxy; such a line has no `source_port`,
 because `X-Forwarded-For` does not carry one.
+
+`http_duration_ms` is the time from the request reaching the app to the last
+byte of the response being handed to the server, CORS and the login throttle
+included. `http_user_agent` is the `User-Agent` header, cut to 512 characters,
+and is left out when the request has none. A request whose handler raised is
+still logged, with `http_status` 500.
 
 Run the React client locally (see [frontend-next/README.md](frontend-next/README.md))
 ```bash
@@ -114,20 +122,57 @@ npm run lint
 ## Tests
 
 The backend suite needs a Postgres to talk to — it creates a scratch database per run and
-drops it afterwards, so the local compose stack is enough. Unit tests (config guard, login
-throttle, upload guards) run without one; everything that touches a router does not.
+drops it afterwards. Unit tests (config guard, login throttle, upload guards) run without
+one; everything that touches a router does not.
+
+### Test database
+
+`compose.test.yml` starts a Postgres made for this and nothing else:
+
+- **Its own name and port.** Project `tinycrm-test`, container `tinycrm-test-db`, port
+  `55433` on `127.0.0.1` only. It runs next to the dev stack (`compose.yml`, port 5432),
+  the CI rehearsal (`compose.ci.yml`) and other projects' Postgres containers.
+- **In memory.** The data directory is a `tmpfs`; nothing touches the disk.
+- **No crash safety.** `fsync=off`, `synchronous_commit=off`, `full_page_writes=off`,
+  `checkpoint_timeout=1h`. A crash, a reboot or `down` loses everything, which is the
+  point: it only ever holds the suite's scratch databases.
+- **Bounded.** The tmpfs is 2 GB and `max_wal_size=256MB` keeps the WAL, which lives in
+  the same RAM, from filling it; a parallel run peaks around 500 MB. With the default
+  1 GB WAL limit a 1 GB tmpfs ran full and the server shut down mid-run.
+- **Same image** as the dev stack and CI (Renovate keeps the digests in step).
 
 ```bash
-podman-compose up -d db                       # or point TEST_DATABASE_URL elsewhere
-cd backend && uv run pytest                   # 340 tests
-cd backend && uv run pytest --cov=app         # with a coverage summary
+podman-compose -f compose.test.yml up -d      # start; ready within a few seconds
+podman exec tinycrm-test-db pg_isready -U crm -d postgres   # "accepting connections"
+podman-compose -f compose.test.yml down       # stop and throw the data away
+```
+
+`TEST_DATABASE_URL` defaults to `postgresql+asyncpg://crm:crm@localhost:55433/postgres`, this
+server. The database it names is only used to issue `CREATE DATABASE`, never written to.
+To use the dev stack's Postgres instead, set
+`TEST_DATABASE_URL=postgresql+asyncpg://crm:crm@localhost:5432/postgres`.
+
+### Running
+
+```bash
+cd backend && uv run pytest -n auto           # all tests, one worker per core
+cd backend && uv run pytest tests/test_contacts.py         # one file, serially
+cd backend && uv run pytest -n auto --cov=app # with a coverage summary
 
 cd frontend-next && npm test                  # Vitest unit tests
 cd frontend-next && npm run test:coverage     # with a coverage report
 ```
 
-`TEST_DATABASE_URL` defaults to `postgresql+asyncpg://crm:crm@localhost:5432/postgres`. The
-database it names is only used to issue `CREATE DATABASE`, never written to.
+Each pytest-xdist worker gets its own scratch database. Most of a test's time is
+its setup (the schema is rebuilt for every test), so workers are what makes the suite fast:
+on 8 cores the full run takes under 3 minutes against 7½ serially.
+
+CI runs the same setup: the `backend-tests` job's Postgres service keeps its data on a
+`tmpfs`, the "Tune Postgres for tests" step applies the same settings, and the
+suite runs with `-n auto`.
+
+In Claude Code, `/backend-tests` starts the test database if it is not running, runs the
+lint, type and test checks CI runs, and reports what failed.
 
 What the backend suite covers: cross-user isolation for every owned resource (read,
 change, delete, list, and anonymous access — table-driven in
@@ -177,8 +222,8 @@ Work happens on `feat/*` branches; `main` is what ships. The pipeline workflows:
 
 **`.github/workflows/ci.yml`** — on a pull request into `main`:
 
-1. **Backend tests** (`ruff check`, `ruff format --check`, `pytest` against a Postgres service
-   container), uploading their JUnit report and coverage file. **Frontend checks** lints and
+1. **Backend tests** (`ruff check`, `ruff format --check`, `mypy`, `pytest -n auto` against
+   an in-memory Postgres service container, see [Test database](#test-database)), uploading their JUnit report and coverage file. **Frontend checks** lints and
    type-checks the React client in `frontend-next/` (#122) with `npm run lint` and
    `npm run build`, and fails when its generated API types no longer match the backend's
    OpenAPI schema, and runs its Vitest unit tests.

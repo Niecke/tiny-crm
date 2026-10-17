@@ -11,6 +11,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.exc import StaleDataError
 
+from app.access_log import AccessLogMiddleware
 from app.auth import fastapi_users
 from app.config import Environment, settings
 from app.db import get_session
@@ -125,6 +126,11 @@ app.add_middleware(
 # than a dependency because only the response reveals whether the credentials
 # were accepted.
 app.middleware("http")(count_failed_logins)
+
+# One access line per request, with its duration and user agent; uvicorn's own
+# is switched off (app/access_log.py). Added last so it is the outermost layer
+# and the time includes CORS and the throttle above.
+app.add_middleware(AccessLogMiddleware)
 
 
 @app.exception_handler(StaleDataError)

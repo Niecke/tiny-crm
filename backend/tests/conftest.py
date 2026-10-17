@@ -5,9 +5,14 @@ timestamptz, none of which SQLite would exercise honestly. One scratch database
 is created for the session and dropped afterwards; its tables are rebuilt before
 every test, so tests never see each other's rows.
 
-Point the suite at another server with TEST_DATABASE_URL, e.g.
+By default the suite expects the in-memory server from compose.test.yml on
+port 55433 (`podman-compose -f compose.test.yml up -d`). Point it at another
+server with TEST_DATABASE_URL, e.g. the dev stack's:
 
     TEST_DATABASE_URL=postgresql+asyncpg://crm:crm@localhost:5432/postgres uv run pytest
+
+Every pytest-xdist worker (`-n auto`) runs its own session, so each gets a
+scratch database of its own.
 """
 
 from __future__ import annotations
@@ -50,7 +55,7 @@ settings.app_url = "https://crm.example.com"
 # Server to create the scratch database on. The database named here is only used
 # to issue CREATE DATABASE, so any existing one works.
 ADMIN_URL = os.environ.get(
-    "TEST_DATABASE_URL", "postgresql+asyncpg://crm:crm@localhost:5432/postgres"
+    "TEST_DATABASE_URL", "postgresql+asyncpg://crm:crm@localhost:55433/postgres"
 )
 
 TEST_PASSWORD = "correct horse battery staple"

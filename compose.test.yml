@@ -1,0 +1,56 @@
+# A throwaway Postgres for the backend test suite, nothing else.
+#
+#   podman-compose -f compose.test.yml up -d
+#   cd backend && TEST_DATABASE_URL=postgresql+asyncpg://crm:crm@localhost:55433/postgres uv run pytest
+#   podman-compose -f compose.test.yml down
+#
+# Fast rather than safe: the data lives in RAM and Postgres never waits for a
+# disk, so a crash or `down` loses everything. That is fine here — conftest
+# creates a scratch database per run and drops it afterwards — and it must never
+# hold anything else.
+#
+# Own project, container name and port, so it runs next to the dev stack
+# (compose.yml, 5432), the CI rehearsal (compose.ci.yml) and other projects'
+# Postgres containers without adopting or clashing with any of them.
+name: tinycrm-test
+
+services:
+  db:
+    # Same image as compose.yml and the CI service, so tests see the same server.
+    image: docker.io/library/postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
+    container_name: tinycrm-test-db
+    environment:
+      POSTGRES_USER: crm
+      POSTGRES_PASSWORD: crm
+      POSTGRES_DB: postgres
+    ports:
+      # Loopback only: the credentials are public.
+      - "127.0.0.1:55433:5432"
+    # Postgres 18 keeps PGDATA below /var/lib/postgresql (18/docker), so the
+    # whole tree goes to RAM.
+    tmpfs:
+      - /var/lib/postgresql:rw,noexec,nosuid,size=2g
+    shm_size: 256m
+    command:
+      - postgres
+      # No flush to disk, no waiting for the WAL on commit, no full-page images,
+      # no checkpoints on a timer. Each is unsafe on a crash, which costs nothing
+      # here.
+      - -c
+      - fsync=off
+      - -c
+      - synchronous_commit=off
+      - -c
+      - full_page_writes=off
+      - -c
+      - checkpoint_timeout=1h
+      # The WAL lives in the same RAM. Left at the default 1GB, a parallel run
+      # filled the tmpfs and the server shut itself down; with fsync off the
+      # checkpoints this forces cost next to nothing.
+      - -c
+      - max_wal_size=256MB
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crm -d postgres"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
