@@ -1,29 +1,40 @@
 import { type CalendarDate, getLocalTimeZone, isSameDay, startOfMonth, endOfMonth, today } from '@internationalized/date'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useRouteContext } from '@tanstack/react-router'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Calendar, CalendarCell, CalendarGrid, CalendarGridBody, CalendarGridHeader, CalendarHeaderCell, Dialog, Heading, Popover } from 'react-aria-components'
 import type { InteractionRead } from '../api/types'
-import { localDay } from '../format'
+import { formatTime, localDay } from '../format'
 import { calendarInteractionsQuery, isPlanned, kindLabel } from '../interactions'
 import { RecordName } from './LinksPicker'
-
-const formatTime = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
 
 // The month at a glance: a dot under each day with something logged (solid)
 // or planned (ring); a day opens the list of what is on it. Weeks start on
 // Monday. Days are the operator's local days, as everywhere else.
-export function InteractionCalendar() {
+export function InteractionCalendar({ timezone }: { timezone: string }) {
   const { api } = useRouteContext({ from: '/_authed' })
   const zone = getLocalTimeZone()
   const [focused, setFocused] = useState<CalendarDate>(() => today(zone))
   const [selected, setSelected] = useState<CalendarDate | null>(null)
   const anchor = useRef<HTMLDivElement>(null)
-  const [mounted] = useState(() => Date.now())
+  const [now, setNow] = useState(() => Date.now())
+
+  // A planned entry turns into a logged one as its time passes, also on a
+  // dashboard left open: tick, and catch up when the tab comes back.
+  useEffect(() => {
+    const tick = () => setNow(Date.now())
+    const timer = setInterval(tick, 60_000)
+    window.addEventListener('focus', tick)
+    return () => {
+      clearInterval(timer)
+      window.removeEventListener('focus', tick)
+    }
+  }, [])
 
   // The whole visible grid, first Monday to last Sunday, so the neighbouring
   // months' days carry their dots too. The end bound is inclusive: stop a
-  // millisecond short of the next day.
+  // millisecond short of the next day (an entry in the last sub-millisecond
+  // of the grid is the one thing that can slip through).
   const first = startOfMonth(focused)
   const last = endOfMonth(focused)
   const gridStart = first.subtract({ days: (first.toDate(zone).getDay() + 6) % 7 })
@@ -33,9 +44,6 @@ export function InteractionCalendar() {
     occurred_before: new Date(gridEnd.add({ days: 1 }).toDate(zone).getTime() - 1).toISOString(),
   }
   const interactions = useQuery(calendarInteractionsQuery(api, range))
-  // Moves with the data, so a planned entry turns into a logged one on the
-  // next refetch instead of staying a ring on a dashboard left open.
-  const now = interactions.dataUpdatedAt || mounted
 
   const byDay = useMemo(() => {
     const days = new Map<string, InteractionRead[]>()
@@ -93,11 +101,7 @@ export function InteractionCalendar() {
                   ? `, ${items.length} ${items.length === 1 ? 'interaction' : 'interactions'}${plannedCount ? `, ${plannedCount} planned` : ''}`
                   : ''
                 return (
-                  <CalendarCell
-                    date={date}
-                    className="calendar-cell"
-                    data-current={isSameDay(date, today(zone)) || undefined}
-                  >
+                  <CalendarCell date={date} className="calendar-cell">
                     {({ formattedDate }) => (
                       <>
                         <span>{formattedDate}</span>
@@ -122,17 +126,17 @@ export function InteractionCalendar() {
         onOpenChange={(open) => !open && setSelected(null)}
         placement="bottom"
       >
-        <Dialog className="calendar-dialog" aria-label={selected ? `Interactions on ${selected.toString()}` : 'Interactions'}>
-          {interactions.error ? (
-            <p className="form-error">{interactions.error.message}</p>
-          ) : interactions.isPlaceholderData ? (
+        <Dialog className="calendar-dialog" aria-label={selected ? `Interactions on ${dayLabel(selected, zone)}` : 'Interactions'}>
+          {interactions.isPending || interactions.isPlaceholderData ? (
             <p className="muted small">Loading…</p>
+          ) : interactions.isError && !interactions.data ? (
+            <p className="form-error">{interactions.error.message}</p>
           ) : dayItems.length === 0 ? (
             <p className="muted small">Nothing on this day.</p>
           ) : (
             <ul className="rows">
               {dayItems.map((i) => (
-                <DayItem key={i.id} interaction={i} />
+                <DayItem key={i.id} interaction={i} timezone={timezone} />
               ))}
             </ul>
           )}
@@ -142,7 +146,10 @@ export function InteractionCalendar() {
   )
 }
 
-function DayItem({ interaction: i }: { interaction: InteractionRead }) {
+const dayLabel = (date: CalendarDate, zone: string) =>
+  date.toDate(zone).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+
+function DayItem({ interaction: i, timezone }: { interaction: InteractionRead; timezone: string }) {
   return (
     <li className="interaction-row">
       <span className="row-main">
@@ -155,7 +162,7 @@ function DayItem({ interaction: i }: { interaction: InteractionRead }) {
           </Link>
         </span>
         <span className="row-meta">
-          {formatTime(i.occurred_at)}
+          {formatTime(i.occurred_at, timezone)}
           {[
             ...i.contact_ids.map((id) => ({ kind: 'contact' as const, id })),
             ...i.organization_ids.map((id) => ({ kind: 'organization' as const, id })),

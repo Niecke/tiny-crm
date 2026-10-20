@@ -60,7 +60,7 @@ describe('InteractionCalendar', () => {
   test('starts the week on Monday', async () => {
     serve([])
     const { wrapper } = withQueryClient()
-    render(<InteractionCalendar />, { wrapper })
+    render(<InteractionCalendar timezone="UTC" />, { wrapper })
 
     const headers = [...document.querySelectorAll('.calendar-grid th')].map((h) => h.textContent)
     expect(headers[0]).toMatch(/^M/)
@@ -77,7 +77,7 @@ describe('InteractionCalendar', () => {
       interaction({ id: 'b', occurred_at: at(20) }),
     ])
     const { wrapper } = withQueryClient()
-    render(<InteractionCalendar />, { wrapper })
+    render(<InteractionCalendar timezone="UTC" />, { wrapper })
 
     await screen.findAllByRole('button', { name: /June 10, 2026/ })
     await vi.waitFor(() => expect(document.querySelectorAll('.calendar-dot')).toHaveLength(2))
@@ -91,7 +91,7 @@ describe('InteractionCalendar', () => {
     const ranges = serve([])
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     const { wrapper } = withQueryClient()
-    render(<InteractionCalendar />, { wrapper })
+    render(<InteractionCalendar timezone="UTC" />, { wrapper })
 
     expect(heading()).toBe('June 2026')
     await user.click(screen.getByRole('button', { name: 'Next month' }))
@@ -111,7 +111,7 @@ describe('InteractionCalendar', () => {
     serve([interaction({ id: 'a', occurred_at: at(10), subject: 'Kickoff call', contact_ids: ['c-1'] })])
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     const { wrapper } = withQueryClient()
-    render(<InteractionCalendar />, { wrapper })
+    render(<InteractionCalendar timezone="UTC" />, { wrapper })
 
     await vi.waitFor(() => expect(document.querySelector('.calendar-dot')).not.toBeNull())
     await user.click(screen.getByRole('button', { name: /June 10, 2026/ }))
@@ -126,7 +126,7 @@ describe('InteractionCalendar', () => {
     // 2 July 2026 is a Thursday in June's last row.
     serve([interaction({ id: 'a', occurred_at: new Date(2026, 6, 2, 12, 0).toISOString() })])
     const { wrapper } = withQueryClient()
-    render(<InteractionCalendar />, { wrapper })
+    render(<InteractionCalendar timezone="UTC" />, { wrapper })
 
     await vi.waitFor(() => expect(document.querySelectorAll('.calendar-dot')).toHaveLength(1))
     expect(document.querySelector('.calendar-dot')?.closest('.calendar-cell')).toHaveTextContent('2')
@@ -135,7 +135,7 @@ describe('InteractionCalendar', () => {
   test('counts a future entry that is done as logged', async () => {
     serve([interaction({ id: 'a', occurred_at: at(20), done: true })])
     const { wrapper } = withQueryClient()
-    render(<InteractionCalendar />, { wrapper })
+    render(<InteractionCalendar timezone="UTC" />, { wrapper })
 
     await vi.waitFor(() => expect(document.querySelectorAll('.calendar-dot')).toHaveLength(1))
     expect(document.querySelector('.calendar-dot')).toHaveAttribute('data-state', 'logged')
@@ -144,9 +144,30 @@ describe('InteractionCalendar', () => {
   test('says so when the interactions cannot be loaded', async () => {
     server.use(http.get('/interactions/', ({ response }) => response(422).json({ detail: 'Boom' } as never)))
     const { wrapper } = withQueryClient()
-    render(<InteractionCalendar />, { wrapper })
+    render(<InteractionCalendar timezone="UTC" />, { wrapper })
 
     expect(await screen.findByText(/boom/i)).toBeInTheDocument()
     expect(screen.queryByText('Nothing on this day.')).toBeNull()
+  })
+
+  test('says it is loading, not empty, while the first request is pending', async () => {
+    server.use(http.get('/interactions/', () => new Promise(() => {})))
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    const { wrapper } = withQueryClient()
+    render(<InteractionCalendar timezone="UTC" />, { wrapper })
+
+    await user.click(screen.getByRole('button', { name: /June 10, 2026/ }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('Loading…')).toBeInTheDocument()
+    expect(within(dialog).queryByText('Nothing on this day.')).toBeNull()
+  })
+
+  test('shows the neighbouring months muted rather than hidden', async () => {
+    serve([])
+    const { wrapper } = withQueryClient()
+    render(<InteractionCalendar timezone="UTC" />, { wrapper })
+
+    expect(document.querySelector('.calendar-cell[data-outside-month]')).not.toBeNull()
   })
 })

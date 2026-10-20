@@ -2009,11 +2009,18 @@ textarea.input {
   display: none;
 }
 
+/* The dashboard calendar shows the neighbouring months' days, muted: they
+   carry dots too. */
+.interaction-calendar .calendar-cell[data-outside-month] {
+  display: grid;
+  color: var(--color-text-muted);
+  opacity: 0.6;
+}
+
 .calendar-cell[data-hovered] {
   background: var(--color-accent-soft);
 }
 
-.calendar-cell[data-current],
 .calendar-cell[data-today] {
   border: 1.5px solid var(--color-accent);
   font-weight: 600;
@@ -2784,7 +2791,12 @@ textarea.input {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  /* The queues rise above today's list; the calendar stays below it. */
   .dashboard-side {
+    display: contents;
+  }
+
+  .queues {
     order: -1;
   }
 
