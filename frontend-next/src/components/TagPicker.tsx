@@ -57,7 +57,7 @@ export function TagPicker({
     : availableExisting
 
   const options: TagOption[] = matchingExisting.map((t) => ({
-    id: t,
+    id: `tag:${t}`,
     label: t,
     tag: t,
   }))
@@ -122,15 +122,12 @@ export function TagPicker({
     if (match) {
       added.current = match.label
       addTag(match.tag)
-    } else if (keyStr.startsWith('new:')) {
-      const newTag = keyStr.slice(4)
-      added.current = keyStr
-      addTag(newTag)
     }
     setText('')
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.nativeEvent.isComposing) return
     if (e.key === ',') {
       e.preventDefault()
       if (text.trim()) {
@@ -168,6 +165,7 @@ export function TagPicker({
             className="input"
             placeholder={placeholder}
             onKeyDown={handleKeyDown}
+            onBlur={() => addTag(text)}
           />
           <AriaButton className="picker-button" aria-label={`Show ${label.toLowerCase()} suggestions`}>
             <span aria-hidden="true">▾</span>

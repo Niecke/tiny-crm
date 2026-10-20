@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
@@ -207,5 +207,49 @@ describe('TagPicker', () => {
 
     await user.click(screen.getByRole('button', { name: 'Submit' }))
     expect(onSubmit).toHaveBeenCalledWith({ tags: 'existing, added' }, expect.anything())
+  })
+
+  test('pending text is committed on blur, so Save does not drop it', async () => {
+    server.use(http.get('/tags', ({ response }) => response(200).json([])))
+    const { wrapper } = withQueryClient()
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+
+    render(<FormWithTagPicker onSubmit={onSubmit} />, { wrapper })
+
+    await user.type(screen.getByRole('combobox', { name: 'Tags' }), 'first,second')
+    await user.click(screen.getByText('Submit'))
+
+    expect(onSubmit).toHaveBeenCalledWith({ tags: 'first, second' }, expect.anything())
+  })
+
+  test('Enter during IME composition does not add a tag', async () => {
+    server.use(http.get('/tags', ({ response }) => response(200).json([])))
+    const { wrapper } = withQueryClient()
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+
+    render(<ControlledTagPicker onChange={onChange} />, { wrapper })
+    const combobox = screen.getByRole('combobox', { name: 'Tags' })
+
+    await user.type(combobox, 'ab')
+    fireEvent.keyDown(combobox, { key: 'Enter', isComposing: true })
+
+    expect(onChange).not.toHaveBeenCalled()
+    expect(combobox).toHaveValue('ab')
+  })
+
+  test('Add option adds the typed text even when an existing tag is named new:<text>', async () => {
+    server.use(http.get('/tags', ({ response }) => response(200).json(['new:client'])))
+    const { wrapper } = withQueryClient()
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+
+    render(<ControlledTagPicker onChange={onChange} />, { wrapper })
+
+    await user.type(screen.getByRole('combobox', { name: 'Tags' }), 'client')
+    await user.click(await screen.findByRole('option', { name: 'Add “client”' }))
+
+    expect(onChange).toHaveBeenCalledWith(['client'])
   })
 })

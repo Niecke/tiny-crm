@@ -86,6 +86,18 @@ async def test_tags_excludes_archived_records(client: AsyncClient, alice: Accoun
     archive_res = await client.post(f"/contacts/{contact_id}/archive", headers=alice.headers)
     assert archive_res.status_code == 200
 
+    # An archived task is left out as well
+    archived_task = await client.post(
+        "/tasks/",
+        json={"title": "Archived Task", "tags": ["archived-task-tag"]},
+        headers=alice.headers,
+    )
+    assert archived_task.status_code == 201
+    archive_res = await client.post(
+        f"/tasks/{archived_task.json()['id']}/archive", headers=alice.headers
+    )
+    assert archive_res.status_code == 200
+
     # Create active task with active tag
     task_res = await client.post(
         "/tasks/",
