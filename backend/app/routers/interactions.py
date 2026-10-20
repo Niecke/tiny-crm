@@ -81,6 +81,9 @@ async def list_interactions(
     project_id: UUID | None = None,
     kind: InteractionKind | None = None,
     upcoming: bool | None = None,
+    # Inclusive bounds, so a client can fetch exactly one calendar window.
+    occurred_after: datetime | None = None,
+    occurred_before: datetime | None = None,
     archived: bool = False,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
@@ -89,6 +92,7 @@ async def list_interactions(
 
     `upcoming=true` returns only planned (future) entries, oldest first so the
     next appointment comes up top; `upcoming=false` returns only the past log.
+    `occurred_after` / `occurred_before` bound `occurred_at` inclusively.
     """
     query = select(Interaction).where(
         Interaction.user_id == user.id, archived_is(Interaction, archived)
@@ -107,6 +111,10 @@ async def list_interactions(
         query = query.where(Interaction.occurred_at >= now)
     elif upcoming is False:
         query = query.where(Interaction.occurred_at < now)
+    if occurred_after is not None:
+        query = query.where(Interaction.occurred_at >= occurred_after)
+    if occurred_before is not None:
+        query = query.where(Interaction.occurred_at <= occurred_before)
 
     total = await count_rows(session, query)
 
