@@ -3031,3 +3031,53 @@ textarea.input {
   padding: var(--space-2) var(--space-4);
   font-size: inherit;
 }
+
+/* ---------- Dashboard calendar ---------- */
+
+.dashboard-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.interaction-calendar .calendar {
+  width: 100%;
+}
+
+.interaction-calendar .calendar-grid {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.interaction-calendar .calendar-cell {
+  width: 100%;
+  height: 2.4rem;
+  grid-template-rows: 1fr auto;
+  padding: 2px 0;
+}
+
+.calendar-dots {
+  display: flex;
+  gap: 3px;
+  height: 6px;
+}
+
+.calendar-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.calendar-dot[data-state='logged'] {
+  background: var(--color-accent);
+}
+
+.calendar-dot[data-state='planned'] {
+  border: 1.5px solid var(--color-accent);
+}
+
+.popover.day-popover {
+  width: 300px;
+  max-width: calc(100vw - 2 * var(--space-3));
+}

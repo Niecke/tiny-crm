@@ -3,6 +3,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { type Api, unwrap } from '../../api/client'
 import type { BriefingInteraction, BriefingRead, BriefingTask } from '../../api/types'
+import { InteractionCalendar } from '../../components/InteractionCalendar'
 import { NumbersSummary, WeeklyDealsPanel } from '../../components/NumbersSummary'
 import { PriorityBadge } from '../../components/PriorityBadge'
 
@@ -54,7 +55,10 @@ function Dashboard() {
           </div>
         </section>
 
-        <Queues briefing={briefing.data} />
+        <div className="dashboard-side">
+          <Queues briefing={briefing.data} />
+          <InteractionCalendar />
+        </div>
       </div>
     </div>
   )
