@@ -8,6 +8,7 @@ import { ACCEPTED_TYPES, MAX_BYTES } from '../documents'
 import { formatBytes, splitTags } from '../format'
 import { LinksPicker } from './LinksPicker'
 import { Button } from './ui/Button'
+import { FormTagPicker } from './TagPicker'
 import { FormTextField } from './ui/FormTextField'
 
 const formSchema = z.object({
@@ -117,7 +118,7 @@ export function DocumentForm({
 
       <FormTextField control={control} name="title" label="Title" autoFocus={!withFile} />
       <FormTextField control={control} name="description" label="Description" rows={3} />
-      <FormTextField control={control} name="tags" label="Tags" description="Separated by commas." />
+      <FormTagPicker control={control} name="tags" label="Tags" description="Separated by commas." />
 
       <fieldset className="form-section">
         <legend>Filed under</legend>

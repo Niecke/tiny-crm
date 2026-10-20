@@ -139,6 +139,7 @@ export const invalidateDocuments = (queryClient: QueryClient) =>
       predicate: (q) => q.queryKey[1] !== 'content' && q.queryKey[1] !== 'preview',
     }),
     queryClient.invalidateQueries({ queryKey: ['contacts', 'timeline'] }),
+    queryClient.invalidateQueries({ queryKey: ['tags'] }),
   ])
 
 // A filename that is safe on every OS, from the document's title.

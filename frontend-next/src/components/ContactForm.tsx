@@ -11,6 +11,7 @@ import { createOrganization } from '../organizations'
 import { OrganizationPicker } from './RecordPickers'
 import { Button } from './ui/Button'
 import { DatePicker } from './ui/DatePicker'
+import { FormTagPicker } from './TagPicker'
 import { FormTextField } from './ui/FormTextField'
 import { Modal } from './ui/Modal'
 import { Select } from './ui/Select'
@@ -286,7 +287,7 @@ export function ContactForm({
 
       <fieldset className="form-section">
         <legend>Filing</legend>
-        <FormTextField control={control} name="tags" label="Tags" description="Separated by commas." />
+        <FormTagPicker control={control} name="tags" label="Tags" description="Separated by commas." />
         <FormTextField control={control} name="notes" label="Notes" rows={4} />
       </fieldset>
 

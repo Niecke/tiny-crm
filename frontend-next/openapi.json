@@ -5113,6 +5113,37 @@
         }
       }
     },
+    "/tags": {
+      "get": {
+        "tags": [
+          "tags"
+        ],
+        "summary": "List Tags",
+        "description": "All distinct tags currently in use across non-archived records.",
+        "operationId": "list_tags_tags_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array",
+                  "title": "Response List Tags Tags Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/auth/jwt/login": {
       "post": {
         "tags": [

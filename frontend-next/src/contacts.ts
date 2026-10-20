@@ -187,4 +187,5 @@ export const invalidateContacts = (queryClient: QueryClient) =>
   Promise.all([
     queryClient.invalidateQueries({ queryKey: ['contacts'] }),
     queryClient.invalidateQueries({ queryKey: ['organizations'] }),
+    queryClient.invalidateQueries({ queryKey: ['tags'] }),
   ])
