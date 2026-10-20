@@ -19,22 +19,31 @@ export function InteractionCalendar() {
   const [focused, setFocused] = useState<CalendarDate>(() => today(zone))
   const [selected, setSelected] = useState<CalendarDate | null>(null)
   const anchor = useRef<HTMLDivElement>(null)
-  // Fixed per render of the page, like the lists: a dot does not flip as the
-  // clock ticks.
-  const [now] = useState(() => Date.now())
+  const [mounted] = useState(() => Date.now())
 
-  // The end bound is inclusive: stop a millisecond short of the next month.
+  // The whole visible grid, first Monday to last Sunday, so the neighbouring
+  // months' days carry their dots too. The end bound is inclusive: stop a
+  // millisecond short of the next day.
+  const first = startOfMonth(focused)
+  const last = endOfMonth(focused)
+  const gridStart = first.subtract({ days: (first.toDate(zone).getDay() + 6) % 7 })
+  const gridEnd = last.add({ days: (7 - last.toDate(zone).getDay()) % 7 })
   const range = {
-    occurred_after: startOfMonth(focused).toDate(zone).toISOString(),
-    occurred_before: new Date(endOfMonth(focused).add({ days: 1 }).toDate(zone).getTime() - 1).toISOString(),
+    occurred_after: gridStart.toDate(zone).toISOString(),
+    occurred_before: new Date(gridEnd.add({ days: 1 }).toDate(zone).getTime() - 1).toISOString(),
   }
   const interactions = useQuery(calendarInteractionsQuery(api, range))
+  // Moves with the data, so a planned entry turns into a logged one on the
+  // next refetch instead of staying a ring on a dashboard left open.
+  const now = interactions.dataUpdatedAt || mounted
 
   const byDay = useMemo(() => {
     const days = new Map<string, InteractionRead[]>()
     for (const i of interactions.data?.items ?? []) {
       const day = localDay(i.occurred_at)
-      days.set(day, [...(days.get(day) ?? []), i])
+      const list = days.get(day)
+      if (list) list.push(i)
+      else days.set(day, [i])
     }
     for (const list of days.values()) list.sort((a, b) => Date.parse(a.occurred_at) - Date.parse(b.occurred_at))
     return days
@@ -45,6 +54,7 @@ export function InteractionCalendar() {
   return (
     <section className="panel interaction-calendar" aria-label="Calendar">
       <div className="panel-body" ref={anchor}>
+        {interactions.error && <p className="form-error">{interactions.error.message}</p>}
         <Calendar
           className="calendar"
           aria-label="Interactions"
@@ -63,7 +73,7 @@ export function InteractionCalendar() {
               slot={null}
               className="button button-quiet"
               onPress={() => setFocused(today(zone))}
-              isDisabled={isSameDay(startOfMonth(focused), startOfMonth(today(zone)))}
+              isDisabled={isSameDay(focused, today(zone))}
             >
               Today
             </Button>
@@ -78,6 +88,10 @@ export function InteractionCalendar() {
                 const items = byDay.get(date.toString()) ?? []
                 const logged = items.some((i) => !isPlanned(i, now) || i.done)
                 const planned = items.some((i) => isPlanned(i, now) && !i.done)
+                const plannedCount = items.filter((i) => isPlanned(i, now) && !i.done).length
+                const summary = items.length
+                  ? `, ${items.length} ${items.length === 1 ? 'interaction' : 'interactions'}${plannedCount ? `, ${plannedCount} planned` : ''}`
+                  : ''
                 return (
                   <CalendarCell
                     date={date}
@@ -87,6 +101,7 @@ export function InteractionCalendar() {
                     {({ formattedDate }) => (
                       <>
                         <span>{formattedDate}</span>
+                        {summary && <span className="sr-only">{summary}</span>}
                         <span className="calendar-dots" aria-hidden="true">
                           {logged && <span className="calendar-dot" data-state="logged" />}
                           {planned && <span className="calendar-dot" data-state="planned" />}
@@ -108,7 +123,11 @@ export function InteractionCalendar() {
         placement="bottom"
       >
         <Dialog className="calendar-dialog" aria-label={selected ? `Interactions on ${selected.toString()}` : 'Interactions'}>
-          {dayItems.length === 0 ? (
+          {interactions.error ? (
+            <p className="form-error">{interactions.error.message}</p>
+          ) : interactions.isPlaceholderData ? (
+            <p className="muted small">Loading…</p>
+          ) : dayItems.length === 0 ? (
             <p className="muted small">Nothing on this day.</p>
           ) : (
             <ul className="rows">

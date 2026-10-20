@@ -121,4 +121,32 @@ describe('InteractionCalendar', () => {
     expect(within(dialog).getByText('Call')).toBeInTheDocument()
     expect(await within(dialog).findByRole('link', { name: 'Ada Lovelace' })).toHaveAttribute('href', '/c-1')
   })
+
+  test('marks a day of the next month shown in the grid', async () => {
+    // 2 July 2026 is a Thursday in June's last row.
+    serve([interaction({ id: 'a', occurred_at: new Date(2026, 6, 2, 12, 0).toISOString() })])
+    const { wrapper } = withQueryClient()
+    render(<InteractionCalendar />, { wrapper })
+
+    await vi.waitFor(() => expect(document.querySelectorAll('.calendar-dot')).toHaveLength(1))
+    expect(document.querySelector('.calendar-dot')?.closest('.calendar-cell')).toHaveTextContent('2')
+  })
+
+  test('counts a future entry that is done as logged', async () => {
+    serve([interaction({ id: 'a', occurred_at: at(20), done: true })])
+    const { wrapper } = withQueryClient()
+    render(<InteractionCalendar />, { wrapper })
+
+    await vi.waitFor(() => expect(document.querySelectorAll('.calendar-dot')).toHaveLength(1))
+    expect(document.querySelector('.calendar-dot')).toHaveAttribute('data-state', 'logged')
+  })
+
+  test('says so when the interactions cannot be loaded', async () => {
+    server.use(http.get('/interactions/', ({ response }) => response(422).json({ detail: 'Boom' } as never)))
+    const { wrapper } = withQueryClient()
+    render(<InteractionCalendar />, { wrapper })
+
+    expect(await screen.findByText(/boom/i)).toBeInTheDocument()
+    expect(screen.queryByText('Nothing on this day.')).toBeNull()
+  })
 })

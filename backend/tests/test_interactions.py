@@ -111,6 +111,20 @@ async def test_filtering_by_date_range_after_and_before(
     ) == {"Middle"}
 
 
+async def test_date_range_bounds_must_be_timezone_aware_and_ordered(
+    client: AsyncClient, alice: Account
+) -> None:
+    naive = await client.get(
+        "/interactions/?occurred_after=2030-03-05T00:00:00", headers=alice.headers
+    )
+    assert naive.status_code == 422
+    reversed_range = await client.get(
+        "/interactions/?occurred_after=2030-03-15T00:00:00Z&occurred_before=2030-03-05T00:00:00Z",
+        headers=alice.headers,
+    )
+    assert reversed_range.status_code == 422
+
+
 async def test_date_range_queries_isolate_users(
     client: AsyncClient, alice: Account, bob: Account
 ) -> None:

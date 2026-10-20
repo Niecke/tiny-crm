@@ -2784,7 +2784,7 @@ textarea.input {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .queues {
+  .dashboard-side {
     order: -1;
   }
 
@@ -3035,6 +3035,7 @@ textarea.input {
 /* ---------- Dashboard calendar ---------- */
 
 .dashboard-side {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
