@@ -3789,7 +3789,7 @@
           "interactions"
         ],
         "summary": "List Interactions",
-        "description": "List interactions, newest first.\n\n`upcoming=true` returns only planned (future) entries, oldest first so the\nnext appointment comes up top; `upcoming=false` returns only the past log.",
+        "description": "List interactions, newest first.\n\n`upcoming=true` returns only planned (future) entries, oldest first so the\nnext appointment comes up top; `upcoming=false` returns only the past log.\n`occurred_after` / `occurred_before` bound `occurred_at` inclusively.",
         "operationId": "list_interactions_interactions__get",
         "security": [
           {
@@ -3942,6 +3942,40 @@
                 }
               ],
               "title": "Upcoming"
+            }
+          },
+          {
+            "name": "occurred_after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Occurred After"
+            }
+          },
+          {
+            "name": "occurred_before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Occurred Before"
             }
           },
           {
