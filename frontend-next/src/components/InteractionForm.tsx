@@ -9,6 +9,7 @@ import { type LinkKind, LinksPicker } from './LinksPicker'
 import { Button } from './ui/Button'
 import { Checkbox } from './ui/Checkbox'
 import { DatePicker } from './ui/DatePicker'
+import { FormTagPicker } from './TagPicker'
 import { FormTextField } from './ui/FormTextField'
 import { MarkdownField } from './ui/MarkdownField'
 import { Select } from './ui/Select'
@@ -197,7 +198,7 @@ export function InteractionForm({
             render={({ field }) => <LinksPicker kind="project" value={field.value} onChange={field.onChange} />}
           />
         </div>
-        <FormTextField control={control} name="tags" label="Tags" description="Separated by commas." />
+        <FormTagPicker control={control} name="tags" label="Tags" description="Separated by commas." />
       </fieldset>
 
       {error && (

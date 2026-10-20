@@ -498,6 +498,14 @@ fits. Pickers search on the server as you type (`components/RecordPickers`)
 rather than filtering one loaded page, because a truncated picker is the same
 silent bug in a smaller box.
 
+**Tags.** `GET /tags` returns the caller's distinct tags, sorted, across their
+non-archived contacts, tasks, interactions and documents. The Contact, Task,
+Interaction and Document forms edit tags with `components/TagPicker`: existing
+tags drop down on focus and while typing, a typed one is added with Enter,
+comma, the "Add" row or on leaving the field, and Backspace in an empty field
+removes the last chip. Tags stay a plain list on each record; the picker only
+suggests.
+
 **Deletes preserve history — detached.** Every link between records is
 `SET NULL` or drops only the join row. Deleting a company keeps its people;
 deleting a contact keeps the tasks, documents and sweep logs, with nobody on

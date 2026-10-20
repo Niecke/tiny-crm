@@ -12,6 +12,7 @@ import { MAX_RECURRENCE_INTERVAL, priorityOptions, recurrenceOptions } from '../
 import { ContactPicker, DealPicker } from './RecordPickers'
 import { Button } from './ui/Button'
 import { DatePicker } from './ui/DatePicker'
+import { FormTagPicker } from './TagPicker'
 import { FormTextField } from './ui/FormTextField'
 import { MarkdownField } from './ui/MarkdownField'
 import { Segmented } from './ui/Segmented'
@@ -251,7 +252,7 @@ export function TaskForm({
             </Button>
           </div>
         )}
-        <FormTextField control={control} name="tags" label="Tags" description="Separated by commas." />
+        <FormTagPicker control={control} name="tags" label="Tags" description="Separated by commas." />
       </fieldset>
 
       {error && (
