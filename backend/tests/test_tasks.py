@@ -118,3 +118,20 @@ async def test_due_before_counts_only_tasks_due_before_the_moment(
 
     assert page.json()["total"] == 2
     assert [t["title"] for t in page.json()["items"]] == ["Overdue", "Today"]
+
+
+async def test_tasks_search_filters_by_title_and_contact_name(
+    client: AsyncClient, alice: Account
+) -> None:
+    contact = await create_resource(client, alice, "/contacts/", {"name": "Grace Hopper"})
+    await create_resource(
+        client, alice, "/tasks/", {"title": "Send the offer", "contact_id": contact["id"]}
+    )
+    await create_resource(client, alice, "/tasks/", {"title": "Call the accountant"})
+
+    by_title = await client.get("/tasks/?search=accountant", headers=alice.headers)
+    assert [t["title"] for t in by_title.json()["items"]] == ["Call the accountant"]
+
+    by_contact = await client.get("/tasks/?search=hopper", headers=alice.headers)
+    assert by_contact.json()["total"] == 1
+    assert by_contact.json()["items"][0]["title"] == "Send the offer"

@@ -32,7 +32,7 @@ export function AddLinkPicker({
   const documents = useQuery({ ...documentOptionsQuery(api, search), enabled: kind === 'document' })
   const options = (
     kind === 'contact'
-      ? (contacts.data?.items ?? []).map((c) => ({ id: c.id, label: c.name, description: c.organization_name }))
+      ? (contacts.data?.items ?? []).map((c) => ({ id: c.id, label: c.name, description: [c.job_title, c.organization_name].filter(Boolean).join(' · ') || null }))
       : kind === 'task'
         ? (tasks.data?.items ?? []).map((t) => ({ id: t.id, label: t.title, description: t.contact_name }))
         : (documents.data?.items ?? []).map((d) => ({ id: d.id, label: d.title, description: d.format }))

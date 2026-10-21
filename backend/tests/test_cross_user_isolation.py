@@ -251,3 +251,35 @@ async def test_another_users_rows_are_not_found_by_search(
     assert theirs.status_code == 200
     assert theirs.json()["groups"][0]["total"] == 0
     assert theirs.json()["groups"][0]["items"] == []
+
+
+async def test_widened_search_does_not_leak_cross_tenant_records(
+    client: AsyncClient, alice: Account, bob: Account
+) -> None:
+    organization = await create_resource(client, alice, "/organizations/", {"name": "Initech"})
+    contact = await create_resource(
+        client,
+        alice,
+        "/contacts/",
+        {"name": "Peter Gibbons", "job_title": "Programmer", "organization_id": organization["id"]},
+    )
+    await create_resource(
+        client,
+        alice,
+        "/deals/",
+        {"title": "TPS", "organization_id": organization["id"], "contact_id": contact["id"]},
+    )
+    await create_resource(client, alice, "/tasks/", {"title": "File", "contact_id": contact["id"]})
+
+    for path, term in (
+        ("/contacts/", "initech"),
+        ("/contacts/", "programmer"),
+        ("/deals/", "initech"),
+        ("/deals/", "gibbons"),
+        ("/tasks/", "gibbons"),
+    ):
+        mine = await client.get(path, params={"search": term}, headers=alice.headers)
+        assert mine.json()["total"] == 1, (path, term)
+        theirs = await client.get(path, params={"search": term}, headers=bob.headers)
+        assert theirs.json()["total"] == 0, (path, term)
+        assert theirs.json()["items"] == []
