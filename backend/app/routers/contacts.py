@@ -4,7 +4,7 @@ from urllib.parse import quote
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile
-from sqlalchemy import DateTime, String, case, cast, func, literal, select, union_all
+from sqlalchemy import DateTime, String, case, cast, func, literal, or_, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.archive import archived_is, require_archived, require_live, set_archived
@@ -121,7 +121,14 @@ async def list_contacts(
 ) -> Page[ContactRead]:
     q = select(Contact).where(Contact.user_id == user.id, archived_is(Contact, archived))
     if search:
-        q = q.where(contains(Contact.name, search))
+        # What the picker row shows: "Maria Huber · ACME" has to be found by ACME.
+        q = q.outerjoin(Organization, Contact.organization_id == Organization.id).where(
+            or_(
+                contains(Contact.name, search),
+                contains(Contact.job_title, search),
+                contains(Organization.name, search),
+            )
+        )
     # "Everyone at ACME" — the question free-text company could never answer.
     if organization_id is not None:
         q = q.where(Contact.organization_id == organization_id)

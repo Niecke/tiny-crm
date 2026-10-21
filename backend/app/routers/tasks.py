@@ -3,7 +3,7 @@ from typing import Any, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import insert, select
+from sqlalchemy import insert, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.archive import archived_is, require_archived, require_live, set_archived
@@ -162,7 +162,10 @@ async def list_tasks(
     if not include_done:
         query = query.where(Task.done.is_(False))
     if search:
-        query = query.where(contains(Task.title, search))
+        # What the picker row shows: the contact's name as well as the title.
+        query = query.outerjoin(Contact, Task.contact_id == Contact.id).where(
+            or_(contains(Task.title, search), contains(Contact.name, search))
+        )
     if contact_id is not None:
         query = query.where(Task.contact_id == contact_id)
     if deal_id is not None:
