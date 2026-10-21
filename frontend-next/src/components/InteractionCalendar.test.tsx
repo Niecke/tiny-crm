@@ -104,7 +104,7 @@ describe('InteractionCalendar', () => {
 
     // Each month asks for its own window.
     await vi.waitFor(() => expect(ranges.length).toBeGreaterThanOrEqual(3))
-    expect(new Date(ranges[0].after as string).getMonth()).toBe(5)
+    expect(new Date(ranges[0].after as string).getUTCMonth()).toBe(5)
   })
 
   test('opens a day with its interactions and links', async () => {
@@ -120,6 +120,16 @@ describe('InteractionCalendar', () => {
     expect(within(dialog).getByRole('link', { name: 'Kickoff call' })).toHaveAttribute('href', '/a')
     expect(within(dialog).getByText('Call')).toBeInTheDocument()
     expect(await within(dialog).findByRole('link', { name: 'Ada Lovelace' })).toHaveAttribute('href', '/c-1')
+  })
+
+  test('files an entry under the day of the timezone its time is shown in', async () => {
+    // 22:30 UTC on 10 June is 00:30 on 11 June in Berlin, whatever the browser's zone.
+    serve([interaction({ id: 'a', occurred_at: '2026-06-10T22:30:00Z' })])
+    const { wrapper } = withQueryClient()
+    render(<InteractionCalendar timezone="Europe/Berlin" />, { wrapper })
+
+    await vi.waitFor(() => expect(document.querySelector('.calendar-dot')).not.toBeNull())
+    expect(document.querySelector('.calendar-dot')?.closest('.calendar-cell')).toHaveTextContent('11')
   })
 
   test('marks a day of the next month shown in the grid', async () => {

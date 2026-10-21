@@ -399,6 +399,13 @@ a {
   align-items: start;
 }
 
+.dashboard-side {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
 .today {
   display: flex;
   flex-direction: column;
@@ -3045,13 +3052,6 @@ textarea.input {
 }
 
 /* ---------- Dashboard calendar ---------- */
-
-.dashboard-side {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
 
 .interaction-calendar .calendar {
   width: 100%;

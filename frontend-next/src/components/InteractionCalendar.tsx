@@ -1,19 +1,21 @@
-import { type CalendarDate, getLocalTimeZone, isSameDay, startOfMonth, endOfMonth, today } from '@internationalized/date'
+import { type CalendarDate, isSameDay, startOfMonth, endOfMonth, today } from '@internationalized/date'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useRouteContext } from '@tanstack/react-router'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Calendar, CalendarCell, CalendarGrid, CalendarGridBody, CalendarGridHeader, CalendarHeaderCell, Dialog, Heading, Popover } from 'react-aria-components'
 import type { InteractionRead } from '../api/types'
-import { formatTime, localDay } from '../format'
+import { formatTime } from '../format'
 import { calendarInteractionsQuery, isPlanned, kindLabel } from '../interactions'
 import { RecordName } from './LinksPicker'
 
 // The month at a glance: a dot under each day with something logged (solid)
 // or planned (ring); a day opens the list of what is on it. Weeks start on
-// Monday. Days are the operator's local days, as everywhere else.
+// Monday. Days are days in the briefing's timezone, the one the times are
+// shown in, so an entry sits under the day its displayed time belongs to.
 export function InteractionCalendar({ timezone }: { timezone: string }) {
   const { api } = useRouteContext({ from: '/_authed' })
-  const zone = getLocalTimeZone()
+  const zone = timezone
+  const dayKey = useMemo(() => new Intl.DateTimeFormat('en-CA', { timeZone: zone }), [zone])
   const [focused, setFocused] = useState<CalendarDate>(() => today(zone))
   const [selected, setSelected] = useState<CalendarDate | null>(null)
   const anchor = useRef<HTMLDivElement>(null)
@@ -37,8 +39,9 @@ export function InteractionCalendar({ timezone }: { timezone: string }) {
   // of the grid is the one thing that can slip through).
   const first = startOfMonth(focused)
   const last = endOfMonth(focused)
-  const gridStart = first.subtract({ days: (first.toDate(zone).getDay() + 6) % 7 })
-  const gridEnd = last.add({ days: (7 - last.toDate(zone).getDay()) % 7 })
+  const weekday = (d: CalendarDate) => new Date(Date.UTC(d.year, d.month - 1, d.day)).getUTCDay()
+  const gridStart = first.subtract({ days: (weekday(first) + 6) % 7 })
+  const gridEnd = last.add({ days: (7 - weekday(last)) % 7 })
   const range = {
     occurred_after: gridStart.toDate(zone).toISOString(),
     occurred_before: new Date(gridEnd.add({ days: 1 }).toDate(zone).getTime() - 1).toISOString(),
@@ -48,14 +51,14 @@ export function InteractionCalendar({ timezone }: { timezone: string }) {
   const byDay = useMemo(() => {
     const days = new Map<string, InteractionRead[]>()
     for (const i of interactions.data?.items ?? []) {
-      const day = localDay(i.occurred_at)
+      const day = dayKey.format(new Date(i.occurred_at))
       const list = days.get(day)
       if (list) list.push(i)
       else days.set(day, [i])
     }
     for (const list of days.values()) list.sort((a, b) => Date.parse(a.occurred_at) - Date.parse(b.occurred_at))
     return days
-  }, [interactions.data])
+  }, [interactions.data, dayKey])
 
   const dayItems = selected ? (byDay.get(selected.toString()) ?? []) : []
 
@@ -147,7 +150,7 @@ export function InteractionCalendar({ timezone }: { timezone: string }) {
 }
 
 const dayLabel = (date: CalendarDate, zone: string) =>
-  date.toDate(zone).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  date.toDate(zone).toLocaleDateString(undefined, { timeZone: zone, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
 function DayItem({ interaction: i, timezone }: { interaction: InteractionRead; timezone: string }) {
   return (
