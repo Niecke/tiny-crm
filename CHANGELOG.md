@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.4.0](https://github.com/Niecke/tiny-crm/compare/v0.3.0...v0.4.0) (2026-10-21)
+
+
+### Features
+
+* change access logs ([#334](https://github.com/Niecke/tiny-crm/issues/334)) ([58caca2](https://github.com/Niecke/tiny-crm/commit/58caca28b4b5e27aab7b4b8283c3a4617645a083))
+* compact monthly calendar view on dashboard for logged and planned interactions ([#343](https://github.com/Niecke/tiny-crm/issues/343)) ([3e98573](https://github.com/Niecke/tiny-crm/commit/3e98573391d2eb634d6f8f7fa6b4b8156b402db9))
+* import deals from lead_generation and vCard in/out ([#127](https://github.com/Niecke/tiny-crm/issues/127)) ([#302](https://github.com/Niecke/tiny-crm/issues/302)) ([765d660](https://github.com/Niecke/tiny-crm/commit/765d660f6d316e41113295a9a768f82e6bfaa8b4))
+* show existing tags in dropdown when editing tags ([#290](https://github.com/Niecke/tiny-crm/issues/290)) ([#342](https://github.com/Niecke/tiny-crm/issues/342)) ([b72bc6a](https://github.com/Niecke/tiny-crm/commit/b72bc6a8efab44c7ae11dbd77ee81c6404c539b2))
+* unified timeline on contact detail ([#130](https://github.com/Niecke/tiny-crm/issues/130)) ([#310](https://github.com/Niecke/tiny-crm/issues/310)) ([182a8f8](https://github.com/Niecke/tiny-crm/commit/182a8f8c5856c7e1d64e62a96cd53fd01c8c5f49))
+
+
+### Bug Fixes
+
+* **deps:** update docker.io/library/python:3.14-slim docker digest to a2b82f3 ([#283](https://github.com/Niecke/tiny-crm/issues/283)) ([5082eb2](https://github.com/Niecke/tiny-crm/commit/5082eb29af39ace1008a2942b78809ad06efb920))
+* **deps:** update docker.io/library/python:3.14-slim docker digest to fbecd46 ([#346](https://github.com/Niecke/tiny-crm/issues/346)) ([641014c](https://github.com/Niecke/tiny-crm/commit/641014c069c32eb0da6ea6dc71759612e6d1395c))
+* **deps:** update docker.io/rclone/rclone docker tag to v1.75.2 ([#292](https://github.com/Niecke/tiny-crm/issues/292)) ([bcea86e](https://github.com/Niecke/tiny-crm/commit/bcea86e981c8ae522d834186fc94a23ae7708d7f))
+* **deps:** update ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie docker digest to 5efb669 ([#308](https://github.com/Niecke/tiny-crm/issues/308)) ([4761c4b](https://github.com/Niecke/tiny-crm/commit/4761c4bc9dd3576102a21f80083a4014bce7a2b6))
+* **deps:** update ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie docker digest to f7e0013 ([#339](https://github.com/Niecke/tiny-crm/issues/339)) ([14a20ad](https://github.com/Niecke/tiny-crm/commit/14a20ad8a05b3b97fc37df357f5a421946a7c6cd))
+* **deps:** update node.js to v24.22.0 ([#326](https://github.com/Niecke/tiny-crm/issues/326)) ([6432004](https://github.com/Niecke/tiny-crm/commit/643200452c1d5cac3a0f1ddd5c291e96d1c57f8d))
+* **infra:** run backend and frontend containers as non-root ([#298](https://github.com/Niecke/tiny-crm/issues/298)) ([2258d5e](https://github.com/Niecke/tiny-crm/commit/2258d5e00d3dccf7002c8ae186572e5791bbfc97)), closes [#154](https://github.com/Niecke/tiny-crm/issues/154)
+* picker sometimes not showing correct labels ([#317](https://github.com/Niecke/tiny-crm/issues/317)) ([f8437c4](https://github.com/Niecke/tiny-crm/commit/f8437c4ccb7e66565867feb875b513835226ece3))
+
 ## [0.3.0](https://github.com/Niecke/tiny-crm/compare/v0.2.0...v0.3.0) (2026-10-10)
 
 
