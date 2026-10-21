@@ -46,6 +46,20 @@
   ],
   "packageRules": [
     {
+      "description": "Hold the backend image on Python 3.14: several locked dependencies (asyncpg, pydantic-core, httptools, ...) have no 3.15 wheels yet, so the build fails (see PR #345). Patch and digest updates still flow. Remove this rule once they publish 3.15 wheels.",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
+        "docker.io/library/python"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor"
+      ],
+      "enabled": false
+    },
+    {
       "description": "Never group unrelated packages into one PR - each update stays individually reviewable.",
       "matchPackageNames": [
         "*"
