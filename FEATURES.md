@@ -226,7 +226,9 @@ top); `?upcoming=false` the past log newest-first.
 Attaches many-to-many to **contacts, organizations, deals and projects**.
 
 **Filters.** `?search` (subject) · `?kind` · `?upcoming` · `?contact_id` ·
-`?organization_id` · `?deal_id` · `?project_id`.
+`?organization_id` · `?deal_id` · `?project_id` · `?occurred_after` ·
+`?occurred_before`. The last two bound `occurred_at` inclusively (ISO datetimes),
+for fetching one window such as a calendar month.
 
 ---
 
@@ -528,7 +530,7 @@ rejection. Every delete asks first, through the same `ConfirmDialog`.
 
 | Route | What it does |
 |---|---|
-| `/` | Dashboard: four headline numbers from `GET /metrics/dashboard` (open pipeline and committed work per currency with their open-ended counts, deals won this quarter, stalled and overdue deals), each linking to the page that explains it, above today's tasks and plans from `GET /briefing` and the waiting queues; new deals per week for the last ten weeks run across the full width between the two. Task titles and interaction subjects link to their pages. The numbers fail on their own: today's list never waits for them. |
+| `/` | Dashboard: four headline numbers from `GET /metrics/dashboard` (open pipeline and committed work per currency with their open-ended counts, deals won this quarter, stalled and overdue deals), each linking to the page that explains it, above today's tasks and plans from `GET /briefing` and the waiting queues, with a month calendar under the queues (Monday first, previous / next / Today; a solid dot on days with logged interactions, a ring on days with planned ones, the neighbouring months' days in the grid shown muted with their dots, and a day opens a popover listing its interactions with time (in the briefing's timezone, like today's list), kind, subject and links to the contacts and organizations); new deals per week for the last ten weeks run across the full width between the two. Task titles and interaction subjects link to their pages. The numbers fail on their own: today's list never waits for them. |
 | `/numbers` | The dashboard's aggregates from `GET /metrics/dashboard`, with a Week / Month / Quarter / Year switch (`?period=`). One panel per question in DASHBOARD.md, each marked "Now" or the period. Attention counts link to the list behind them (`/deals` scoped "No next step" or "Past expected close", the inbox, today's briefing). Anything not measurable yet is a dashed skeleton naming the issue it waits on, never a zero. |
 | `/search` | Every type's hits for `?q=`, ten each, with "Show all" paging through one type. |
 | `/inbox` | The inbox: captures oldest-first beside a triage panel. **Open link** opens the profile in a new tab; one form files the person, opens a deal at stage Lead and logs that you wrote to them, then advances to the next capture. Nav badge counts what is waiting. |

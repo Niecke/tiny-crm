@@ -68,6 +68,24 @@ export const linkedInteractionsQuery = (api: Api, link: InteractionLink, page = 
     placeholderData: keepPreviousData,
   })
 
+// One calendar window, as the dashboard's month grid wants it. Bounds are
+// inclusive ISO instants. The API caps a page at 200, so a busy window is
+// fetched page by page rather than silently cut short.
+export const calendarInteractionsQuery = (api: Api, range: { occurred_after: string; occurred_before: string }) =>
+  queryOptions({
+    queryKey: ['interactions', 'calendar', range],
+    queryFn: async () => {
+      const limit = 200
+      const items: InteractionRead[] = []
+      for (;;) {
+        const page = await unwrap(api.GET('/interactions/', { params: { query: { ...range, skip: items.length, limit } } }))
+        items.push(...page.items)
+        if (page.items.length === 0 || items.length >= page.total) return { ...page, items }
+      }
+    },
+    placeholderData: keepPreviousData,
+  })
+
 export const createInteraction = (api: Api, body: InteractionCreate) => unwrap(api.POST('/interactions/', { body }))
 
 // The link lists are sent whole: they replace what is stored.

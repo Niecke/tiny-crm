@@ -909,6 +909,7 @@ export interface paths {
          *
          *     `upcoming=true` returns only planned (future) entries, oldest first so the
          *     next appointment comes up top; `upcoming=false` returns only the past log.
+         *     `occurred_after` / `occurred_before` bound `occurred_at` inclusively.
          */
         get: operations["list_interactions_interactions__get"];
         put?: never;
@@ -6056,6 +6057,8 @@ export interface operations {
                 project_id?: string | null;
                 kind?: ("call" | "meeting" | "event" | "email" | "note" | "other") | null;
                 upcoming?: boolean | null;
+                occurred_after?: string | null;
+                occurred_before?: string | null;
                 archived?: boolean;
             };
             header?: never;

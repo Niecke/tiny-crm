@@ -3,8 +3,10 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { type Api, unwrap } from '../../api/client'
 import type { BriefingInteraction, BriefingRead, BriefingTask } from '../../api/types'
+import { InteractionCalendar } from '../../components/InteractionCalendar'
 import { NumbersSummary, WeeklyDealsPanel } from '../../components/NumbersSummary'
 import { PriorityBadge } from '../../components/PriorityBadge'
+import { formatTime } from '../../format'
 
 // The morning briefing, as data (GET /briefing). The same function builds the
 // 07:00 Slack message, so this page and that message agree on what today is
@@ -54,7 +56,10 @@ function Dashboard() {
           </div>
         </section>
 
-        <Queues briefing={briefing.data} />
+        <div className="dashboard-side">
+          <Queues briefing={briefing.data} />
+          <InteractionCalendar timezone={briefing.data?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone} />
+        </div>
       </div>
     </div>
   )
@@ -236,9 +241,6 @@ function formatDay(isoDate: string): string {
     month: 'long',
   })
 }
-
-const formatTime = (iso: string, timeZone: string) =>
-  new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', timeZone })
 
 const formatShortDate = (iso: string, timeZone: string) =>
   new Date(iso).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', timeZone })

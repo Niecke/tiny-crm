@@ -399,6 +399,13 @@ a {
   align-items: start;
 }
 
+.dashboard-side {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
 .today {
   display: flex;
   flex-direction: column;
@@ -2009,11 +2016,18 @@ textarea.input {
   display: none;
 }
 
+/* The dashboard calendar shows the neighbouring months' days, muted: they
+   carry dots too. */
+.interaction-calendar .calendar-cell[data-outside-month] {
+  display: grid;
+  color: var(--color-text-muted);
+  opacity: 0.6;
+}
+
 .calendar-cell[data-hovered] {
   background: var(--color-accent-soft);
 }
 
-.calendar-cell[data-current],
 .calendar-cell[data-today] {
   border: 1.5px solid var(--color-accent);
   font-weight: 600;
@@ -2784,6 +2798,11 @@ textarea.input {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  /* The queues rise above today's list; the calendar stays below it. */
+  .dashboard-side {
+    display: contents;
+  }
+
   .queues {
     order: -1;
   }
@@ -3030,4 +3049,48 @@ textarea.input {
 .page-header-row .header-actions .button-quiet {
   padding: var(--space-2) var(--space-4);
   font-size: inherit;
+}
+
+/* ---------- Dashboard calendar ---------- */
+
+.interaction-calendar .calendar {
+  width: 100%;
+}
+
+.interaction-calendar .calendar-grid {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.interaction-calendar .calendar-cell {
+  width: 100%;
+  height: 2.4rem;
+  grid-template-rows: 1fr auto;
+  padding: 2px 0;
+}
+
+.calendar-dots {
+  display: flex;
+  gap: 3px;
+  height: 6px;
+}
+
+.calendar-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.calendar-dot[data-state='logged'] {
+  background: var(--color-accent);
+}
+
+.calendar-dot[data-state='planned'] {
+  border: 1.5px solid var(--color-accent);
+}
+
+.popover.day-popover {
+  width: 300px;
+  max-width: calc(100vw - 2 * var(--space-3));
 }

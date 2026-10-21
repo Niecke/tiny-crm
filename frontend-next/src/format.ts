@@ -4,6 +4,10 @@ const dateTimeFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium',
 
 export const formatDate = (iso: string) => dateFormat.format(new Date(iso))
 
+// The time of day in `timeZone`: the briefing's, so every list agrees.
+export const formatTime = (iso: string, timeZone: string) =>
+  new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', timeZone })
+
 export const formatDateTime = (iso: string) => dateTimeFormat.format(new Date(iso))
 
 const relativeFormat = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })

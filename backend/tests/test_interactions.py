@@ -84,6 +84,70 @@ async def test_filtering_by_contact_and_kind(client: AsyncClient, alice: Account
     assert [i["subject"] for i in by_kind.json()["items"]] == ["Unlinked"]
 
 
+async def test_filtering_by_date_range_after_and_before(
+    client: AsyncClient, alice: Account
+) -> None:
+    for subject, day in (("Early", 1), ("Middle", 10), ("Late", 20)):
+        await create_resource(
+            client,
+            alice,
+            "/interactions/",
+            {"subject": subject, "occurred_at": f"2030-03-{day:02d}T12:00:00+00:00"},
+        )
+
+    async def subjects(query: str) -> set[str]:
+        response = await client.get(f"/interactions/?{query}", headers=alice.headers)
+        assert response.status_code == 200
+        return {i["subject"] for i in response.json()["items"]}
+
+    assert await subjects("occurred_after=2030-03-05T00:00:00Z") == {"Middle", "Late"}
+    assert await subjects("occurred_before=2030-03-15T00:00:00Z") == {"Early", "Middle"}
+    assert await subjects(
+        "occurred_after=2030-03-05T00:00:00Z&occurred_before=2030-03-15T00:00:00Z"
+    ) == {"Middle"}
+    # Both bounds are inclusive.
+    assert await subjects(
+        "occurred_after=2030-03-10T12:00:00Z&occurred_before=2030-03-10T12:00:00Z"
+    ) == {"Middle"}
+
+
+async def test_date_range_bounds_must_be_timezone_aware_and_ordered(
+    client: AsyncClient, alice: Account
+) -> None:
+    naive = await client.get(
+        "/interactions/?occurred_after=2030-03-05T00:00:00", headers=alice.headers
+    )
+    assert naive.status_code == 422
+    reversed_range = await client.get(
+        "/interactions/?occurred_after=2030-03-15T00:00:00Z&occurred_before=2030-03-05T00:00:00Z",
+        headers=alice.headers,
+    )
+    assert reversed_range.status_code == 422
+
+
+async def test_date_range_queries_isolate_users(
+    client: AsyncClient, alice: Account, bob: Account
+) -> None:
+    await create_resource(
+        client,
+        alice,
+        "/interactions/",
+        {"subject": "Alice's", "occurred_at": "2030-03-10T12:00:00+00:00"},
+    )
+    await create_resource(
+        client,
+        bob,
+        "/interactions/",
+        {"subject": "Bob's", "occurred_at": "2030-03-11T12:00:00+00:00"},
+    )
+
+    response = await client.get(
+        "/interactions/?occurred_after=2030-03-01T00:00:00Z&occurred_before=2030-03-31T00:00:00Z",
+        headers=alice.headers,
+    )
+    assert [i["subject"] for i in response.json()["items"]] == ["Alice's"]
+
+
 async def test_an_event_is_a_kind_of_its_own(client: AsyncClient, alice: Account) -> None:
     # A conference or meetup: the people met there go on as contacts, so an
     # event needs no entity of its own — only a kind the filter can find.
