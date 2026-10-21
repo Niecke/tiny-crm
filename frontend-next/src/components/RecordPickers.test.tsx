@@ -25,6 +25,23 @@ function ControlledOrganizationPicker({ initialLabel, initialValue = null }: { i
 }
 
 describe('RecordPickers', () => {
+  test('displays search placeholders by default', () => {
+    const { wrapper } = withQueryClient()
+
+    render(
+      <>
+        <ControlledContactPicker />
+        <ControlledOrganizationPicker />
+        <ControlledDealPicker />
+      </>,
+      { wrapper },
+    )
+
+    expect(screen.getByRole('combobox', { name: 'Contact' })).toHaveAttribute('placeholder', 'Search contacts')
+    expect(screen.getByRole('combobox', { name: 'Organization' })).toHaveAttribute('placeholder', 'Search organizations')
+    expect(screen.getByRole('combobox', { name: 'Deal' })).toHaveAttribute('placeholder', 'Search deals')
+  })
+
   test('DealPicker: clicking an option without typing immediately displays deal title', async () => {
     server.use(
       http.get('/deals/', ({ response }) =>

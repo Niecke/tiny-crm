@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, test, vi } from 'vitest'
 import { contact } from '../test/fixtures'
@@ -62,4 +62,33 @@ describe('LinksPicker', () => {
     expect(await screen.findByText('Contact 55')).toBeInTheDocument()
     expect(screen.queryByText(/more not shown/)).not.toBeInTheDocument()
   }, 15_000)
+
+  // #269: a row reads "Maria Huber · ACME", so typing ACME has to find it.
+  test('typing an organization name offers contacts at that organization', async () => {
+    const maria = contact({ id: 'contact-maria', name: 'Maria Huber', job_title: 'CTO', organization_name: 'ACME' })
+    const ada = contact({ id: 'contact-ada', name: 'Ada Lovelace', organization_name: 'Initech' })
+    const searches: string[] = []
+    server.use(
+      http.get('/contacts/', ({ query, response }) => {
+        const search = query.get('search')?.toLowerCase() ?? ''
+        searches.push(search)
+        const matches = [maria, ada].filter((c) =>
+          [c.name, c.job_title, c.organization_name].some((field) => field?.toLowerCase().includes(search)),
+        )
+        return response(200).json({ items: matches, total: matches.length, skip: 0, limit: 50 })
+      }),
+    )
+    const { wrapper } = withQueryClient()
+    const user = userEvent.setup()
+    render(<LinksPicker kind="contact" value={[]} onChange={() => {}} />, { wrapper })
+
+    const combobox = screen.getByRole('combobox', { name: 'Contacts' })
+    expect(combobox).toHaveAttribute('placeholder', 'Search contacts to link')
+    await user.click(combobox)
+    await user.paste('acme')
+
+    await waitFor(() => expect(screen.queryByRole('option', { name: /Ada Lovelace/ })).not.toBeInTheDocument())
+    expect(screen.getByRole('option', { name: /Maria Huber/ })).toHaveTextContent('CTO · ACME')
+    expect(searches).toContain('acme')
+  })
 })
