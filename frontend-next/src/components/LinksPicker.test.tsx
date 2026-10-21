@@ -87,8 +87,10 @@ describe('LinksPicker', () => {
     await user.click(combobox)
     await user.paste('acme')
 
-    await waitFor(() => expect(screen.queryByRole('option', { name: /Ada Lovelace/ })).not.toBeInTheDocument())
-    expect(screen.getByRole('option', { name: /Maria Huber/ })).toHaveTextContent('CTO · ACME')
-    expect(searches).toContain('acme')
+    await waitFor(() => {
+      expect(searches).toContain('acme')
+      expect(screen.getByRole('option', { name: /Maria Huber/ })).toHaveTextContent('CTO · ACME')
+      expect(screen.queryByRole('option', { name: /Ada Lovelace/ })).not.toBeInTheDocument()
+    })
   })
 })
