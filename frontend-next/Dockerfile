@@ -20,6 +20,11 @@ FROM caddy:alpine@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19fb
 
 RUN addgroup -g 10001 -S caddy && adduser -u 10001 -D -S -G caddy caddy
 
+# The base image grants /usr/bin/caddy cap_net_bind_service. We listen on 8080 and
+# don't need it, and with allowPrivilegeEscalation: false plus drop: ["ALL"] the
+# kernel refuses to exec a binary carrying a file capability (EPERM).
+RUN setcap -r /usr/bin/caddy
+
 ENV XDG_CONFIG_HOME=/tmp/config \
     XDG_DATA_HOME=/tmp/data
 
