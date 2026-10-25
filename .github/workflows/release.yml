@@ -42,7 +42,7 @@ env:
   # renovate: datasource=github-releases depName=sigstore/cosign
   COSIGN_VERSION: v3.1.4
   # renovate: datasource=github-releases depName=anchore/syft
-  SYFT_VERSION: v1.54.1
+  SYFT_VERSION: v1.55.0
 
 jobs:
   release:
