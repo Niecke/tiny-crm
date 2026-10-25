@@ -5,7 +5,7 @@ from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
-from sqlalchemy import not_, nulls_last, select
+from sqlalchemy import not_, nulls_last, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.archive import archived_is, require_archived, require_live, set_archived
@@ -230,7 +230,18 @@ async def list_deals(
 ) -> Page[DealRead]:
     q = select(Deal).where(Deal.user_id == user.id, archived_is(Deal, archived))
     if search:
-        q = q.where(contains(Deal.title, search))
+        # What the picker row shows: the organization and the contact as well.
+        q = (
+            q.outerjoin(Organization, Deal.organization_id == Organization.id)
+            .outerjoin(Contact, Deal.contact_id == Contact.id)
+            .where(
+                or_(
+                    contains(Deal.title, search),
+                    contains(Organization.name, search),
+                    contains(Contact.name, search),
+                )
+            )
+        )
     if stage is not None:
         q = q.where(Deal.stage == stage)
     if status is not None:

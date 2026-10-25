@@ -58,7 +58,7 @@ in either direction, checked against the *merged* row on PATCH. Money is
 `preferred_language` ISO 639-1 lower-cased, so a filter cannot split "AT",
 "at" and "Austria" into three countries.
 
-**Filters.** `?search` (name) · `?organization_id` · `?lifecycle_status` ·
+**Filters.** `?search` (name, job title, organization name — #269) · `?organization_id` · `?lifecycle_status` ·
 `?relation_type` · `?source` · `?country` · `?works_with_freelancers=yes|no|unknown`.
 An unknown filter value is a 422, never silently ignored.
 
@@ -169,7 +169,7 @@ their `stage_changed_at` — a floor, not the real move — and have no events.
 **Ordering.** Expected close date ascending, **NULLs last** — an undated deal
 is not urgent. `?sort=stage_changed_at` puts the longest-waiting deal first.
 
-**Filters.** `?search` (title) · `?stage` · `?status` · `?contact_id` ·
+**Filters.** `?search` (title, organization name, contact name — #269) · `?stage` · `?status` · `?contact_id` ·
 `?organization_id` · `?stalled=true` (in play, no next step) · `?overdue=true`
 (in play, `expected_close_date` before today — today in `BRIEFING_TIMEZONE`, as
 the briefing has it).
@@ -206,7 +206,7 @@ inherits description, priority, tags, project links and all three record links.
 The PATCH response is `TaskCompletionRead` — it carries `next_occurrence` only
 when the server actually created one, so the UI never guesses.
 
-**Filters.** `?search` (title) · `?include_done` · the three link filters.
+**Filters.** `?search` (title, contact name — #269) · `?include_done` · the three link filters.
 Ordering is due date ascending NULLs last, so overdue floats to the top.
 
 ---
@@ -498,7 +498,9 @@ an `id` tiebreaker**: paging over a non-unique order lets rows repeat or vanish
 between pages. The UI shows "1–25 of 213" and hides the bar when everything
 fits. Pickers search on the server as you type (`components/RecordPickers`)
 rather than filtering one loaded page, because a truncated picker is the same
-silent bug in a smaller box.
+silent bug in a smaller box. A picker finds a record by anything its row shows
+(#269): a contact by organization or job title, a deal by organization or
+contact, a task by contact.
 
 **Tags.** `GET /tags` returns the caller's distinct tags, sorted, across their
 non-archived contacts, tasks, interactions and documents. The Contact, Task,

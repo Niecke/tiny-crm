@@ -53,7 +53,7 @@ function useOptions(kind: LinkKind, search: string): { options: PickerOption[]; 
   const projects = useQuery({ ...projectOptionsQuery(api, search), enabled: kind === 'project' })
   if (kind === 'contact')
     return {
-      options: (contacts.data?.items ?? []).map((c) => ({ id: c.id, label: c.name, description: c.organization_name })),
+      options: (contacts.data?.items ?? []).map((c) => ({ id: c.id, label: c.name, description: [c.job_title, c.organization_name].filter(Boolean).join(' · ') || null })),
       more: notShown(contacts.data),
     }
   if (kind === 'organization')
@@ -63,7 +63,7 @@ function useOptions(kind: LinkKind, search: string): { options: PickerOption[]; 
     }
   if (kind === 'deal')
     return {
-      options: (deals.data?.items ?? []).map((d) => ({ id: d.id, label: d.title, description: d.organization_name })),
+      options: (deals.data?.items ?? []).map((d) => ({ id: d.id, label: d.title, description: [d.organization_name, d.contact_name, d.stage].filter(Boolean).join(' · ') || null })),
       more: notShown(deals.data),
     }
   return {
@@ -95,7 +95,7 @@ export function LinksPicker({
     <div className="links-picker">
       <SearchPicker
         label={many[0].toUpperCase() + many.slice(1)}
-        placeholder={`Link a ${one}`}
+        placeholder={`Search ${many} to link`}
         options={options}
         more={found.more}
         value={null}

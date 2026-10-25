@@ -59,6 +59,31 @@ async def test_search_filters_by_name(client: AsyncClient, alice: Account) -> No
     assert response.json()["items"][0]["name"] == "Grace Hopper"
 
 
+async def test_search_filters_by_job_title(client: AsyncClient, alice: Account) -> None:
+    await create_resource(
+        client, alice, "/contacts/", {"name": "Grace Hopper", "job_title": "Rear Admiral"}
+    )
+    await create_resource(client, alice, "/contacts/", {"name": "Ada Lovelace"})
+
+    response = await client.get("/contacts/?search=admiral", headers=alice.headers)
+
+    assert response.json()["total"] == 1
+    assert response.json()["items"][0]["name"] == "Grace Hopper"
+
+
+async def test_search_filters_by_organization_name(client: AsyncClient, alice: Account) -> None:
+    acme = await create_resource(client, alice, "/organizations/", {"name": "ACME"})
+    await create_resource(
+        client, alice, "/contacts/", {"name": "Maria Huber", "organization_id": acme["id"]}
+    )
+    await create_resource(client, alice, "/contacts/", {"name": "Ada Lovelace"})
+
+    response = await client.get("/contacts/?search=acme", headers=alice.headers)
+
+    assert response.json()["total"] == 1
+    assert response.json()["items"][0]["name"] == "Maria Huber"
+
+
 async def test_a_contact_without_a_name_is_rejected(client: AsyncClient, alice: Account) -> None:
     response = await client.post(
         "/contacts/", json={"email": "nameless@example.com"}, headers=alice.headers

@@ -55,7 +55,7 @@ export function ContactPicker({
   onChange,
   initialLabel,
   label = 'Contact',
-  placeholder = 'Type a name',
+  placeholder = 'Search contacts',
   errorMessage,
 }: PickerProps) {
   const { api } = useRouteContext({ from: '/_authed' })
@@ -82,7 +82,7 @@ export function ContactPicker({
       onChange={(id) => onSelect(id, options, onChange)}
       inputValue={text}
       onInputChange={(t) => onInput(t, onChange)}
-      emptyText={search ? `No contact called “${search}”.` : 'No contacts yet.'}
+      emptyText={search ? `No contact matches “${search}”.` : 'No contacts yet.'}
       errorMessage={errorMessage}
     />
   )
@@ -93,7 +93,7 @@ export function OrganizationPicker({
   onChange,
   initialLabel,
   label = 'Organization',
-  placeholder = 'Optional',
+  placeholder = 'Search organizations',
   errorMessage,
 }: PickerProps) {
   const { api } = useRouteContext({ from: '/_authed' })
@@ -125,7 +125,7 @@ export function DealPicker({
   onChange,
   initialLabel,
   label = 'Deal',
-  placeholder = 'Optional',
+  placeholder = 'Search deals',
   errorMessage,
 }: PickerProps) {
   const { api } = useRouteContext({ from: '/_authed' })
@@ -135,7 +135,7 @@ export function DealPicker({
   const options = (data?.items ?? []).map((d) => ({
     id: d.id,
     label: d.title,
-    description: [d.organization_name ?? d.contact_name, d.stage].filter(Boolean).join(' · ') || null,
+    description: [d.organization_name, d.contact_name, d.stage].filter(Boolean).join(' · ') || null,
   }))
   if (value && selectedLabel && !options.some((o) => o.id === value)) {
     options.unshift({ id: value, label: selectedLabel, description: null })

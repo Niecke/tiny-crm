@@ -286,7 +286,6 @@ export function DealForm({
             name="contact_id"
             render={({ field }) => (
               <ContactPicker
-                placeholder="Optional"
                 value={field.value}
                 onChange={field.onChange}
                 initialLabel={initial?.contact_name ?? preset.contact?.name}

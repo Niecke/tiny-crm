@@ -222,7 +222,6 @@ export function TaskForm({
             render={({ field }) => (
               <ContactPicker
                 label="Contact"
-                placeholder="Optional"
                 value={field.value}
                 onChange={field.onChange}
                 initialLabel={initial?.contact_name ?? links.contact?.name}

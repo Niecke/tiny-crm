@@ -705,6 +705,24 @@ async def test_deals_can_be_filtered_by_customer_and_searched_by_title(
     assert by_title.json()["items"][0]["title"] == "Ada's retainer"
 
 
+async def test_deals_search_filters_by_organization_name_and_contact_name(
+    client: AsyncClient, alice: Account
+) -> None:
+    organization = await create_resource(client, alice, "/organizations/", {"name": "Globex"})
+    contact = await create_resource(client, alice, "/contacts/", {"name": "Hank Scorpio"})
+    await _deal(client, alice, title="Relaunch", organization_id=organization["id"])
+    await _deal(client, alice, title="Retainer", contact_id=contact["id"])
+    await _deal(client, alice, title="Unattached audit")
+
+    by_org = await client.get("/deals/?search=globex", headers=alice.headers)
+    assert [d["title"] for d in by_org.json()["items"]] == ["Relaunch"]
+    assert by_org.json()["total"] == 1
+
+    by_contact = await client.get("/deals/?search=scorpio", headers=alice.headers)
+    assert [d["title"] for d in by_contact.json()["items"]] == ["Retainer"]
+    assert by_contact.json()["total"] == 1
+
+
 async def test_the_soonest_close_comes_first_and_undated_deals_come_last(
     client: AsyncClient, alice: Account
 ) -> None:
