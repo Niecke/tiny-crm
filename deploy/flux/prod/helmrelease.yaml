@@ -39,10 +39,10 @@ spec:
       image:
         # Written by release.yml from a vX.Y.Z tag — a merge to main never
         # moves production. Rolling back is reverting that Deploy commit.
-        tag: 0.3.0
+        tag: 0.4.0
     frontend:
       image:
-        tag: 0.3.0
+        tag: 0.4.0
     backup:
       image:
-        tag: 0.3.0
+        tag: 0.4.0
