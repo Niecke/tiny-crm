@@ -7,11 +7,12 @@ app/models/search.py.
 """
 
 import re
+from collections.abc import Sequence
 from typing import Any, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import Select, case, func, select
+from sqlalchemy import ColumnElement, Select, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, raiseload
 
@@ -84,13 +85,29 @@ def _match(searchable: Searchable, row: Any, title: str, terms: list[str]) -> Se
     return None
 
 
-async def _search_one(
+def checked_terms(q: str) -> list[str]:
+    """The terms of `q`, or a 422 when there is nothing a search could look for."""
+    if "\x00" in q:
+        # Postgres text cannot hold a NUL, and the driver refuses to send one.
+        raise HTTPException(status_code=422, detail="The search holds a character no record can")
+    terms = _terms(q)
+    # Counted without the padding: "  a  " is as long as the parameter asks for.
+    if len(" ".join(terms)) < MIN_QUERY_LENGTH:
+        raise HTTPException(
+            status_code=422, detail=f"Type at least {MIN_QUERY_LENGTH} characters to search for"
+        )
+    return terms
+
+
+async def search_one(
     session: AsyncSession,
     searchable: Searchable,
     user_id: UUID,
     terms: list[str],
     skip: int,
     limit: int,
+    *,
+    where: Sequence[ColumnElement[bool]] = (),
 ) -> SearchGroup:
     document = searchable.document()
     q: Select[tuple[Any]] = select(searchable.model).where(
@@ -99,6 +116,7 @@ async def _search_one(
         # each list has its own archive, and that is where to look (#140).
         searchable.archived_at.is_(None),
         *(contains(document, term) for term in terms),
+        *where,
     )
     phrase = " ".join(terms)
     # Titles that start with what was typed first, then by how close the title
@@ -145,22 +163,14 @@ async def search(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> SearchResults:
-    if "\x00" in q:
-        # Postgres text cannot hold a NUL, and the driver refuses to send one.
-        raise HTTPException(status_code=422, detail="The search holds a character no record can")
-    terms = _terms(q)
-    # Counted without the padding: "  a  " is as long as the parameter asks for.
-    if len(" ".join(terms)) < MIN_QUERY_LENGTH:
-        raise HTTPException(
-            status_code=422, detail=f"Type at least {MIN_QUERY_LENGTH} characters to search for"
-        )
+    terms = checked_terms(q)
     if skip and type is None:
         # Paging all nine groups at once would page each one by the same
         # offset, which is no list anybody reads.
         raise HTTPException(status_code=422, detail="skip needs a type to page through")
 
     groups = [
-        await _search_one(session, s, user.id, terms, skip, limit)
+        await search_one(session, s, user.id, terms, skip, limit)
         for s in SEARCHABLES
         if type is None or s.key == type
     ]

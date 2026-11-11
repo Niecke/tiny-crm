@@ -73,7 +73,7 @@ jobs:
           changed="$(git diff --name-only "$BASE...$HEAD")"
           echo "$changed"
 
-          if echo "$changed" | grep -qE '^(backend/|frontend-next/|backup/|ci/|compose\.ci\.yml|\.github/workflows/ci\.yml)'; then
+          if echo "$changed" | grep -qE '^(backend/|frontend-next/|mcp/|backup/|ci/|compose\.ci\.yml|\.github/workflows/ci\.yml)'; then
             echo "code=true" >> "$GITHUB_OUTPUT"
             echo "Application code touched — running the full pipeline." >> "$GITHUB_STEP_SUMMARY"
           else
@@ -210,6 +210,38 @@ jobs:
             backend/coverage.xml
           if-no-files-found: warn
           retention-days: 7
+
+  mcp-checks:
+    name: MCP server checks
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          enable-cache: true
+          cache-dependency-glob: mcp/uv.lock
+
+      - name: Sync locked dependencies
+        working-directory: mcp
+        run: uv sync --frozen
+
+      - name: Lint
+        working-directory: mcp
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+
+      - name: Type-check
+        working-directory: mcp
+        run: uv run mypy .
+
+      - name: Test
+        working-directory: mcp
+        run: uv run pytest -q
 
   # The React client in frontend-next/ (#122). The gate is the unit tests, what
   # `npm run build` enforces — the TypeScript type-check — plus the linter, and
