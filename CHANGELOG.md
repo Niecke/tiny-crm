@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.0](https://github.com/Niecke/tiny-crm/compare/v0.4.0...v0.5.0) (2026-11-11)
+
+
+### Features
+
+* agent API tokens, read-only agent endpoints and MCP server ([#375](https://github.com/Niecke/tiny-crm/issues/375)) ([d069cb3](https://github.com/Niecke/tiny-crm/commit/d069cb3e9c9b38f27f5f9686556d3b319bc1e75a))
+
+
+### Bug Fixes
+
+* **deps:** update caddy:alpine docker digest to 78bd350 ([#374](https://github.com/Niecke/tiny-crm/issues/374)) ([caaf051](https://github.com/Niecke/tiny-crm/commit/caaf05181233c4fc3932ccd830596936c6d0f7c8))
+* **deps:** update docker.io/library/python:3.14-slim docker digest to 9aaa474 ([#373](https://github.com/Niecke/tiny-crm/issues/373)) ([42097a7](https://github.com/Niecke/tiny-crm/commit/42097a7c880dbf7619e65183f12e65278039264e))
+
 ## [0.4.0](https://github.com/Niecke/tiny-crm/compare/v0.3.0...v0.4.0) (2026-10-25)
 
 
