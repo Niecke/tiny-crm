@@ -134,7 +134,7 @@ jobs:
     # and it never waits for a disk (see "Tune Postgres for tests"), as in compose.test.yml.
     services:
       postgres:
-        image: postgres:18-alpine@sha256:898c60cb390d1085bc97bdd6a1ae968757421df394b071848b52b1c09c89d6a5
+        image: postgres:18-alpine@sha256:123b17998ccaf47e53b502e8c6a1e79afd8f579c6f3eec83c563da026f957395
         env:
           POSTGRES_USER: crm
           POSTGRES_PASSWORD: crm
