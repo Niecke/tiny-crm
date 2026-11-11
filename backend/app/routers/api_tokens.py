@@ -13,7 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import current_active_user
 from app.auth.api_tokens import SCOPES, ApiToken, hash_token, new_token
-from app.auth.users import User
+from app.auth.sessions import lock_open_session
+from app.auth.users import User, current_session_id
 from app.db import get_session
 from app.schemas.api_token import ApiTokenCreate, ApiTokenCreated, ApiTokenRead, ApiTokenStatus
 
@@ -60,8 +61,13 @@ async def create_api_token(
     body: ApiTokenCreate,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
+    session_id: UUID = Depends(current_session_id),
 ) -> ApiTokenCreated:
     """Make a token. The raw value is in this response and nowhere else, ever."""
+    # Re-check the session under a row lock so a concurrent password reset
+    # cannot sweep tokens before this one is committed.
+    if not await lock_open_session(session, session_id, user.id):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
     raw = new_token()
     token = ApiToken(
         user_id=user.id,

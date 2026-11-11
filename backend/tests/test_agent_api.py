@@ -531,3 +531,42 @@ async def test_the_day_follows_the_pinned_clock(
     body = (await client.get("/v1/agent/tasks/today", headers=alice_token)).json()
     assert body["date"] == "2026-09-05"
     assert [t["title"] for t in body["today"]] == ["Tomorrow"]
+
+
+async def test_planned_meetings_do_not_crowd_out_past_activity(
+    client: AsyncClient,
+    alice: Account,
+    alice_token: dict[str, str],
+    session_factory: async_sessionmaker[AsyncSession],
+    pinned_clock: Callable[[datetime], None],
+) -> None:
+    pinned_clock(NOW)
+    contact = Contact(user_id=alice.id, name="Anna Berger", notes="word " * 200)
+    await seed(
+        session_factory,
+        *[
+            Interaction(
+                user_id=alice.id,
+                subject=f"Planned {n}",
+                kind="meeting",
+                occurred_at=NOW + timedelta(days=n),
+                done=False,
+                contacts=[contact],
+            )
+            for n in range(1, 7)
+        ],
+        Interaction(
+            user_id=alice.id,
+            subject="Last call",
+            kind="call",
+            occurred_at=NOW - timedelta(days=1),
+            done=True,
+            contacts=[contact],
+        ),
+    )
+
+    body = (await client.get(f"/v1/agent/contacts/{contact.id}", headers=alice_token)).json()
+
+    assert [i["subject"] for i in body["recent_interactions"]] == ["Last call"]
+    assert len(body["notes"]) < 400
+    assert body["notes"].endswith("…")

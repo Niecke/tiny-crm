@@ -45,7 +45,8 @@
           { "context": "Build frontend", "integration_id": 15368 },
           { "context": "Build backup", "integration_id": 15368 },
           { "context": "Integration test", "integration_id": 15368 },
-          { "context": "commitlint", "integration_id": 15368 }
+          { "context": "commitlint", "integration_id": 15368 },
+          { "context": "MCP server checks", "integration_id": 15368 }
         ]
       }
     }

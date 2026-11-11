@@ -95,12 +95,18 @@ def _interactions(rows: list[Interaction]) -> list[AgentInteraction] | None:
 
 
 async def _recent_interactions(
-    session: AsyncSession, user: User, link: Any, column: Any, entity_id: UUID
+    session: AsyncSession, user: User, now: datetime, link: Any, column: Any, entity_id: UUID
 ) -> list[AgentInteraction] | None:
     rows = await session.scalars(
         select(Interaction)
         .join(link, link.c.interaction_id == Interaction.id)
-        .where(Interaction.user_id == user.id, column == entity_id, live(Interaction))
+        .where(
+            Interaction.user_id == user.id,
+            column == entity_id,
+            live(Interaction),
+            # Planned meetings are not activity; they would crowd out the past.
+            Interaction.occurred_at <= now,
+        )
         .order_by(Interaction.occurred_at.desc(), Interaction.id)
         .limit(RECENT_INTERACTIONS)
         .options(raiseload("*"))
@@ -135,6 +141,7 @@ async def search(
 @router.get("/contacts/{contact_id}", response_model=AgentContact, response_model_exclude_none=True)
 async def get_contact(
     contact_id: UUID,
+    now: datetime = Depends(current_time),
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_token_user),
 ) -> AgentContact:
@@ -158,9 +165,9 @@ async def get_contact(
         lifecycle_status=contact.lifecycle_status,
         relation_type=contact.relation_type,
         tags=_or_none(list(contact.tags)),
-        notes=contact.notes,
+        notes=_excerpt(contact.notes),
         recent_interactions=await _recent_interactions(
-            session, user, interaction_contacts, interaction_contacts.c.contact_id, contact.id
+            session, user, now, interaction_contacts, interaction_contacts.c.contact_id, contact.id
         ),
     )
 
@@ -172,6 +179,7 @@ async def get_contact(
 )
 async def get_organization(
     organization_id: UUID,
+    now: datetime = Depends(current_time),
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_token_user),
 ) -> AgentOrganization:
@@ -207,7 +215,7 @@ async def get_organization(
         email=organization.email,
         phone=organization.phone,
         industry=organization.industry,
-        notes=organization.notes,
+        notes=_excerpt(organization.notes),
         contacts=_or_none(
             [AgentOrgContact(id=c.id, name=c.name, job_title=c.job_title) for c in people]
         ),
@@ -215,6 +223,7 @@ async def get_organization(
         recent_interactions=await _recent_interactions(
             session,
             user,
+            now,
             interaction_organizations,
             interaction_organizations.c.organization_id,
             organization.id,

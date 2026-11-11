@@ -158,6 +158,26 @@ async def session_is_open(db: AsyncSession, claims: AccessClaims) -> bool:
     return found is not None
 
 
+async def lock_open_session(db: AsyncSession, session_id: UUID, user_id: UUID) -> bool:
+    """Whether the session still exists; its row stays locked until the commit.
+
+    A password reset deletes the user's sessions and then sweeps their API
+    tokens. Taking the row lock before inserting a token makes the two ordered:
+    either the reset's delete waits for the insert (and the sweep then covers
+    the new token) or the session is already gone and nothing is inserted.
+    """
+    found = await db.scalar(
+        select(AuthSession.id)
+        .where(
+            AuthSession.id == session_id,
+            AuthSession.user_id == user_id,
+            AuthSession.expires_at > datetime.now(UTC),
+        )
+        .with_for_update()
+    )
+    return found is not None
+
+
 async def open_session(db: AsyncSession, user_id: UUID) -> TokenPair:
     now = datetime.now(UTC)
     # Nothing else deletes a session that simply ran out, so a login sweeps

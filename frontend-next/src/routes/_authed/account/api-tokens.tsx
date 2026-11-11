@@ -29,7 +29,7 @@ export const Route = createFileRoute('/_authed/account/api-tokens')({
 // revocable. The secret exists in the response that creates a token and
 // nowhere else, so it is held here only while the dialog shows it.
 function ApiTokensPage() {
-  const { api } = Route.useRouteContext()
+  const { api, config } = Route.useRouteContext()
   const { data: tokens, error, isPending } = useQuery(apiTokensQuery(api))
   const [creating, setCreating] = useState(false)
   const [revoking, setRevoking] = useState<ApiToken | null>(null)
@@ -76,7 +76,7 @@ function ApiTokensPage() {
             <code className="token-secret">X-API-Key: tc_live_…</code>
           </p>
           <p className="muted">
-            The base URL is <code>{window.location.origin}/api/v1/agent</code>. A token works there and nowhere else. The MCP
+            The base URL is <code>{new URL(config.apiUrl, window.location.origin).href.replace(/\/$/, '')}/v1/agent</code>. A token works there and nowhere else. The MCP
             server in <code>mcp/</code> reads it from <code>TINYCRM_API_TOKEN</code>.
           </p>
         </div>

@@ -1,7 +1,7 @@
 """api tokens
 
-Named, revocable, read-only credentials for agents (#320): only the SHA-256 of
-the token is stored. See app/auth/api_tokens.py.
+Named, revocable, read-only credentials for agents (#320): only an HMAC-SHA256 of
+the token, keyed with the server secret, is stored. See app/auth/api_tokens.py.
 
 Nothing to backfill: no account has a token. Expand only: the previous release
 ignores the table.

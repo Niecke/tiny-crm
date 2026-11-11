@@ -15,6 +15,7 @@ tool error it can show the model.
 import os
 import sys
 from typing import Any
+from urllib.parse import quote
 
 import httpx2
 from mcp.server import MCPServer
@@ -59,7 +60,10 @@ async def _get(path: str, params: dict[str, Any] | None = None) -> dict[str, Any
         raise TinyCrmError("not found")
     if response.is_error:
         raise TinyCrmError(f"tinyCRM answered {response.status_code}: {_detail(response)}")
-    body: dict[str, Any] = response.json()
+    try:
+        body: dict[str, Any] = response.json()
+    except ValueError as exc:
+        raise TinyCrmError("tinyCRM did not return JSON — check TINYCRM_URL") from exc
     return body
 
 
@@ -86,14 +90,14 @@ async def tinycrm_search(query: str, limit: int = 5) -> dict[str, Any]:
 async def tinycrm_get_contact(contact_id: str) -> dict[str, Any]:
     """A contact's profile (job title, organization, email, phone, tags, notes) and
     their five most recent interactions. `contact_id` is an id from tinycrm_search."""
-    return await _get(f"/contacts/{contact_id}")
+    return await _get(f"/contacts/{quote(contact_id, safe='')}")
 
 
 @server.tool()
 async def tinycrm_get_organization(organization_id: str) -> dict[str, Any]:
     """An organization with its contacts, open deals and five most recent interactions.
     `organization_id` is an id from tinycrm_search."""
-    return await _get(f"/organizations/{organization_id}")
+    return await _get(f"/organizations/{quote(organization_id, safe='')}")
 
 
 @server.tool()
