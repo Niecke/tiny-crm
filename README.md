@@ -76,6 +76,9 @@ npm install
 npm run dev
 ```
 
+Agents read tinyCRM through the API tokens on the account page and the MCP server in
+[mcp/](mcp/README.md).
+
 ## Full stack (test)
 Containers are build each time to get latest code changes.
 

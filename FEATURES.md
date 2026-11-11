@@ -650,6 +650,40 @@ shows an archived row.
 
 ---
 
+## Agent API
+
+Read-only context for external agents (Claude Code, Cursor, Pi, scripts), #320.
+
+- **Tokens.** Account → *API tokens* (`/account/api-tokens`): list (name,
+  created, last used, status), *Generate token* (name, expiry never/30/90/365
+  days; the secret is shown once with a copy button), *Revoke* with confirm.
+  Revoked and expired tokens stay listed. API: `GET`/`POST /users/me/api-tokens/`
+  and `POST /users/me/api-tokens/{id}/revoke`, session login only (a token cannot
+  manage tokens). Table `api_tokens` (`token_hash` SHA-256, `scopes` default
+  `{read}`, `expires_at`, `revoked_at`, `last_used_at`). `last_used_at` is
+  written at most once a minute per token.
+- **Authentication.** `Authorization: Bearer tc_live_…` or
+  `X-API-Key: tc_live_…`. Missing, unknown, revoked, expired tokens and those of
+  an inactive user get 401. Every route returns the token owner's rows only.
+- **Endpoints**, public as `/api/v1/agent/…` (the ingress strips `/api`, the
+  backend prefix is `/v1/agent`). Compact JSON: nothing null or empty is sent,
+  notes are cut to an excerpt, archived rows are left out of lists.
+  - `GET /search?q=&limit=` — contacts, organizations and *open* deals; `limit`
+    is per type (default 5, max 20).
+  - `GET /contacts/{id}` — profile and the five latest interactions (archived
+    contacts are returned with `archived: true`).
+  - `GET /organizations/{id}` — people (max 25), open deals, latest interactions.
+    Not in the issue's list; the MCP tool `tinycrm_get_organization` needs it.
+  - `GET /deals/open` — open deals in stage order with `days_in_stage`, and
+    `totals` of expected value per currency; capped at 200 (`truncated`).
+  - `GET /tasks/today` — open `overdue` and `today` tasks in `BRIEFING_TIMEZONE`.
+- **MCP server** (`mcp/`, own uv project, stdio): tools `tinycrm_search`,
+  `tinycrm_get_contact`, `tinycrm_get_organization`, `tinycrm_get_pipeline`,
+  `tinycrm_get_today_tasks`; `TINYCRM_URL` and `TINYCRM_API_TOKEN`. See
+  `mcp/README.md`. Checked by the `MCP server checks` CI job.
+
+---
+
 ## Auth and hardening
 
 - **JWT bearer** via fastapi-users. No register router; accounts come from
@@ -701,6 +735,11 @@ shows an archived row.
   (`PASSWORD_TOKEN_LIFETIME_SECONDS`). Redeeming one marks the address verified;
   `/auth/request-verify-token` + `/auth/verify` are mounted too, but no mail
   carries a verify token.
+- **API tokens** (#320, `app/auth/api_tokens.py`): `tc_live_…` credentials for
+  agents, made on the account page. Stored as SHA-256 only; the raw token is
+  shown once. Read-only by scope, accepted on `/v1/agent/*` and nowhere else
+  (a session JWT is refused there, a token everywhere else). Revoked by a
+  password *reset*; a password *change* leaves them.
 - **Login throttle** (`app/ratelimit.py`): sliding window of *failed* logins per
   client address, `LOGIN_MAX_FAILURES` (10) per `LOGIN_FAILURE_WINDOW_SECONDS`
   (300). Over budget → 429 with `Retry-After`. Counted in middleware, because a
