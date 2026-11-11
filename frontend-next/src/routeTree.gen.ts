@@ -28,6 +28,7 @@ import { Route as AuthedSystemRouteImport } from './routes/_authed/system'
 import { Route as AuthedTasksRouteRouteImport } from './routes/_authed/tasks/route'
 import { Route as AuthedWatchesRouteRouteImport } from './routes/_authed/watches/route'
 import { Route as AuthedAccountIndexRouteImport } from './routes/_authed/account/index'
+import { Route as AuthedAccountApiTokensRouteImport } from './routes/_authed/account/api-tokens'
 import { Route as AuthedAccountMfaRouteImport } from './routes/_authed/account/mfa'
 import { Route as AuthedAccountPasswordRouteImport } from './routes/_authed/account/password'
 import { Route as AuthedContactsIndexRouteImport } from './routes/_authed/contacts/index'
@@ -156,6 +157,11 @@ const AuthedWatchesRouteRoute = AuthedWatchesRouteRouteImport.update({
 const AuthedAccountIndexRoute = AuthedAccountIndexRouteImport.update({
   id: '/account/',
   path: '/account/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedAccountApiTokensRoute = AuthedAccountApiTokensRouteImport.update({
+  id: '/account/api-tokens',
+  path: '/account/api-tokens',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedAccountMfaRoute = AuthedAccountMfaRouteImport.update({
@@ -358,6 +364,7 @@ export interface FileRoutesByFullPath {
   '/numbers': typeof AuthedNumbersRoute
   '/search': typeof AuthedSearchRoute
   '/system': typeof AuthedSystemRoute
+  '/account/api-tokens': typeof AuthedAccountApiTokensRoute
   '/account/mfa': typeof AuthedAccountMfaRoute
   '/account/password': typeof AuthedAccountPasswordRoute
   '/contacts/new': typeof AuthedContactsNewRoute
@@ -403,6 +410,7 @@ export interface FileRoutesByTo {
   '/search': typeof AuthedSearchRoute
   '/system': typeof AuthedSystemRoute
   '/': typeof AuthedIndexRoute
+  '/account/api-tokens': typeof AuthedAccountApiTokensRoute
   '/account/mfa': typeof AuthedAccountMfaRoute
   '/account/password': typeof AuthedAccountPasswordRoute
   '/contacts/new': typeof AuthedContactsNewRoute
@@ -459,6 +467,7 @@ export interface FileRoutesById {
   '/_authed/search': typeof AuthedSearchRoute
   '/_authed/system': typeof AuthedSystemRoute
   '/_authed/': typeof AuthedIndexRoute
+  '/_authed/account/api-tokens': typeof AuthedAccountApiTokensRoute
   '/_authed/account/mfa': typeof AuthedAccountMfaRoute
   '/_authed/account/password': typeof AuthedAccountPasswordRoute
   '/_authed/contacts/new': typeof AuthedContactsNewRoute
@@ -515,6 +524,7 @@ export interface FileRouteTypes {
     | '/numbers'
     | '/search'
     | '/system'
+    | '/account/api-tokens'
     | '/account/mfa'
     | '/account/password'
     | '/contacts/new'
@@ -560,6 +570,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/system'
     | '/'
+    | '/account/api-tokens'
     | '/account/mfa'
     | '/account/password'
     | '/contacts/new'
@@ -615,6 +626,7 @@ export interface FileRouteTypes {
     | '/_authed/search'
     | '/_authed/system'
     | '/_authed/'
+    | '/_authed/account/api-tokens'
     | '/_authed/account/mfa'
     | '/_authed/account/password'
     | '/_authed/contacts/new'
@@ -792,6 +804,13 @@ declare module '@tanstack/react-router' {
       path: '/account'
       fullPath: '/account/'
       preLoaderRoute: typeof AuthedAccountIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/account/api-tokens': {
+      id: '/_authed/account/api-tokens'
+      path: '/account/api-tokens'
+      fullPath: '/account/api-tokens'
+      preLoaderRoute: typeof AuthedAccountApiTokensRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/account/mfa': {
@@ -1203,6 +1222,7 @@ interface AuthedRouteChildren {
   AuthedSearchRoute: typeof AuthedSearchRoute
   AuthedSystemRoute: typeof AuthedSystemRoute
   AuthedIndexRoute: typeof AuthedIndexRoute
+  AuthedAccountApiTokensRoute: typeof AuthedAccountApiTokensRoute
   AuthedAccountMfaRoute: typeof AuthedAccountMfaRoute
   AuthedAccountPasswordRoute: typeof AuthedAccountPasswordRoute
   AuthedAccountIndexRoute: typeof AuthedAccountIndexRoute
@@ -1223,6 +1243,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedSearchRoute: AuthedSearchRoute,
   AuthedSystemRoute: AuthedSystemRoute,
   AuthedIndexRoute: AuthedIndexRoute,
+  AuthedAccountApiTokensRoute: AuthedAccountApiTokensRoute,
   AuthedAccountMfaRoute: AuthedAccountMfaRoute,
   AuthedAccountPasswordRoute: AuthedAccountPasswordRoute,
   AuthedAccountIndexRoute: AuthedAccountIndexRoute,

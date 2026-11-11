@@ -1844,6 +1844,36 @@ textarea.input {
   overflow-wrap: anywhere;
 }
 
+/* API tokens (routes/_authed/account/api-tokens.tsx). A finished token stays
+   listed as history, so it is dimmed rather than removed. */
+.token-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.token-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
+.token-row:not([data-status='active']) .token-info {
+  opacity: 0.6;
+}
+
+.token-secret {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-mono);
+  background: var(--color-sidebar);
+  border-radius: var(--radius-sm);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
 .recovery-codes {
   list-style: none;
   margin: 0;

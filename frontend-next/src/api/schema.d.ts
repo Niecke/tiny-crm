@@ -1480,6 +1480,150 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/users/me/api-tokens/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Api Tokens
+         * @description Every token of the caller, newest first, revoked ones included.
+         */
+        get: operations["list_api_tokens_users_me_api_tokens__get"];
+        put?: never;
+        /**
+         * Create Api Token
+         * @description Make a token. The raw value is in this response and nowhere else, ever.
+         */
+        post: operations["create_api_token_users_me_api_tokens__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/me/api-tokens/{token_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke Api Token
+         * @description End a token. Revoking one that is already revoked keeps the first date.
+         */
+        post: operations["revoke_api_token_users_me_api_tokens__token_id__revoke_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/agent/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search
+         * @description Contacts, organizations and open deals matching every word of `q`.
+         */
+        get: operations["search_v1_agent_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/agent/contacts/{contact_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Contact
+         * @description A contact's profile and their last interactions. Archived ones are flagged.
+         */
+        get: operations["get_contact_v1_agent_contacts__contact_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/agent/organizations/{organization_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Organization
+         * @description An organization with its people, open deals and last interactions.
+         */
+        get: operations["get_organization_v1_agent_organizations__organization_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/agent/deals/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Open Deals
+         * @description The open pipeline: every deal still being prepared or competed for.
+         */
+        get: operations["open_deals_v1_agent_deals_open_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/agent/tasks/today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tasks Today
+         * @description Open tasks that are overdue, and those due today, in the operator's timezone.
+         */
+        get: operations["tasks_today_v1_agent_tasks_today_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/version": {
         parameters: {
             query?: never;
@@ -1544,6 +1688,288 @@ export interface components {
             tasks_created: number;
             /** Tasks Completed */
             tasks_completed: number;
+        };
+        /** AgentContact */
+        AgentContact: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Archived */
+            archived?: boolean | null;
+            /** Job Title */
+            job_title?: string | null;
+            organization?: components["schemas"]["AgentRef"] | null;
+            /** Email */
+            email?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** City */
+            city?: string | null;
+            /** Country */
+            country?: string | null;
+            /** Lifecycle Status */
+            lifecycle_status?: string | null;
+            /** Relation Type */
+            relation_type?: string | null;
+            /** Tags */
+            tags?: string[] | null;
+            /** Notes */
+            notes?: string | null;
+            /** Recent Interactions */
+            recent_interactions?: components["schemas"]["AgentInteraction"][] | null;
+        };
+        /** AgentDeal */
+        AgentDeal: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /** Stage */
+            stage: string;
+            /** Currency */
+            currency: string;
+            /** Days In Stage */
+            days_in_stage: number;
+            /** Expected Value */
+            expected_value?: string | null;
+            /** Probability */
+            probability?: number | null;
+            /** Expected Close Date */
+            expected_close_date?: string | null;
+            /** Contact Name */
+            contact_name?: string | null;
+            /** Organization Name */
+            organization_name?: string | null;
+        };
+        /** AgentHit */
+        AgentHit: {
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "contact" | "organization" | "deal";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /** Subtitle */
+            subtitle?: string | null;
+        };
+        /** AgentInteraction */
+        AgentInteraction: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Subject */
+            subject: string;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Done */
+            done: boolean;
+            /** Notes Excerpt */
+            notes_excerpt?: string | null;
+        };
+        /** AgentOrgContact */
+        AgentOrgContact: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Job Title */
+            job_title?: string | null;
+        };
+        /** AgentOrgDeal */
+        AgentOrgDeal: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /** Stage */
+            stage: string;
+        };
+        /** AgentOrganization */
+        AgentOrganization: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Archived */
+            archived?: boolean | null;
+            /** Domain */
+            domain?: string | null;
+            /** Email */
+            email?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Industry */
+            industry?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /** Contacts */
+            contacts?: components["schemas"]["AgentOrgContact"][] | null;
+            /** Open Deals */
+            open_deals?: components["schemas"]["AgentOrgDeal"][] | null;
+            /** Recent Interactions */
+            recent_interactions?: components["schemas"]["AgentInteraction"][] | null;
+        };
+        /** AgentPipeline */
+        AgentPipeline: {
+            /** Deals */
+            deals: components["schemas"]["AgentDeal"][];
+            /** Totals */
+            totals: {
+                [key: string]: string;
+            };
+            /** Truncated */
+            truncated?: boolean | null;
+        };
+        /** AgentRef */
+        AgentRef: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+        };
+        /** AgentSearch */
+        AgentSearch: {
+            /** Q */
+            q: string;
+            /** Hits */
+            hits: components["schemas"]["AgentHit"][];
+        };
+        /** AgentTask */
+        AgentTask: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /** Priority */
+            priority: number;
+            /** Due Date */
+            due_date?: string | null;
+            /** Days Late */
+            days_late?: number | null;
+            /** Contact Name */
+            contact_name?: string | null;
+            /** Deal Title */
+            deal_title?: string | null;
+        };
+        /** AgentTasks */
+        AgentTasks: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Timezone */
+            timezone: string;
+            /** Overdue */
+            overdue: components["schemas"]["AgentTask"][];
+            /** Today */
+            today: components["schemas"]["AgentTask"][];
+        };
+        /** ApiTokenCreate */
+        ApiTokenCreate: {
+            /** Name */
+            name: string;
+            /** Expires At */
+            expires_at?: string | null;
+        };
+        /**
+         * ApiTokenCreated
+         * @description The only response that ever carries the secret.
+         */
+        ApiTokenCreated: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Scopes */
+            scopes: string[];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Last Used At */
+            last_used_at?: string | null;
+            /** Expires At */
+            expires_at?: string | null;
+            /** Revoked At */
+            revoked_at?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "expired" | "revoked";
+            /**
+             * Token
+             * @description The raw token. Shown once; only its hash is kept.
+             */
+            token: string;
+        };
+        /** ApiTokenRead */
+        ApiTokenRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Scopes */
+            scopes: string[];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Last Used At */
+            last_used_at?: string | null;
+            /** Expires At */
+            expires_at?: string | null;
+            /** Revoked At */
+            revoked_at?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "expired" | "revoked";
         };
         /**
          * AttentionMetrics
@@ -7194,6 +7620,224 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_api_tokens_users_me_api_tokens__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiTokenRead"][];
+                };
+            };
+        };
+    };
+    create_api_token_users_me_api_tokens__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApiTokenCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiTokenCreated"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_api_token_users_me_api_tokens__token_id__revoke_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiTokenRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_v1_agent_search_get: {
+        parameters: {
+            query: {
+                q: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentSearch"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_contact_v1_agent_contacts__contact_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentContact"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_organization_v1_agent_organizations__organization_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentOrganization"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    open_deals_v1_agent_deals_open_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentPipeline"];
+                };
+            };
+        };
+    };
+    tasks_today_v1_agent_tasks_today_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentTasks"];
                 };
             };
         };

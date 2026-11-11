@@ -59,6 +59,9 @@ function AccountPage() {
         <Link to="/system" className="button button-quiet">
           System status
         </Link>
+        <Link to="/account/api-tokens" className="button button-quiet">
+          API tokens
+        </Link>
         <Link to="/account/mfa" className="button button-quiet">
           Two-factor sign-in
         </Link>
