@@ -22,6 +22,7 @@ from sqlalchemy import BigInteger, DateTime, String
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.auth.api_tokens import revoke_all
 from app.auth.sessions import close_sessions, read_access_token, session_is_open
 from app.auth.throttle import claim_reset_mail, clear_login
 from app.config import settings
@@ -170,6 +171,8 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, UUID]):
         # Whoever reset the password may not be whoever is signed in: every
         # session ends, including any the old password opened.
         await close_sessions(self.db, user.id)
+        # The same goes for credentials handed to agents.
+        await revoke_all(self.db, user.id)
         # Whoever could redeem the link controls the mailbox; any backoff the
         # forgotten password ran up is theirs to drop.
         await clear_login(self.db, user.email)

@@ -19,6 +19,8 @@ from app.jobs import jobs_app
 from app.logging_config import configure_logging
 from app.ratelimit import count_failed_logins
 from app.routers import (
+    agent,
+    api_tokens,
     auth,
     briefing,
     business_cards,
@@ -186,6 +188,8 @@ app.include_router(
 # PATCH /users/me set a new password without the old one and changed the email
 # address — which, with password reset, redirected every reset link (#150).
 app.include_router(users.router)
+app.include_router(api_tokens.router)
+app.include_router(agent.router)
 
 
 @app.get(
