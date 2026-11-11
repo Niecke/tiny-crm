@@ -659,7 +659,7 @@ Read-only context for external agents (Claude Code, Cursor, Pi, scripts), #320.
   days; the secret is shown once with a copy button), *Revoke* with confirm.
   Revoked and expired tokens stay listed. API: `GET`/`POST /users/me/api-tokens/`
   and `POST /users/me/api-tokens/{id}/revoke`, session login only (a token cannot
-  manage tokens). Table `api_tokens` (`token_hash` SHA-256, `scopes` default
+  manage tokens). Table `api_tokens` (`token_hash` HMAC-SHA256, `scopes` default
   `{read}`, `expires_at`, `revoked_at`, `last_used_at`). `last_used_at` is
   written at most once a minute per token.
 - **Authentication.** `Authorization: Bearer tc_live_…` or
@@ -736,7 +736,7 @@ Read-only context for external agents (Claude Code, Cursor, Pi, scripts), #320.
   `/auth/request-verify-token` + `/auth/verify` are mounted too, but no mail
   carries a verify token.
 - **API tokens** (#320, `app/auth/api_tokens.py`): `tc_live_…` credentials for
-  agents, made on the account page. Stored as SHA-256 only; the raw token is
+  agents, made on the account page. Stored as HMAC-SHA256 (keyed with JWT_SECRET) only; the raw token is
   shown once. Read-only by scope, accepted on `/v1/agent/*` and nowhere else
   (a session JWT is refused there, a token everywhere else). Revoked by a
   password *reset*; a password *change* leaves them.

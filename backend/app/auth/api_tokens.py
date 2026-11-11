@@ -6,10 +6,10 @@ MFA, and should not hold a session. It gets a token instead: `tc_live_` plus
 
   * one token per agent, named by the operator ("pi-agent-desktop"), so one
     can be revoked without touching the others;
-  * stored only as its SHA-256. Unlike a password it is not chosen by a human,
-    so a slow hash would add per-request latency and no safety — the same
-    reasoning as the calendar feed token (app/auth/sessions.py) and
-    `mfa_recovery_codes.code_hash`;
+  * stored only as its HMAC-SHA256, keyed with the server secret. Unlike a
+    password it is not chosen by a human, so a slow hash would add per-request
+    latency and no safety. Rotating JWT_SECRET therefore invalidates every
+    token, as it does every session;
   * read-only by scope, and accepted by the agent routes alone
     (`current_token_user` in app/auth/agent.py, used only by app/routers/agent.py).
     It is never a bearer for a session: `current_active_user` does not know it,
@@ -24,6 +24,7 @@ app/auth/users.py needs `revoke_all` from here.
 """
 
 import hashlib
+import hmac
 import secrets
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
@@ -33,6 +34,7 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.config import settings
 from app.db import Base
 
 TOKEN_PREFIX = "tc_live_"
@@ -48,7 +50,7 @@ class ApiToken(Base):
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("user.id", ondelete="CASCADE"), index=True)
     name: Mapped[str] = mapped_column(String(100))
-    # SHA-256 hex of the raw token; the raw token is never stored.
+    # HMAC-SHA256 hex of the raw token; the raw token is never stored.
     token_hash: Mapped[str] = mapped_column(String(64), unique=True)
     scopes: Mapped[list[str]] = mapped_column(ARRAY(String), server_default="{read}")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -62,7 +64,7 @@ def new_token() -> str:
 
 
 def hash_token(raw: str) -> str:
-    return hashlib.sha256(raw.encode()).hexdigest()
+    return hmac.new(settings.jwt_secret.encode(), raw.encode(), hashlib.sha256).hexdigest()
 
 
 async def find_active(db: AsyncSession, raw: str) -> ApiToken | None:
