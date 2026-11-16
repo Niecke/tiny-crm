@@ -14,8 +14,10 @@
   "pinDigests": true,
   "osvVulnerabilityAlerts": true,
   "configMigration": true,
-  "dependencyDashboard": true,
-  "dependencyDashboardOSVVulnerabilitySummary": "unresolved",
+  "dependencyDashboard": {
+    "enabled": true,
+    "osvVulnerabilitySummary": "unresolved"
+  },
   "labels": [
     "dependencies"
   ],
