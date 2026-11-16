@@ -441,28 +441,36 @@ async def get_contact_timeline(
     return Page[TimelineItemRead](items=items, total=total, skip=skip, limit=limit)
 
 
+async def apply_create(session: AsyncSession, body: ContactCreate, user: User) -> Contact:
+    """Validate and add a contact without committing.
+
+    Split from the route so that approving an agent proposal (#321) runs exactly
+    this, in the same transaction that marks the proposal approved.
+    """
+    await _check_organization(session, body.organization_id, user)
+    _reject_orphan_rate(body.known_day_rate, body.rate_currency)
+    contact = Contact(**body.model_dump(), user_id=user.id)
+    session.add(contact)
+    await session.flush()
+    return contact
+
+
 @router.post("/", response_model=ContactRead, status_code=201)
 async def create_contact(
     body: ContactCreate,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> Contact:
-    await _check_organization(session, body.organization_id, user)
-    _reject_orphan_rate(body.known_day_rate, body.rate_currency)
-    contact = Contact(**body.model_dump(), user_id=user.id)
-    session.add(contact)
+    contact = await apply_create(session, body, user)
     await session.commit()
     await session.refresh(contact)
     return contact
 
 
-@router.patch("/{contact_id}", response_model=ContactRead)
-async def update_contact(
-    contact_id: UUID,
-    body: ContactUpdate,
-    session: AsyncSession = Depends(get_session),
-    user: User = Depends(current_active_user),
+async def apply_update(
+    session: AsyncSession, contact_id: UUID, body: ContactUpdate, user: User
 ) -> Contact:
+    """Validate and apply a contact change without committing; see apply_create."""
     contact = await _get_owned(session, contact_id, user)
     require_live(contact, "Contact")
     updates = body.model_dump(exclude_unset=True)
@@ -476,6 +484,17 @@ async def update_contact(
     for field, value in updates.items():
         setattr(contact, field, value)
     record_update(session, user, contact, before)
+    return contact
+
+
+@router.patch("/{contact_id}", response_model=ContactRead)
+async def update_contact(
+    contact_id: UUID,
+    body: ContactUpdate,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_active_user),
+) -> Contact:
+    contact = await apply_update(session, contact_id, body, user)
     await session.commit()
     await session.refresh(contact)
     return contact

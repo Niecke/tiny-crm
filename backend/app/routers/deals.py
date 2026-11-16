@@ -320,12 +320,12 @@ async def get_deal(
     return await _get_owned(session, deal_id, user)
 
 
-@router.post("/", response_model=DealRead, status_code=201)
-async def create_deal(
-    body: DealCreate,
-    session: AsyncSession = Depends(get_session),
-    user: User = Depends(current_active_user),
-) -> Deal:
+async def apply_create(session: AsyncSession, body: DealCreate, user: User) -> Deal:
+    """Validate and add a deal without committing.
+
+    Split from the route so that approving an agent proposal (#321) runs exactly
+    this, in the same transaction that marks the proposal approved.
+    """
     await _check_links(session, body.contact_id, body.organization_id, user)
     _reject_orphan_lost_reason(body.stage, body.lost_reason)
     _reject_contradictory_value(
@@ -345,19 +345,25 @@ async def create_deal(
     apply_stage(deal, body.stage, body.lost_reason)
 
     session.add(deal)
+    await session.flush()
+    return deal
+
+
+@router.post("/", response_model=DealRead, status_code=201)
+async def create_deal(
+    body: DealCreate,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_active_user),
+) -> Deal:
+    deal = await apply_create(session, body, user)
     await session.commit()
     # Reloads expected_value, which Postgres generates rather than the app.
     await session.refresh(deal)
     return deal
 
 
-@router.patch("/{deal_id}", response_model=DealRead)
-async def update_deal(
-    deal_id: UUID,
-    body: DealUpdate,
-    session: AsyncSession = Depends(get_session),
-    user: User = Depends(current_active_user),
-) -> Deal:
+async def apply_update(session: AsyncSession, deal_id: UUID, body: DealUpdate, user: User) -> Deal:
+    """Validate and apply a deal change without committing; see apply_create."""
     deal = await _get_owned(session, deal_id, user)
     require_live(deal, "Deal")
 
@@ -393,7 +399,17 @@ async def update_deal(
     # 100/0 the decided stage implies rather than the other way round.
     apply_stage(deal, stage, lost_reason)
     record_update(session, user, deal, before)
+    return deal
 
+
+@router.patch("/{deal_id}", response_model=DealRead)
+async def update_deal(
+    deal_id: UUID,
+    body: DealUpdate,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_active_user),
+) -> Deal:
+    deal = await apply_update(session, deal_id, body, user)
     await session.commit()
     await session.refresh(deal)
     return deal

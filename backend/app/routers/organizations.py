@@ -115,26 +115,34 @@ async def get_organization(
     return _to_read(organization, await _count_contacts(session, organization.id))
 
 
+async def apply_create(session: AsyncSession, body: OrganizationCreate, user: User) -> Organization:
+    """Add an organization without committing.
+
+    Split from the route so that approving an agent proposal (#321) runs exactly
+    this, in the same transaction that marks the proposal approved.
+    """
+    organization = Organization(**body.model_dump(), user_id=user.id)
+    session.add(organization)
+    await session.flush()
+    return organization
+
+
 @router.post("/", response_model=OrganizationRead, status_code=201)
 async def create_organization(
     body: OrganizationCreate,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> OrganizationRead:
-    organization = Organization(**body.model_dump(), user_id=user.id)
-    session.add(organization)
+    organization = await apply_create(session, body, user)
     await session.commit()
     await session.refresh(organization)
     return _to_read(organization, 0)
 
 
-@router.patch("/{organization_id}", response_model=OrganizationRead)
-async def update_organization(
-    organization_id: UUID,
-    body: OrganizationUpdate,
-    session: AsyncSession = Depends(get_session),
-    user: User = Depends(current_active_user),
-) -> OrganizationRead:
+async def apply_update(
+    session: AsyncSession, organization_id: UUID, body: OrganizationUpdate, user: User
+) -> Organization:
+    """Validate and apply an organization change without committing."""
     organization = await _get_owned(session, organization_id, user)
     require_live(organization, "Organization")
     # exclude_unset=True — only update fields the caller actually sent
@@ -144,6 +152,17 @@ async def update_organization(
     for field, value in updates.items():
         setattr(organization, field, value)
     record_update(session, user, organization, before)
+    return organization
+
+
+@router.patch("/{organization_id}", response_model=OrganizationRead)
+async def update_organization(
+    organization_id: UUID,
+    body: OrganizationUpdate,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_active_user),
+) -> OrganizationRead:
+    organization = await apply_update(session, organization_id, body, user)
     await session.commit()
     await session.refresh(organization)
     return _to_read(organization, await _count_contacts(session, organization.id))
