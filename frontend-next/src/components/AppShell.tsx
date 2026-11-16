@@ -4,6 +4,7 @@ import { type ReactNode, useState } from 'react'
 import { Dialog, Modal, ModalOverlay } from 'react-aria-components'
 import { logout, meQuery } from '../auth'
 import { captureCountQuery } from '../captures'
+import { proposalCountQuery } from '../proposals'
 import { dueCountQuery as dueTasksQuery } from '../tasks'
 import { dueCountQuery } from '../watches'
 import { GlobalSearch } from './GlobalSearch'
@@ -16,6 +17,7 @@ const nav: { label: string; to: LinkProps['to'] }[] = [
   { label: 'Dashboard', to: '/' },
   { label: 'Numbers', to: '/numbers' },
   { label: 'Inbox', to: '/inbox' },
+  { label: 'Approvals', to: '/approvals' },
   { label: 'Organizations', to: '/organizations' },
   { label: 'Contacts', to: '/contacts' },
   { label: 'Tasks', to: '/tasks' },
@@ -38,6 +40,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   // else in the app would ever surface.
   const { data: inbox } = useQuery(captureCountQuery(api))
   const waiting = inbox?.new ?? 0
+  // Changes an agent proposed, waiting for a yes or a no. Nothing else would
+  // tell the operator they are there.
+  const { data: proposals } = useQuery(proposalCountQuery(api))
+  const approvals = proposals?.pending ?? 0
   // Sources due for a sweep, on the Watches entry, for the same reason: a
   // watch list nobody looks at is the failure it exists to prevent.
   const { data: due = 0 } = useQuery(dueCountQuery(api))
@@ -62,11 +68,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           variant="quiet"
           className="menu-button"
           onPress={() => setMenuOpen(true)}
-          aria-label={waiting ? `Menu, ${waiting} waiting in the inbox` : 'Menu'}
+          aria-label={menuLabel(waiting, approvals)}
         >
-          {waiting > 0 && (
+          {waiting + approvals > 0 && (
             <span className="nav-count" aria-hidden="true">
-              {waiting}
+              {waiting + approvals}
             </span>
           )}
           <span className="menu-icon" aria-hidden="true" />
@@ -76,7 +82,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <aside className="sidebar">
         <div className="brand">tinyCRM</div>
         <QuickCaptureButton className="quick-note-sidebar" />
-        <NavLinks waiting={waiting} due={due} dueTasks={dueTasks} />
+        <NavLinks waiting={waiting} approvals={approvals} due={due} dueTasks={dueTasks} />
         <Account />
       </aside>
 
@@ -91,7 +97,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 ×
               </Button>
             </div>
-            <NavLinks waiting={waiting} due={due} dueTasks={dueTasks} onNavigate={() => setMenuOpen(false)} />
+            <NavLinks waiting={waiting} approvals={approvals} due={due} dueTasks={dueTasks} onNavigate={() => setMenuOpen(false)} />
             <Account />
           </Dialog>
         </Modal>
@@ -110,13 +116,23 @@ export function AppShell({ children }: { children: ReactNode }) {
   )
 }
 
+function menuLabel(waiting: number, approvals: number): string {
+  const parts = [
+    waiting > 0 && `${waiting} waiting in the inbox`,
+    approvals > 0 && `${approvals} pending approval`,
+  ].filter(Boolean)
+  return parts.length ? `Menu, ${parts.join(', ')}` : 'Menu'
+}
+
 function NavLinks({
   waiting,
+  approvals,
   due,
   dueTasks,
   onNavigate,
 }: {
   waiting: number
+  approvals: number
   due: number
   dueTasks: number
   onNavigate?: () => void
@@ -139,6 +155,11 @@ function NavLinks({
           {item.to === '/inbox' && waiting > 0 && (
             <span className="nav-count" aria-label={`${waiting} waiting`}>
               {waiting}
+            </span>
+          )}
+          {item.to === '/approvals' && approvals > 0 && (
+            <span className="nav-count" aria-label={`${approvals} pending`}>
+              {approvals}
             </span>
           )}
           {item.to === '/tasks' && dueTasks > 0 && (

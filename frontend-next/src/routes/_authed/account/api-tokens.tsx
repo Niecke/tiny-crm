@@ -11,10 +11,13 @@ import {
   EXPIRY_OPTIONS,
   type Expiry,
   expiresAt,
+  scopesFor,
+  scopesLabel,
   statusLabel,
   statusTone,
 } from '../../../apiTokens'
 import { Button } from '../../../components/ui/Button'
+import { Checkbox } from '../../../components/ui/Checkbox'
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog'
 import { FormTextField } from '../../../components/ui/FormTextField'
 import { Modal } from '../../../components/ui/Modal'
@@ -41,7 +44,10 @@ function ApiTokensPage() {
       </Link>
       <header className="page-header">
         <h1>API tokens</h1>
-        <p>Read-only access for agents such as Claude Code or Cursor. Make one token per tool, so each can be revoked on its own.</p>
+        <p>
+          Access for agents such as Claude Code or Cursor: read-only, unless you allow proposing changes, which you then approve one by one under
+          Approvals. Make one token per tool, so each can be revoked on its own.
+        </p>
       </header>
 
       <section className="panel">
@@ -94,7 +100,7 @@ function TokenRow({ token, onRevoke }: { token: ApiToken; onRevoke: () => void }
       <div className="token-info">
         <strong>{token.name}</strong>
         <span className="muted">
-          Created {formatDateTime(token.created_at)} · Last used{' '}
+          {scopesLabel(token.scopes)} · Created {formatDateTime(token.created_at)} · Last used{' '}
           {token.last_used_at ? formatTimeAgo(token.last_used_at) : 'never'}
           {token.expires_at && token.status === 'active' ? ` · Expires ${formatDateTime(token.expires_at)}` : ''}
         </span>
@@ -153,13 +159,18 @@ function CreateDialog({ isOpen, onOpenChange }: { isOpen: boolean; onOpenChange:
   const queryClient = useQueryClient()
   const [expiry, setExpiry] = useState<Expiry | ''>('')
   const [copied, setCopied] = useState(false)
+  const [allowPropose, setAllowPropose] = useState(false)
   const { control, handleSubmit, reset } = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
     defaultValues: { name: '' },
   })
   const create = useMutation({
     mutationFn: ({ name }: { name: string }) =>
-      unwrap(api.POST('/users/me/api-tokens/', { body: { name, expires_at: expiresAt(expiry) } })),
+      unwrap(
+        api.POST('/users/me/api-tokens/', {
+          body: { name, expires_at: expiresAt(expiry), scopes: scopesFor(allowPropose) },
+        }),
+      ),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: apiTokensQuery(api).queryKey }),
   })
 
@@ -170,6 +181,7 @@ function CreateDialog({ isOpen, onOpenChange }: { isOpen: boolean; onOpenChange:
       create.reset()
       reset()
       setExpiry('')
+      setAllowPropose(false)
       setCopied(false)
     }
   }
@@ -210,6 +222,9 @@ function CreateDialog({ isOpen, onOpenChange }: { isOpen: boolean; onOpenChange:
             value={expiry}
             onChange={setExpiry}
           />
+          <Checkbox isSelected={allowPropose} onChange={setAllowPropose}>
+            Allow proposing changes (each one waits for your approval)
+          </Checkbox>
           {create.isError && (
             <p className="form-error" role="alert">
               {create.error.message}

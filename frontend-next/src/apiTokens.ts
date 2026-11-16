@@ -42,3 +42,13 @@ export function statusLabel(status: ApiTokenStatus): string {
 export function statusTone(status: ApiTokenStatus): 'success' | 'warning' | 'danger' {
   return status === 'active' ? 'success' : status === 'expired' ? 'warning' : 'danger'
 }
+
+// "read" or "read · propose": what a token may do, for the list.
+export function scopesLabel(scopes: string[]): string {
+  return scopes.join(' · ')
+}
+
+// The scopes to send: reading is always on, and proposing is the operator's choice.
+export function scopesFor(allowPropose: boolean): ('read' | 'propose')[] {
+  return allowPropose ? ['read', 'propose'] : ['read']
+}

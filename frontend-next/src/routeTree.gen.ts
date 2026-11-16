@@ -31,6 +31,7 @@ import { Route as AuthedAccountIndexRouteImport } from './routes/_authed/account
 import { Route as AuthedAccountApiTokensRouteImport } from './routes/_authed/account/api-tokens'
 import { Route as AuthedAccountMfaRouteImport } from './routes/_authed/account/mfa'
 import { Route as AuthedAccountPasswordRouteImport } from './routes/_authed/account/password'
+import { Route as AuthedApprovalsIndexRouteImport } from './routes/_authed/approvals/index'
 import { Route as AuthedContactsIndexRouteImport } from './routes/_authed/contacts/index'
 import { Route as AuthedContactsNewRouteImport } from './routes/_authed/contacts/new'
 import { Route as AuthedContactsScanRouteImport } from './routes/_authed/contacts/scan'
@@ -172,6 +173,11 @@ const AuthedAccountMfaRoute = AuthedAccountMfaRouteImport.update({
 const AuthedAccountPasswordRoute = AuthedAccountPasswordRouteImport.update({
   id: '/account/password',
   path: '/account/password',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedApprovalsIndexRoute = AuthedApprovalsIndexRouteImport.update({
+  id: '/approvals/',
+  path: '/approvals/',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedContactsIndexRoute = AuthedContactsIndexRouteImport.update({
@@ -381,6 +387,7 @@ export interface FileRoutesByFullPath {
   '/tasks/new': typeof AuthedTasksNewRoute
   '/watches/new': typeof AuthedWatchesNewRoute
   '/account/': typeof AuthedAccountIndexRoute
+  '/approvals/': typeof AuthedApprovalsIndexRoute
   '/contacts/': typeof AuthedContactsIndexRoute
   '/deals/': typeof AuthedDealsIndexRoute
   '/documents/': typeof AuthedDocumentsIndexRoute
@@ -427,6 +434,7 @@ export interface FileRoutesByTo {
   '/tasks/new': typeof AuthedTasksNewRoute
   '/watches/new': typeof AuthedWatchesNewRoute
   '/account': typeof AuthedAccountIndexRoute
+  '/approvals': typeof AuthedApprovalsIndexRoute
   '/contacts': typeof AuthedContactsIndexRoute
   '/deals': typeof AuthedDealsIndexRoute
   '/documents': typeof AuthedDocumentsIndexRoute
@@ -484,6 +492,7 @@ export interface FileRoutesById {
   '/_authed/tasks/new': typeof AuthedTasksNewRoute
   '/_authed/watches/new': typeof AuthedWatchesNewRoute
   '/_authed/account/': typeof AuthedAccountIndexRoute
+  '/_authed/approvals/': typeof AuthedApprovalsIndexRoute
   '/_authed/contacts/': typeof AuthedContactsIndexRoute
   '/_authed/deals/': typeof AuthedDealsIndexRoute
   '/_authed/documents/': typeof AuthedDocumentsIndexRoute
@@ -541,6 +550,7 @@ export interface FileRouteTypes {
     | '/tasks/new'
     | '/watches/new'
     | '/account/'
+    | '/approvals/'
     | '/contacts/'
     | '/deals/'
     | '/documents/'
@@ -587,6 +597,7 @@ export interface FileRouteTypes {
     | '/tasks/new'
     | '/watches/new'
     | '/account'
+    | '/approvals'
     | '/contacts'
     | '/deals'
     | '/documents'
@@ -643,6 +654,7 @@ export interface FileRouteTypes {
     | '/_authed/tasks/new'
     | '/_authed/watches/new'
     | '/_authed/account/'
+    | '/_authed/approvals/'
     | '/_authed/contacts/'
     | '/_authed/deals/'
     | '/_authed/documents/'
@@ -825,6 +837,13 @@ declare module '@tanstack/react-router' {
       path: '/account/password'
       fullPath: '/account/password'
       preLoaderRoute: typeof AuthedAccountPasswordRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/approvals/': {
+      id: '/_authed/approvals/'
+      path: '/approvals'
+      fullPath: '/approvals/'
+      preLoaderRoute: typeof AuthedApprovalsIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/contacts/': {
@@ -1226,6 +1245,7 @@ interface AuthedRouteChildren {
   AuthedAccountMfaRoute: typeof AuthedAccountMfaRoute
   AuthedAccountPasswordRoute: typeof AuthedAccountPasswordRoute
   AuthedAccountIndexRoute: typeof AuthedAccountIndexRoute
+  AuthedApprovalsIndexRoute: typeof AuthedApprovalsIndexRoute
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
@@ -1247,6 +1267,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAccountMfaRoute: AuthedAccountMfaRoute,
   AuthedAccountPasswordRoute: AuthedAccountPasswordRoute,
   AuthedAccountIndexRoute: AuthedAccountIndexRoute,
+  AuthedApprovalsIndexRoute: AuthedApprovalsIndexRoute,
 }
 
 const AuthedRouteWithChildren =
