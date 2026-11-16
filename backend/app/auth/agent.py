@@ -58,4 +58,14 @@ async def current_token_user(
         await db.commit()
     # For the access log; never the token itself.
     request.state.api_token_id = token.id
+    request.state.api_token_scopes = list(token.scopes)
+    return user
+
+
+async def proposing_token_user(request: Request, user: User = Depends(current_token_user)) -> User:
+    """`current_token_user`, and the token must carry the `propose` scope (#321)."""
+    if "propose" not in request.state.api_token_scopes:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="This token may not propose changes"
+        )
     return user

@@ -1,8 +1,13 @@
-"""The agent API (#320): read-only context for an external agent.
+"""The agent API (#320): context for an external agent, and proposals (#321).
 
 `/v1/agent/*`, public as `/api/v1/agent/*` (the ingress strips `/api`). Every
 route authenticates with an API token and nothing else (app/auth/agent.py), and
 returns the token owner's rows only. Compact output; see app/schemas/agent.py.
+
+Reading is the whole of it, with one exception: `POST /proposals`. A proposal
+stages a change in `agent_proposals` and nothing else; the CRM is untouched until
+the operator approves it in the web client (app/routers/proposals.py). It needs
+a token with the `propose` scope.
 
 The one rule for this file: it never imports `current_active_user`, and no
 session route imports `current_token_user`. That is the boundary that keeps a
@@ -15,13 +20,13 @@ from typing import Any
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import raiseload
 
-from app.archive import live
-from app.auth.agent import current_token_user
+from app.archive import live, require_live
+from app.auth.agent import current_token_user, proposing_token_user
 from app.auth.users import User
 from app.briefing import DayWindow, briefing_queries
 from app.config import settings
@@ -29,7 +34,9 @@ from app.db import get_session
 from app.models import Contact, Deal, Interaction, Organization, Task
 from app.models.deal import OPEN_STAGES
 from app.models.interaction import interaction_contacts, interaction_organizations
+from app.models.proposal import AgentProposal
 from app.models.search import SEARCHABLES
+from app.proposals import check_references, entity_label, load_target, validate_payload
 from app.routers.briefing import current_time
 from app.routers.search import MIN_QUERY_LENGTH, checked_terms, search_one
 from app.schemas.agent import (
@@ -47,6 +54,7 @@ from app.schemas.agent import (
     AgentTasks,
     HitType,
 )
+from app.schemas.proposal import ProposalCreate, ProposalSubmitted
 
 router = APIRouter(prefix="/v1/agent", tags=["agent"])
 
@@ -314,3 +322,36 @@ async def tasks_today(
         overdue=[_task(t, window, late=True) for t in overdue],
         today=[_task(t, window, late=False) for t in today],
     )
+
+
+@router.post("/proposals", response_model=ProposalSubmitted, status_code=201)
+async def submit_proposal(
+    body: ProposalCreate,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(proposing_token_user),
+) -> AgentProposal:
+    """Stage a create, update or archive for the operator to approve.
+
+    Checked now against the entity's own schema, so a proposal that could never
+    be applied is refused at once instead of waiting in the inbox. Nothing in the
+    CRM changes.
+    """
+    payload = validate_payload(body.entity_type, body.action, body.payload)
+    if body.target_id is not None:
+        target = await load_target(session, body.entity_type, body.target_id, user)
+        require_live(target, entity_label(body.entity_type))
+    await check_references(session, payload, user)
+    proposal = AgentProposal(
+        user_id=user.id,
+        api_token_id=request.state.api_token_id,
+        entity_type=body.entity_type,
+        action=body.action,
+        target_id=body.target_id,
+        proposed_payload=payload,
+        reason=body.reason,
+    )
+    session.add(proposal)
+    await session.commit()
+    await session.refresh(proposal)
+    return proposal

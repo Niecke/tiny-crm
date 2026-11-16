@@ -1,4 +1,4 @@
-"""API tokens for agents (#320): a read-only credential an operator hands to a tool.
+"""API tokens for agents (#320): a credential an operator hands to a tool.
 
 An agent — Claude Code, Cursor, a script — cannot sign in with a password and
 MFA, and should not hold a session. It gets a token instead: `tc_live_` plus
@@ -10,10 +10,12 @@ MFA, and should not hold a session. It gets a token instead: `tc_live_` plus
     password it is not chosen by a human, so a slow hash would add per-request
     latency and no safety. Rotating JWT_SECRET therefore invalidates every
     token, as it does every session;
-  * read-only by scope, and accepted by the agent routes alone
+  * read-only by default. The `propose` scope (#321) lets it stage a change,
+    which only ever lands in `agent_proposals`: nothing reaches the CRM until
+    the operator approves it. It is accepted by the agent routes alone
     (`current_token_user` in app/auth/agent.py, used only by app/routers/agent.py).
     It is never a bearer for a session: `current_active_user` does not know it,
-    so a token cannot reach token management, the password, MFA or any write;
+    so a token cannot reach token management, the password, MFA or any direct write;
   * ends at `expires_at` if one was set, or when revoked. A password *reset*
     (the compromised-account path) revokes every token; a password *change*
     leaves them, like the feed token, so a routine change does not break
@@ -38,8 +40,8 @@ from app.config import settings
 from app.db import Base
 
 TOKEN_PREFIX = "tc_live_"
-# Part 1 knows one scope. Not settable by the client yet.
-SCOPES = ("read",)
+# `read` is on every token. `propose` lets it stage changes for approval (#321).
+SCOPES = ("read", "propose")
 
 
 class ApiToken(Base):
