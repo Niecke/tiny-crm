@@ -91,7 +91,7 @@ async def test_an_unreachable_server_is_a_tool_error() -> None:
         server._client = None
 
 
-async def test_the_server_lists_the_five_tools(mock: Mock) -> None:
+async def test_the_server_lists_its_ten_tools(mock: Mock) -> None:
     async with Client(server.server) as client:
         tools = {t.name: t for t in (await client.list_tools()).tools}
 
@@ -101,6 +101,11 @@ async def test_the_server_lists_the_five_tools(mock: Mock) -> None:
         "tinycrm_get_organization",
         "tinycrm_get_pipeline",
         "tinycrm_get_today_tasks",
+        "tinycrm_propose_contact_creation",
+        "tinycrm_propose_contact_update",
+        "tinycrm_propose_deal_update",
+        "tinycrm_propose_task_creation",
+        "tinycrm_propose_interaction_log",
     }
     assert tools["tinycrm_search"].input_schema["required"] == ["query"]
     assert all(t.description for t in tools.values())
@@ -134,3 +139,120 @@ def test_main_needs_a_url_and_a_tc_live_token(monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.setenv("TINYCRM_API_TOKEN", "eyJ-a-session-jwt")
     with pytest.raises(SystemExit, match="tc_live_"):
         main()
+
+
+# --- Proposals (#321) --------------------------------------------------------
+
+PROPOSAL = "/api/v1/agent/proposals"
+
+
+def sent(mock: Mock) -> dict[str, Any]:
+    [request] = mock.requests
+    assert request.method == "POST"
+    assert request.url.path == PROPOSAL
+    assert request.headers["authorization"] == f"Bearer {TOKEN}"
+    body: dict[str, Any] = json.loads(request.content)
+    return body
+
+
+async def test_a_contact_creation_leaves_out_what_was_not_given(mock: Mock) -> None:
+    mock.status = 201
+    mock.body = {"id": "p1", "status": "pending"}
+
+    result = await server.tinycrm_propose_contact_creation(
+        "Maria Huber", "Met at the meetup", email="maria@example.com"
+    )
+
+    assert result["id"] == "p1"
+    assert result["status"] == "pending"
+    assert "Approvals" in result["hint"]
+    assert sent(mock) == {
+        "entity_type": "contact",
+        "action": "create",
+        "payload": {"name": "Maria Huber", "email": "maria@example.com"},
+        "reason": "Met at the meetup",
+    }
+
+
+@pytest.mark.parametrize(
+    ("call", "expected"),
+    [
+        (
+            lambda: server.tinycrm_propose_contact_update("c1", {"job_title": "CTO"}, "New role"),
+            {
+                "entity_type": "contact",
+                "action": "update",
+                "target_id": "c1",
+                "payload": {"job_title": "CTO"},
+                "reason": "New role",
+            },
+        ),
+        (
+            lambda: server.tinycrm_propose_deal_update("d1", {"stage": "won"}, "Signed"),
+            {
+                "entity_type": "deal",
+                "action": "update",
+                "target_id": "d1",
+                "payload": {"stage": "won"},
+                "reason": "Signed",
+            },
+        ),
+        (
+            lambda: server.tinycrm_propose_task_creation(
+                "Call Maria", "Follow up", due_date="2026-12-01", priority=2
+            ),
+            {
+                "entity_type": "task",
+                "action": "create",
+                "payload": {"title": "Call Maria", "due_date": "2026-12-01", "priority": 2},
+                "reason": "Follow up",
+            },
+        ),
+        (
+            lambda: server.tinycrm_propose_interaction_log(
+                "Kickoff", "2026-11-10T10:00:00Z", "From the calendar", contact_ids=["c1"]
+            ),
+            {
+                "entity_type": "interaction",
+                "action": "create",
+                "payload": {
+                    "subject": "Kickoff",
+                    "occurred_at": "2026-11-10T10:00:00Z",
+                    "kind": "note",
+                    "contact_ids": ["c1"],
+                },
+                "reason": "From the calendar",
+            },
+        ),
+    ],
+)
+async def test_each_propose_tool_posts_its_body(mock: Mock, call: Any, expected: Any) -> None:
+    mock.status = 201
+    mock.body = {"id": "p1", "status": "pending"}
+    await call()
+    assert sent(mock) == expected
+
+
+async def test_a_403_says_the_token_may_not_propose(mock: Mock) -> None:
+    mock.status = 403
+    mock.body = {"detail": "This token may not propose changes"}
+    with pytest.raises(TinyCrmError, match="Allow proposing changes"):
+        await server.tinycrm_propose_task_creation("x", "y")
+
+
+async def test_a_422_carries_the_reason_it_was_refused(mock: Mock) -> None:
+    mock.status = 422
+    mock.body = {"detail": "An update needs at least one field"}
+    with pytest.raises(TinyCrmError, match="invalid proposal: An update needs at least one"):
+        await server.tinycrm_propose_contact_update("c1", {}, "why")
+
+
+async def test_a_proposal_over_mcp_returns_the_id(mock: Mock) -> None:
+    mock.status = 201
+    mock.body = {"id": "p9", "status": "pending"}
+    async with Client(server.server) as client:
+        result = await client.call_tool(
+            "tinycrm_propose_task_creation", {"title": "Call", "reason": "Follow up"}
+        )
+    assert not result.is_error
+    assert json.loads(result.content[0].text)["id"] == "p9"  # type: ignore[union-attr]
