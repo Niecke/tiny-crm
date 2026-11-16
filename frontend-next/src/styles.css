@@ -1347,6 +1347,7 @@ a {
   display: grid;
   place-items: start center;
   padding: 12vh var(--space-4) var(--space-4);
+  overflow-y: auto;
   background: rgb(58 51 42 / 0.3);
 }
 
