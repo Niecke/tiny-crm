@@ -16,7 +16,7 @@ RUN echo "{\"version\":\"$GIT_COMMIT\"}" > public/version.json && \
     VITE_BUILD_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ") npm run build
 
 # Static files only: Node exists in the build stage and nowhere after it.
-FROM caddy:alpine@sha256:78bd35025c7ba85961dd149ae670315129954e77abe2383ac47c89106b35ade9
+FROM caddy:alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
 
 RUN addgroup -g 10001 -S caddy && adduser -u 10001 -D -S -G caddy caddy
 
