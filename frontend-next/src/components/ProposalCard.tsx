@@ -257,7 +257,8 @@ function EditDialog({
   else if (isUpdate && target.error) content = <p className="form-error">{target.error.message}</p>
   else {
     const base = (isUpdate ? target.data : undefined) as { version?: number } | undefined
-    const save = (body: unknown) => onSave({ payload: body as Record<string, unknown>, version: base?.version })
+    const save = (body: unknown) =>
+      onSave({ payload: withUneditable(proposal, body as Record<string, unknown>), version: base?.version })
     content = (
       <EditForm
         proposal={proposal}
@@ -277,6 +278,15 @@ function EditDialog({
       {content}
     </Modal>
   )
+}
+
+// The task form has no `done`, and saving replaces the proposal's payload with
+// the form body, so a proposed completion would be dropped (and the task never
+// completed or rescheduled). Carry it over.
+function withUneditable(proposal: ProposalRead, body: Record<string, unknown>): Record<string, unknown> {
+  const proposed = proposal.proposed_payload
+  if (proposal.entity_type === 'task' && 'done' in proposed && !('done' in body)) return { ...body, done: proposed.done }
+  return body
 }
 
 // What the forms show beside the ids: the names are read-only mirrors on the

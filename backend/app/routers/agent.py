@@ -36,7 +36,13 @@ from app.models.deal import OPEN_STAGES
 from app.models.interaction import interaction_contacts, interaction_organizations
 from app.models.proposal import AgentProposal
 from app.models.search import SEARCHABLES
-from app.proposals import check_references, entity_label, load_target, validate_payload
+from app.proposals import (
+    check_applies,
+    check_references,
+    entity_label,
+    load_target,
+    validate_payload,
+)
 from app.routers.briefing import current_time
 from app.routers.search import MIN_QUERY_LENGTH, checked_terms, search_one
 from app.schemas.agent import (
@@ -342,6 +348,7 @@ async def submit_proposal(
         target = await load_target(session, body.entity_type, body.target_id, user)
         require_live(target, entity_label(body.entity_type))
     await check_references(session, payload, user)
+    await check_applies(session, body.entity_type, body.action, body.target_id, payload, user)
     proposal = AgentProposal(
         user_id=user.id,
         api_token_id=request.state.api_token_id,

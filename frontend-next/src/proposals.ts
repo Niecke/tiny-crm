@@ -10,12 +10,14 @@ import { taskQuery } from './tasks'
 // What agents propose (backend/app/proposals.py): a create, update or archive
 // that waits here until the operator approves, edits or rejects it.
 
+// Oldest first, so a page of decided proposals ends before the newest ones;
+// the inbox asks for another PROPOSALS_LIMIT at a time.
 export const PROPOSALS_LIMIT = 100
 
-export const proposalsQuery = (api: Api, status: ProposalStatus) =>
+export const proposalsQuery = (api: Api, status: ProposalStatus, limit = PROPOSALS_LIMIT) =>
   queryOptions({
-    queryKey: ['proposals', 'list', status],
-    queryFn: () => unwrap(api.GET('/proposals/', { params: { query: { status, limit: PROPOSALS_LIMIT } } })),
+    queryKey: ['proposals', 'list', status, limit],
+    queryFn: () => unwrap(api.GET('/proposals/', { params: { query: { status, limit } } })),
     placeholderData: keepPreviousData,
   })
 

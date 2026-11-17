@@ -23,6 +23,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.archive import mark_archived
+from app.audit import check_version
 from app.auth.users import User
 from app.models import Contact, Deal, Interaction, Organization, Project, Task
 from app.models.proposal import AgentProposal
@@ -164,6 +165,37 @@ async def check_references(session: AsyncSession, payload: dict[str, Any], user:
             raise HTTPException(status_code=404, detail=f"Unknown id in {field}")
 
 
+class _DryRunDone(Exception):
+    """Raised inside the savepoint of `check_applies` to roll it back."""
+
+
+async def check_applies(
+    session: AsyncSession,
+    entity_type: EntityType,
+    action: ProposalAction,
+    target_id: UUID | None,
+    payload: dict[str, Any],
+    user: User,
+) -> None:
+    """Run the change through the routers' own checks, then undo it.
+
+    The rules that live in the entity routers (a rate needs its currency, a lost
+    reason needs the lost stage, a deal is priced one way) are not in the Create
+    and Update schemas. Running the real apply inside a savepoint that is always
+    rolled back lets submission refuse what approval would refuse, without
+    keeping a second copy of those rules here. Raises the router's HTTPException.
+    """
+    if action == "archive":
+        return
+    probe = AgentProposal(entity_type=entity_type, action=action, target_id=target_id)
+    try:
+        async with session.begin_nested():
+            await apply(session, probe, payload, user, None)
+            raise _DryRunDone
+    except _DryRunDone:
+        pass
+
+
 async def apply(
     session: AsyncSession,
     proposal: AgentProposal,
@@ -203,6 +235,7 @@ async def apply(
         raise HTTPException(status_code=409, detail="This proposal has no target")
     if proposal.action == "archive":
         row = await load_target(session, entity_type, target_id, user)
+        check_version(row, version, entity_label(entity_type))
         mark_archived(session, row, True, user)
         return target_id
 
@@ -225,6 +258,16 @@ async def apply(
     return target_id
 
 
+def _read_values(entity_type: EntityType, read_schema: type[BaseModel], row: Any) -> dict[str, Any]:
+    """The row as its Read schema shows it, as JSON-safe values."""
+    if entity_type == "organization":
+        # OrganizationRead needs a contact_count that the list routes compute
+        # with a subquery. No proposal can change it, so it is not worth a query.
+        fields = {n: getattr(row, n) for n in read_schema.model_fields if n != "contact_count"}
+        return read_schema.model_validate({**fields, "contact_count": 0}).model_dump(mode="json")
+    return read_schema.model_validate(row, from_attributes=True).model_dump(mode="json")
+
+
 async def current_values(
     session: AsyncSession, proposals: list[AgentProposal]
 ) -> dict[UUID, tuple[str, dict[str, Any]]]:
@@ -245,9 +288,7 @@ async def current_values(
         read_schema = SCHEMAS[entity_type][2]
         found = await session.scalars(select(model).where(model.id.in_(ids)))
         for row in found:
-            rows[(entity_type, row.id)] = read_schema.model_validate(
-                row, from_attributes=True
-            ).model_dump(mode="json")
+            rows[(entity_type, row.id)] = _read_values(entity_type, read_schema, row)
             labels[(entity_type, row.id)] = label_of(entity_type, row)
 
     result: dict[UUID, tuple[str, dict[str, Any]]] = {}
@@ -257,7 +298,10 @@ async def current_values(
             continue
         row_values = rows[key]
         if proposal.action == "archive":
-            keep = {"archived_at": row_values.get("archived_at")}
+            keep = {
+                "archived_at": row_values.get("archived_at"),
+                "version": row_values.get("version"),
+            }
         else:
             keep = {k: row_values.get(k) for k in proposal.proposed_payload}
             keep["version"] = row_values.get("version")

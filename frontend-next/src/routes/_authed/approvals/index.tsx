@@ -1,9 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
+import { useState } from 'react'
 import { z } from 'zod'
 import type { ProposalStatus } from '../../../api/types'
+import { Button } from '../../../components/ui/Button'
 import { ProposalCard } from '../../../components/ProposalCard'
-import { proposalsQuery } from '../../../proposals'
+import { PROPOSALS_LIMIT, proposalsQuery } from '../../../proposals'
 import { useProposalDecision } from '../../../useProposalDecision'
 
 const searchSchema = z.object({
@@ -26,7 +28,11 @@ const statuses: { value: ProposalStatus; label: string }[] = [
 function Approvals() {
   const { api } = Route.useRouteContext()
   const { status = 'pending' } = Route.useSearch()
-  const { data, error, isPending } = useQuery(proposalsQuery(api, status))
+  // How many to fetch per tab; "Show more" raises it, so decisions beyond the
+  // first page stay reachable.
+  const [limits, setLimits] = useState<Partial<Record<ProposalStatus, number>>>({})
+  const limit = limits[status] ?? PROPOSALS_LIMIT
+  const { data, error, isPending } = useQuery(proposalsQuery(api, status, limit))
   const { approve, reject, errors } = useProposalDecision(api)
 
   return (
@@ -73,7 +79,10 @@ function Approvals() {
           </ul>
           {data.total > data.items.length && (
             <p className="muted small">
-              Showing {data.items.length} of {data.total}.
+              Showing {data.items.length} of {data.total}.{' '}
+              <Button variant="quiet" onPress={() => setLimits((l) => ({ ...l, [status]: limit + PROPOSALS_LIMIT }))}>
+                Show more
+              </Button>
             </p>
           )}
         </>

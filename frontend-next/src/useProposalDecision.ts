@@ -2,7 +2,11 @@ import { type QueryClient, useMutation, useQueryClient } from '@tanstack/react-q
 import { useState } from 'react'
 import { type Api, ApiError } from './api/client'
 import type { ProposalRead } from './api/types'
-import { type Approval, approveProposal, entityKeys, rejectProposal } from './proposals'
+import { invalidateContacts } from './contacts'
+import { invalidateDeals } from './deals'
+import { invalidateInteractions } from './interactions'
+import { type Approval, approveProposal, rejectProposal } from './proposals'
+import { invalidateTasks } from './tasks'
 
 type Decision = { proposal: ProposalRead; approval?: Approval; reject?: { reason: string } }
 
@@ -47,8 +51,21 @@ export function useProposalDecision(api: Api) {
   }
 }
 
-// The inbox and the badge, and whatever the change touched.
+// The inbox and the badge, then whatever the change touched, through the same
+// helpers the entity's own pages use after a write, so tag suggestions,
+// organization counts, the briefing and timelines are not left stale.
 async function invalidateAfterDecision(queryClient: QueryClient, proposal: ProposalRead) {
-  const keys = [['proposals'], [entityKeys[proposal.entity_type]], ['briefing'], ['count']]
-  await Promise.all(keys.map((queryKey) => queryClient.invalidateQueries({ queryKey })))
+  const entity = {
+    contact: invalidateContacts,
+    organization: (qc: QueryClient) =>
+      Promise.all([qc.invalidateQueries({ queryKey: ['organizations'] }), qc.invalidateQueries({ queryKey: ['contacts'] })]),
+    deal: invalidateDeals,
+    task: invalidateTasks,
+    interaction: invalidateInteractions,
+  }[proposal.entity_type]
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: ['proposals'] }),
+    queryClient.invalidateQueries({ queryKey: ['count'] }),
+    entity(queryClient),
+  ])
 }

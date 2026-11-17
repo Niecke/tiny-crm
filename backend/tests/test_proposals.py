@@ -617,3 +617,69 @@ async def test_a_decided_proposal_cannot_be_decided_again(
         for action in ("approve", "reject"):
             response = await client.post(f"{INBOX}{proposal_id}/{action}", headers=alice.headers)
             assert response.status_code == 409
+
+
+# --- Review findings ---------------------------------------------------------
+
+
+async def test_organization_proposals_list_with_current_values(
+    client: AsyncClient, alice: Account, agent: dict[str, str]
+) -> None:
+    org_id = await organization(client, alice)
+    await staged(client, agent, "organization", "update", {"name": "ACME AG"}, org_id)
+    await staged(client, agent, "organization", "archive", target_id=org_id)
+    response = await client.get(INBOX, headers=alice.headers)
+    assert response.status_code == 200
+    update, archive = response.json()["items"]
+    assert update["current"]["name"] == "ACME GmbH"
+    assert update["target_label"] == "ACME GmbH"
+    assert set(archive["current"]) == {"archived_at", "version"}
+
+
+async def test_archive_approval_with_a_stale_version_is_409(
+    client: AsyncClient, alice: Account, agent: dict[str, str]
+) -> None:
+    contact = await create_resource(client, alice, "/contacts/", {"name": "Maria"})
+    proposal_id = await staged(client, agent, "contact", "archive", target_id=contact["id"])
+    await client.patch(f"/contacts/{contact['id']}", json={"city": "Linz"}, headers=alice.headers)
+    stale = await client.post(
+        f"{INBOX}{proposal_id}/approve", json={"version": contact["version"]}, headers=alice.headers
+    )
+    assert stale.status_code == 409
+    after = (await client.get(f"/contacts/{contact['id']}", headers=alice.headers)).json()
+    assert after["archived_at"] is None
+
+
+@pytest.mark.parametrize(
+    ("entity_type", "payload"),
+    [
+        ("contact", {"name": "Maria", "known_day_rate": 100}),
+        ("deal", {"title": "Relaunch", "lost_reason": "too dear"}),
+        ("deal", {"title": "Relaunch", "value_type": "fixed", "rate": 100, "rate_unit": "day"}),
+    ],
+)
+async def test_a_create_the_router_would_refuse_is_422_at_submission(
+    client: AsyncClient,
+    agent: dict[str, str],
+    session_factory: async_sessionmaker[AsyncSession],
+    entity_type: str,
+    payload: dict[str, Any],
+) -> None:
+    response = await submit(client, agent, entity_type, "create", payload)
+    assert response.status_code == 422, response.text
+    assert await count(session_factory, AgentProposal) == 0
+    assert await count(session_factory, Contact) == 0
+    assert await count(session_factory, Deal) == 0
+
+
+async def test_an_update_the_router_would_refuse_is_422_and_changes_nothing(
+    client: AsyncClient, alice: Account, agent: dict[str, str]
+) -> None:
+    contact = await create_resource(client, alice, "/contacts/", {"name": "Maria"})
+    response = await submit(
+        client, agent, "contact", "update", {"known_day_rate": 100}, contact["id"]
+    )
+    assert response.status_code == 422
+    after = (await client.get(f"/contacts/{contact['id']}", headers=alice.headers)).json()
+    assert after["version"] == contact["version"]
+    assert after["known_day_rate"] is None
