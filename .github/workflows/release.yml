@@ -38,7 +38,7 @@ env:
   # helm push appends the chart name: this is ghcr.io/niecke/tiny-crm/charts/tinycrm.
   CHART_REGISTRY: ghcr.io/niecke/tiny-crm/charts
   # renovate: datasource=github-releases depName=helm/helm
-  HELM_VERSION: v4.3.1
+  HELM_VERSION: v4.3.2
   # renovate: datasource=github-releases depName=sigstore/cosign
   COSIGN_VERSION: v3.1.4
   # renovate: datasource=github-releases depName=anchore/syft
