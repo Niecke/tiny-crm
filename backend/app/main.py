@@ -33,6 +33,7 @@ from app.routers import (
     metrics,
     organizations,
     projects,
+    proposals,
     search,
     tags,
     tasks,
@@ -154,6 +155,7 @@ async def stale_write(request: Request, exc: StaleDataError) -> JSONResponse:
 
 app.include_router(contacts.router)
 app.include_router(captures.router)
+app.include_router(proposals.router)
 app.include_router(business_cards.router)
 app.include_router(organizations.router)
 app.include_router(deals.router)

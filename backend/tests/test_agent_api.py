@@ -570,3 +570,11 @@ async def test_planned_meetings_do_not_crowd_out_past_activity(
     assert [i["subject"] for i in body["recent_interactions"]] == ["Last call"]
     assert len(body["notes"]) < 400
     assert body["notes"].endswith("…")
+
+
+async def test_a_proposing_token_can_still_read(client: AsyncClient, alice: Account) -> None:
+    response = await client.post(
+        TOKENS, json={"name": "agent", "scopes": ["read", "propose"]}, headers=alice.headers
+    )
+    bearer = {"Authorization": f"Bearer {response.json()['token']}"}
+    assert (await client.get("/v1/agent/tasks/today", headers=bearer)).status_code == 200

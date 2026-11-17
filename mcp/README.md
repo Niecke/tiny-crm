@@ -1,9 +1,10 @@
 # tinyCRM MCP server
 
 A small [Model Context Protocol](https://modelcontextprotocol.io) server that lets
-an agent (Claude Code, Cursor, Pi, …) read tinyCRM: search, a contact, an
-organization, the open pipeline, today's tasks. It is a thin wrapper over the
-read-only agent API (`/api/v1/agent/*`, see `FEATURES.md` → *Agent API*) and
+an agent (Claude Code, Cursor, Pi, …) read tinyCRM — search, a contact, an
+organization, the open pipeline, today's tasks — and **propose** changes, which
+wait for you to approve them. It is a thin wrapper over the agent API
+(`/api/v1/agent/*`, see `FEATURES.md` → *Agent API*) and
 speaks **stdio** — the client launches it as a subprocess. It is not part of the
 backend image.
 
@@ -11,7 +12,12 @@ backend image.
 
 Account → **API tokens** → *Generate token*. The token (`tc_live_…`) is shown
 once. Make one per tool so each can be revoked on its own. A token is read-only
-and works on the agent API only.
+by default and works on the agent API only.
+
+To let the agent *propose* changes, tick **Allow proposing changes** when you
+generate the token (the `propose` scope). A proposal never writes to your CRM: it
+waits in **Approvals**, where you approve, edit or reject it. A read-only token
+can use every tool except the `tinycrm_propose_*` ones.
 
 ## Configure
 
@@ -55,8 +61,9 @@ claude mcp add tinycrm \
 
 ## Tools
 
-Each tool is one `GET` and returns the endpoint's JSON as is. Nothing that is
-null or empty is sent, to keep the answer small.
+The read tools are one `GET` each and return the endpoint's JSON as is. Nothing
+that is null or empty is sent, to keep the answer small. The propose tools are
+one `POST` each and need a token with the `propose` scope.
 
 | Tool | Arguments | Endpoint |
 | --- | --- | --- |
@@ -65,6 +72,11 @@ null or empty is sent, to keep the answer small.
 | `tinycrm_get_organization` | `organization_id` (string, from search) | `GET /v1/agent/organizations/{id}` |
 | `tinycrm_get_pipeline` | none | `GET /v1/agent/deals/open` |
 | `tinycrm_get_today_tasks` | none | `GET /v1/agent/tasks/today` |
+| `tinycrm_propose_contact_creation` | `name`, `reason`; optional `job_title`, `organization_id`, `email`, `phone`, `city`, `country`, `tags`, `notes` | `POST /v1/agent/proposals` |
+| `tinycrm_propose_contact_update` | `contact_id`, `changes` (object of contact fields), `reason` | `POST /v1/agent/proposals` |
+| `tinycrm_propose_deal_update` | `deal_id`, `changes` (object of deal fields), `reason` | `POST /v1/agent/proposals` |
+| `tinycrm_propose_task_creation` | `title`, `reason`; optional `due_date`, `priority`, `contact_id`, `deal_id`, `description` | `POST /v1/agent/proposals` |
+| `tinycrm_propose_interaction_log` | `subject`, `occurred_at`, `reason`; optional `kind` (default `note`), `notes`, `contact_ids`, `organization_ids`, `deal_ids` | `POST /v1/agent/proposals` |
 
 Search covers contacts, organizations and **open** deals (not won, lost or
 archived ones).
@@ -117,11 +129,26 @@ always covers all of them.
  "today": [{"id": "…", "title": "Call Anna", "priority": 1, "contact_name": "Anna Berger"}]}
 ```
 
+A propose tool returns `{id, status, hint}` — the proposal is `pending` until you
+approve it in tinyCRM → **Approvals**:
+
+```json
+{"id": "…", "status": "pending",
+ "hint": "pending until the operator approves it in tinyCRM → Approvals"}
+```
+
+The server checks the proposal against the same rules as the web app, so a
+proposal that could never be applied is refused at once (`invalid proposal: …`).
+Every proposal needs a `reason`; it is shown next to the change.
+
 ### Errors
 
 A tool call fails (the client shows it as a tool error) with:
 
 - `token invalid or revoked` — HTTP 401: revoked, expired, unknown, or not a `tc_live_` token;
+- `this token may not propose changes — create one with 'Allow proposing changes'` —
+  HTTP 403, from a propose tool called with a read-only token;
+- `invalid proposal: <detail>` — HTTP 422: the payload failed the entity's validation;
 - `not found` — HTTP 404: no such id, or it belongs to another account;
 - `tinyCRM answered <status>: <detail>` — anything else, e.g. a search shorter than two characters;
 - `could not reach tinyCRM: <error>` — network failure.

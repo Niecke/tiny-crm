@@ -353,6 +353,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/proposals/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Proposals
+         * @description The caller's proposals, oldest first: the ones waiting longest go stale.
+         */
+        get: operations["list_proposals_proposals__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/proposals/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Count Proposals
+         * @description How many are waiting: the nav badge, without pulling the rows.
+         */
+        get: operations["count_proposals_proposals_count_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/proposals/{proposal_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve Proposal
+         * @description Apply the change and mark it approved, or change nothing at all.
+         *
+         *     With a `payload` the reviewer's edit is applied instead of the agent's, and
+         *     kept in `applied_payload`; `version` refuses the approval (409) if the target
+         *     changed since the reviewer loaded it. An error from the change itself raises
+         *     before the one commit below, so the session rolls back and the proposal
+         *     stays pending.
+         */
+        post: operations["approve_proposal_proposals__proposal_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/proposals/{proposal_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reject Proposal
+         * @description Dismiss it, with an optional note. No CRM data changes.
+         */
+        post: operations["reject_proposal_proposals__proposal_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/business-cards/scan": {
         parameters: {
             query?: never;
@@ -1624,6 +1710,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/agent/proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Submit Proposal
+         * @description Stage a create, update or archive for the operator to approve.
+         *
+         *     Checked now against the entity's own schema, so a proposal that could never
+         *     be applied is refused at once instead of waiting in the inbox. Nothing in the
+         *     CRM changes.
+         */
+        post: operations["submit_proposal_v1_agent_proposals_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/version": {
         parameters: {
             query?: never;
@@ -1906,6 +2016,13 @@ export interface components {
             name: string;
             /** Expires At */
             expires_at?: string | null;
+            /**
+             * Scopes
+             * @default [
+             *       "read"
+             *     ]
+             */
+            scopes: ("read" | "propose")[];
         };
         /**
          * ApiTokenCreated
@@ -3706,6 +3823,146 @@ export interface components {
             /** Document Ids */
             document_ids?: string[] | null;
         };
+        /**
+         * ProposalApprove
+         * @description Approve as proposed (empty body), or with what the reviewer edited.
+         */
+        ProposalApprove: {
+            /** Payload */
+            payload?: {
+                [key: string]: unknown;
+            } | null;
+            /** Version */
+            version?: number | null;
+        };
+        /** ProposalCount */
+        ProposalCount: {
+            /** Pending */
+            pending: number;
+        };
+        /**
+         * ProposalCreate
+         * @description What an agent sends: a change, and why.
+         *
+         *     `payload` holds exactly the fields of the entity's own Create (for a
+         *     create) or Update (for an update) schema; app/proposals.py validates it
+         *     against that schema, so a proposal can never hold something the real
+         *     endpoint would refuse.
+         */
+        ProposalCreate: {
+            /**
+             * Entity Type
+             * @enum {string}
+             */
+            entity_type: "contact" | "organization" | "deal" | "task" | "interaction";
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "create" | "update" | "archive";
+            /** Target Id */
+            target_id?: string | null;
+            /**
+             * Payload
+             * @default {}
+             */
+            payload: {
+                [key: string]: unknown;
+            };
+            /** Reason */
+            reason: string;
+        };
+        /** ProposalPage */
+        ProposalPage: {
+            /** Items */
+            items: components["schemas"]["ProposalRead"][];
+            /** Total */
+            total: number;
+            /** Skip */
+            skip: number;
+            /** Limit */
+            limit: number;
+            /**
+             * Labels
+             * @default {}
+             */
+            labels: {
+                [key: string]: string;
+            };
+        };
+        /** ProposalRead */
+        ProposalRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Entity Type
+             * @enum {string}
+             */
+            entity_type: "contact" | "organization" | "deal" | "task" | "interaction";
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "create" | "update" | "archive";
+            /** Target Id */
+            target_id?: string | null;
+            /** Proposed Payload */
+            proposed_payload: {
+                [key: string]: unknown;
+            };
+            /** Applied Payload */
+            applied_payload?: {
+                [key: string]: unknown;
+            } | null;
+            /** Reason */
+            reason: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "approved" | "rejected";
+            /** Rejection Reason */
+            rejection_reason?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Reviewed At */
+            reviewed_at?: string | null;
+            /** Token Name */
+            token_name?: string | null;
+            /** Current */
+            current?: {
+                [key: string]: unknown;
+            } | null;
+            /** Target Label */
+            target_label?: string | null;
+        };
+        /** ProposalReject */
+        ProposalReject: {
+            /** Rejection Reason */
+            rejection_reason?: string | null;
+        };
+        /**
+         * ProposalSubmitted
+         * @description The compact answer an agent gets back.
+         */
+        ProposalSubmitted: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "approved" | "rejected";
+        };
         /** RefreshTokenBody */
         RefreshTokenBody: {
             /** Refresh Token */
@@ -5089,6 +5346,130 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CaptureRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_proposals_proposals__get: {
+        parameters: {
+            query?: {
+                status?: "pending" | "approved" | "rejected";
+                entity_type?: ("contact" | "organization" | "deal" | "task" | "interaction") | null;
+                skip?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    count_proposals_proposals_count_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalCount"];
+                };
+            };
+        };
+    };
+    approve_proposal_proposals__proposal_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ProposalApprove"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_proposal_proposals__proposal_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ProposalReject"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalRead"];
                 };
             };
             /** @description Validation Error */
@@ -7838,6 +8219,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AgentTasks"];
+                };
+            };
+        };
+    };
+    submit_proposal_v1_agent_proposals_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposalCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalSubmitted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

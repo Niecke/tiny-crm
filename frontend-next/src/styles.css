@@ -1347,6 +1347,7 @@ a {
   display: grid;
   place-items: start center;
   padding: 12vh var(--space-4) var(--space-4);
+  overflow-y: auto;
   background: rgb(58 51 42 / 0.3);
 }
 
@@ -3123,4 +3124,78 @@ textarea.input {
 .popover.day-popover {
   width: 300px;
   max-width: calc(100vw - 2 * var(--space-3));
+}
+
+/* Approvals: what agents propose, waiting for a decision. */
+.proposal-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.proposal-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+}
+
+.proposal-title {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.proposal-reason {
+  margin: var(--space-3) 0 var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--color-border);
+  white-space: pre-wrap;
+}
+
+.proposal-fields {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-1) var(--space-4);
+  margin: var(--space-3) 0;
+}
+
+.proposal-fields>div {
+  display: contents;
+}
+
+.proposal-fields dt {
+  color: var(--color-muted, inherit);
+}
+
+.proposal-fields dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.proposal-diff {
+  width: 100%;
+  margin: var(--space-3) 0;
+  border-collapse: collapse;
+}
+
+.proposal-diff th,
+.proposal-diff td {
+  padding: var(--space-1) var(--space-2);
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.proposal-diff tbody tr[data-changed] td:last-child {
+  font-weight: 600;
+  background: var(--color-sidebar);
+}
+
+.proposal-actions,
+.proposal-outcome {
+  margin-top: var(--space-3);
 }

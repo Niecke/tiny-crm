@@ -88,9 +88,32 @@ async def test_an_expiry_without_a_timezone_is_refused(client: AsyncClient, alic
     assert response.status_code == 422
 
 
-async def test_scopes_are_not_client_settable(client: AsyncClient, alice: Account) -> None:
-    created = await make(client, alice, scopes=["write"])
-    assert created["scopes"] == ["read"]
+async def test_a_token_is_read_only_unless_it_asks_to_propose(
+    client: AsyncClient, alice: Account
+) -> None:
+    assert (await make(client, alice))["scopes"] == ["read"]
+
+
+async def test_a_token_can_be_allowed_to_propose(client: AsyncClient, alice: Account) -> None:
+    created = await make(client, alice, scopes=["read", "propose"])
+    assert created["scopes"] == ["read", "propose"]
+    [listed] = (await client.get(URL, headers=alice.headers)).json()
+    assert listed["scopes"] == ["read", "propose"]
+
+
+async def test_read_is_always_included(client: AsyncClient, alice: Account) -> None:
+    assert (await make(client, alice, scopes=["propose"]))["scopes"] == ["read", "propose"]
+    assert (await make(client, alice, scopes=["propose", "read", "propose"]))["scopes"] == [
+        "read",
+        "propose",
+    ]
+
+
+async def test_an_unknown_scope_is_refused(client: AsyncClient, alice: Account) -> None:
+    response = await client.post(
+        URL, json={"name": "x", "scopes": ["write"]}, headers=alice.headers
+    )
+    assert response.status_code == 422
 
 
 async def test_a_token_past_its_expiry_is_listed_as_expired(

@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import current_active_user
-from app.auth.api_tokens import SCOPES, ApiToken, hash_token, new_token
+from app.auth.api_tokens import ApiToken, hash_token, new_token
 from app.auth.sessions import lock_open_session
 from app.auth.users import User, current_session_id
 from app.db import get_session
@@ -73,7 +73,7 @@ async def create_api_token(
         user_id=user.id,
         name=body.name,
         token_hash=hash_token(raw),
-        scopes=list(SCOPES),
+        scopes=list(body.scopes),
         expires_at=body.expires_at,
     )
     session.add(token)

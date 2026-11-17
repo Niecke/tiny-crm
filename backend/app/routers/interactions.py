@@ -153,28 +153,36 @@ async def get_interaction(
     return InteractionRead.model_validate(await _get_owned(session, interaction_id, user))
 
 
+async def apply_create(session: AsyncSession, body: InteractionCreate, user: User) -> Interaction:
+    """Validate and add an interaction without committing.
+
+    Split from the route so that approving an agent proposal (#321) runs exactly
+    this, in the same transaction that marks the proposal approved.
+    """
+    link_fields = {field for field, *_ in LINKS}
+    interaction = Interaction(**body.model_dump(exclude=link_fields), user_id=user.id)
+    await _apply_links(session, interaction, body.model_dump(), user.id)
+    session.add(interaction)
+    await session.flush()
+    return interaction
+
+
 @router.post("/", response_model=InteractionRead, status_code=201)
 async def create_interaction(
     body: InteractionCreate,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(current_active_user),
 ) -> InteractionRead:
-    link_fields = {field for field, *_ in LINKS}
-    interaction = Interaction(**body.model_dump(exclude=link_fields), user_id=user.id)
-    await _apply_links(session, interaction, body.model_dump(), user.id)
-    session.add(interaction)
+    interaction = await apply_create(session, body, user)
     await session.commit()
     await session.refresh(interaction)
     return InteractionRead.model_validate(interaction)
 
 
-@router.patch("/{interaction_id}", response_model=InteractionRead)
-async def update_interaction(
-    interaction_id: UUID,
-    body: InteractionUpdate,
-    session: AsyncSession = Depends(get_session),
-    user: User = Depends(current_active_user),
-) -> InteractionRead:
+async def apply_update(
+    session: AsyncSession, interaction_id: UUID, body: InteractionUpdate, user: User
+) -> Interaction:
+    """Validate and apply an interaction change without committing."""
     interaction = await _get_owned(session, interaction_id, user)
     require_live(interaction, "Interaction")
     updates = body.model_dump(exclude_unset=True)
@@ -186,6 +194,17 @@ async def update_interaction(
         if not field.endswith("_ids"):
             setattr(interaction, field, value)
     record_update(session, user, interaction, before)
+    return interaction
+
+
+@router.patch("/{interaction_id}", response_model=InteractionRead)
+async def update_interaction(
+    interaction_id: UUID,
+    body: InteractionUpdate,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_active_user),
+) -> InteractionRead:
+    interaction = await apply_update(session, interaction_id, body, user)
     await session.commit()
     await session.refresh(interaction)
     return InteractionRead.model_validate(interaction)

@@ -27,6 +27,7 @@ from app.models.document import Document
 from app.models.interaction import Interaction
 from app.models.organization import Organization
 from app.models.project import Project
+from app.models.proposal import AgentProposal
 
 # Registers the search indexes on the tables above; see the module.
 from app.models.search import SEARCHABLES
@@ -34,6 +35,7 @@ from app.models.task import Task
 from app.models.watch import Watch, WatchCheck
 
 __all__ = [
+    "AgentProposal",
     "ApiToken",
     "AuditEvent",
     "Capture",

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { expiresAt, statusLabel, statusTone } from './apiTokens'
+import { expiresAt, scopesFor, scopesLabel, statusLabel, statusTone } from './apiTokens'
 
 describe('expiresAt', () => {
   const now = new Date('2026-11-11T10:00:00.000Z')
@@ -25,5 +25,17 @@ describe('status', () => {
     expect(statusTone('active')).toBe('success')
     expect(statusTone('expired')).toBe('warning')
     expect(statusTone('revoked')).toBe('danger')
+  })
+})
+
+describe('scopes', () => {
+  test('are listed in the order they were granted', () => {
+    expect(scopesLabel(['read'])).toBe('read')
+    expect(scopesLabel(['read', 'propose'])).toBe('read · propose')
+  })
+
+  test('always include reading, and propose only when allowed', () => {
+    expect(scopesFor(false)).toEqual(['read'])
+    expect(scopesFor(true)).toEqual(['read', 'propose'])
   })
 })

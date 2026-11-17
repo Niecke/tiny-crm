@@ -652,15 +652,17 @@ shows an archived row.
 
 ## Agent API
 
-Read-only context for external agents (Claude Code, Cursor, Pi, scripts), #320.
+Context for external agents (Claude Code, Cursor, Pi, scripts), #320, and
+proposals they stage for approval, #321.
 
 - **Tokens.** Account → *API tokens* (`/account/api-tokens`): list (name,
-  created, last used, status), *Generate token* (name, expiry never/30/90/365
-  days; the secret is shown once with a copy button), *Revoke* with confirm.
+  created, last used, status, scopes), *Generate token* (name, expiry
+  never/30/90/365 days, *Allow proposing changes*; the secret is shown once with a copy button), *Revoke* with confirm.
   Revoked and expired tokens stay listed. API: `GET`/`POST /users/me/api-tokens/`
   and `POST /users/me/api-tokens/{id}/revoke`, session login only (a token cannot
   manage tokens). Table `api_tokens` (`token_hash` HMAC-SHA256, `scopes` default
-  `{read}`, `expires_at`, `revoked_at`, `last_used_at`). `last_used_at` is
+  `{read}`, `{read,propose}` when allowed at creation (read is always
+  included; scopes of an existing token do not change), `expires_at`, `revoked_at`, `last_used_at`). `last_used_at` is
   written at most once a minute per token.
 - **Authentication.** `Authorization: Bearer tc_live_…` or
   `X-API-Key: tc_live_…`. Missing, unknown, revoked, expired tokens and those of
@@ -677,10 +679,43 @@ Read-only context for external agents (Claude Code, Cursor, Pi, scripts), #320.
   - `GET /deals/open` — open deals in stage order with `days_in_stage`, and
     `totals` of expected value per currency; capped at 200 (`truncated`).
   - `GET /tasks/today` — open `overdue` and `today` tasks in `BRIEFING_TIMEZONE`.
+  - `POST /proposals` — stage a create, update or archive (below); needs the
+    `propose` scope (403 without), the only non-GET route here.
 - **MCP server** (`mcp/`, own uv project, stdio): tools `tinycrm_search`,
   `tinycrm_get_contact`, `tinycrm_get_organization`, `tinycrm_get_pipeline`,
-  `tinycrm_get_today_tasks`; `TINYCRM_URL` and `TINYCRM_API_TOKEN`. See
+  `tinycrm_get_today_tasks`, and the proposal tools
+  `tinycrm_propose_contact_creation`, `tinycrm_propose_contact_update`,
+  `tinycrm_propose_deal_update`, `tinycrm_propose_task_creation`,
+  `tinycrm_propose_interaction_log`; `TINYCRM_URL` and `TINYCRM_API_TOKEN`. See
   `mcp/README.md`. Checked by the `MCP server checks` CI job.
+- **Proposals and approvals** (#321). An agent never writes to the CRM: it
+  stages a change in `agent_proposals` (entity `contact`, `organization`,
+  `deal`, `task` or `interaction`; action `create`, `update` or `archive`;
+  payload; a required `reason`; the submitting token). The payload is checked at
+  once against the entity's own Create (or, for an update, Update) schema, and
+  every id in it (and the target) must be the caller's: 422 for an invalid
+  payload, a `version` in the payload, an empty update or a non-empty archive;
+  404 for a missing or foreign id; 409 for an archived target.
+  - *Approvals* (`/approvals`, nav badge with the pending count): one card per
+    proposal with the agent's reason and token name. A create previews every
+    proposed field, an update shows Current | Proposed with the changed rows
+    marked, an archive names the record. **Approve** and **Reject** (with an
+    optional note) act in one click and the card leaves the list at once; if the
+    request fails it comes back with the error. **Edit** opens the entity's
+    normal form prefilled, and saving it approves with the edited payload (kept
+    in `applied_payload`; the agent's original stays in `proposed_payload`).
+    Tabs Pending / Approved / Rejected; a decided card links to the record.
+  - API, session login only (a token gets 401): `GET /proposals/` (`status`,
+    default `pending`; `entity_type`; oldest first; paged, with `current` values
+    for updates, `token_name` and a `labels` map of ids to names),
+    `GET /proposals/count`, `POST /proposals/{id}/approve` (optional
+    `{payload, version}`: 409 if the target changed since the reviewer loaded
+    it) and `POST /proposals/{id}/reject` (optional `rejection_reason`, ≤ 2000).
+    Another user's proposal is 404; one already decided is 409.
+  - Approving runs the same code as the session routes (validation, change
+    history, deal stage events, task recurrence) in one transaction with
+    marking the proposal approved: an error leaves the CRM unchanged and the
+    proposal pending. After a create, `target_id` holds the new record.
 
 ---
 
@@ -737,7 +772,8 @@ Read-only context for external agents (Claude Code, Cursor, Pi, scripts), #320.
   carries a verify token.
 - **API tokens** (#320, `app/auth/api_tokens.py`): `tc_live_…` credentials for
   agents, made on the account page. Stored as HMAC-SHA256 (keyed with JWT_SECRET) only; the raw token is
-  shown once. Read-only by scope, accepted on `/v1/agent/*` and nowhere else
+  shown once. Read-only by default (`propose` stages changes for approval, it
+  never writes to the CRM), accepted on `/v1/agent/*` and nowhere else
   (a session JWT is refused there, a token everywhere else). Revoked by a
   password *reset*; a password *change* leaves them.
 - **Login throttle** (`app/ratelimit.py`): sliding window of *failed* logins per

@@ -199,30 +199,41 @@ async def get_task(
     return await _get_owned(session, task_id, user)
 
 
-@router.post("/", response_model=TaskRead, status_code=201)
-async def create_task(
-    body: TaskCreate,
-    session: AsyncSession = Depends(get_session),
-    user: User = Depends(current_active_user),
-) -> Task:
+async def apply_create(session: AsyncSession, body: TaskCreate, user: User) -> Task:
+    """Validate and add a task without committing.
+
+    Split from the route so that approving an agent proposal (#321) runs exactly
+    this, in the same transaction that marks the proposal approved.
+    """
     await _check_links(session, body.model_dump(), user)
     task = Task(**body.model_dump(), user_id=user.id)
     # Entered as already done: it was completed as far as anyone can say now.
     if task.done:
         task.completed_at = datetime.now(UTC)
     session.add(task)
+    await session.flush()
+    return task
+
+
+@router.post("/", response_model=TaskRead, status_code=201)
+async def create_task(
+    body: TaskCreate,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_active_user),
+) -> Task:
+    task = await apply_create(session, body, user)
     await session.commit()
     await session.refresh(task)
     return task
 
 
-@router.patch("/{task_id}", response_model=TaskCompletionRead)
-async def update_task(
-    task_id: UUID,
-    body: TaskUpdate,
-    session: AsyncSession = Depends(get_session),
-    user: User = Depends(current_active_user),
-) -> TaskCompletionRead:
+async def apply_update(
+    session: AsyncSession, task_id: UUID, body: TaskUpdate, user: User
+) -> tuple[Task, Task | None]:
+    """Validate and apply a task change without committing.
+
+    Returns the task and the next occurrence it spawned, if completing it did.
+    """
     task = await _get_owned(session, task_id, user)
     # Which also keeps an archived task from being completed, and so from
     # spawning the next one of a series nobody is looking at.
@@ -260,7 +271,17 @@ async def update_task(
     successor = None
     if task.done and not was_done:
         successor = await _spawn_next_occurrence(session, task)
+    return task, successor
 
+
+@router.patch("/{task_id}", response_model=TaskCompletionRead)
+async def update_task(
+    task_id: UUID,
+    body: TaskUpdate,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(current_active_user),
+) -> TaskCompletionRead:
+    task, successor = await apply_update(session, task_id, body, user)
     await session.commit()
     await session.refresh(task)
     completed = TaskCompletionRead.model_validate(task)

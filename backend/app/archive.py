@@ -84,8 +84,8 @@ class Record(Archivable, Versioned):
     """
 
 
-async def set_archived(session: AsyncSession, row: Record, archived: bool, actor: "User") -> None:
-    """Archive or restore `row`, and commit.
+def mark_archived(session: AsyncSession, row: Record, archived: bool, actor: "User") -> None:
+    """Archive or restore `row` in the open transaction, without committing.
 
     Both directions can be repeated without harm. Archiving again keeps the
     first timestamp: it says when the record was put away, not when someone
@@ -95,5 +95,10 @@ async def set_archived(session: AsyncSession, row: Record, archived: bool, actor
     if archived != (row.archived_at is not None):
         row.archived_at = datetime.now(UTC) if archived else None
         record(session, actor, row, "archive" if archived else "restore")
+
+
+async def set_archived(session: AsyncSession, row: Record, archived: bool, actor: "User") -> None:
+    """`mark_archived`, then commit."""
+    mark_archived(session, row, archived, actor)
     await session.commit()
     await session.refresh(row)
