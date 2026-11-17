@@ -437,6 +437,32 @@ async def test_approving_an_archive_archives_the_record(
     assert after["archived_at"] is not None
 
 
+async def test_approving_a_completion_spawns_the_next_recurring_task(
+    client: AsyncClient, alice: Account, agent: dict[str, str]
+) -> None:
+    task = await create_resource(
+        client,
+        alice,
+        "/tasks/",
+        {
+            "title": "Monthly check",
+            "due_date": "2026-12-01T09:00:00Z",
+            "recurrence_rule": "monthly",
+        },
+    )
+    proposal_id = await staged(
+        client, agent, "task", "update", {"done": True}, target_id=str(task["id"])
+    )
+    response = await client.post(f"{INBOX}{proposal_id}/approve", headers=alice.headers)
+    assert response.status_code == 200, response.text
+    tasks = (await client.get("/tasks/", headers=alice.headers)).json()
+    items = tasks["items"] if isinstance(tasks, dict) else tasks
+    successors = [t for t in items if t.get("recurrence_parent_id") == task["id"]]
+    assert len(successors) == 1
+    assert successors[0]["done"] is False
+    assert successors[0]["title"] == "Monthly check"
+
+
 async def test_approving_an_update_writes_the_change_history(
     client: AsyncClient,
     alice: Account,
