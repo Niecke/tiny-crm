@@ -348,8 +348,9 @@ auth is the part only a phone can prove.
 - **Routes** in `src/routes/`; everything behind the login sits under the
   pathless `_authed` layout. A record type gets `index` (list), `new`,
   `$id/index` (detail) and `$id/edit`.
-- **Record pages** share one shape: a facts column (label above value) on the
-  left, linked records in tabs on the right, the tab in `?tab=`.
+- **Record pages** share one shape: facts (label above value) and a notes
+  panel in the main column, linked records in tabs beside it, the tab in
+  `?tab=`. From 1440px both columns are wide (#401).
 - **Lists** show how many rows they are not showing rather than stopping
   silently at the page limit.
 - **Archive, then delete** (#140). A record page offers Archive, with no

@@ -2,7 +2,9 @@ import type { UseQueryResult } from '@tanstack/react-query'
 import { Children, type ReactNode } from 'react'
 
 // The pieces every record page is built from (FRONTEND.md, "Record pages"):
-// a facts column on the left, linked records in tabs on the right.
+// a main column (facts, then notes) and a side column with the linked records
+// in tabs. Below 1440px the facts stay a narrow column beside the tabs; from
+// 1440px both columns are wide.
 
 // Label above value: the column is narrow, so the eye reads straight down
 // instead of jumping across a wide row from label to value. Children are the
@@ -14,6 +16,22 @@ export function Facts({ children, before }: { children: ReactNode; before?: Reac
       {before}
       {facts.length === 0 ? <p className="muted small">No details yet.</p> : <dl>{facts}</dl>}
     </aside>
+  )
+}
+
+// The main column of a record page: facts, then the notes panel, as one grid cell.
+export function ProfileMain({ children }: { children: ReactNode }) {
+  return <div className="profile-main">{children}</div>
+}
+
+// Notes (or a description) as a panel of their own, at the full width of the
+// main column, instead of one squeezed fact.
+export function Notes({ label = 'Notes', children }: { label?: string; children: ReactNode }) {
+  return (
+    <section className="panel record-notes" aria-label={label}>
+      <h2 className="record-notes-title">{label}</h2>
+      <div className="record-notes-body">{children}</div>
+    </section>
   )
 }
 

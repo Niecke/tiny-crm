@@ -293,7 +293,7 @@ export function DealForm({
             )}
           />
         </div>
-        <FormTextField control={control} name="notes" label="Notes" rows={4} />
+        <FormTextField control={control} name="notes" label="Notes" rows={10} />
       </fieldset>
 
       {error && (

@@ -11,7 +11,7 @@ import { useArchive } from '../../../../useArchive'
 import { DocumentRows } from '../../../../components/DocumentRows'
 import { InteractionList } from '../../../../components/InteractionList'
 import { Markdown } from '../../../../components/Markdown'
-import { Fact, Facts } from '../../../../components/RecordPage'
+import { Notes, ProfileMain } from '../../../../components/RecordPage'
 import { TaskList } from '../../../../components/TaskList'
 import { Button } from '../../../../components/ui/Button'
 import { Checkbox } from '../../../../components/ui/Checkbox'
@@ -128,7 +128,7 @@ function ProjectDetail() {
   const without = (ids: string[], id: string) => ids.filter((x) => x !== id)
 
   return (
-    <div className="page">
+    <div className="page page-record">
       {back}
 
       <ArchivedNotice record={p} noun="project" name={p.name} archiving={archiving}>
@@ -162,13 +162,13 @@ function ProjectDetail() {
       )}
 
       <div className="profile">
-        <Facts>
+        <ProfileMain>
           {p.description && (
-            <Fact label="Description">
+            <Notes label="Description">
               <Markdown>{p.description}</Markdown>
-            </Fact>
+            </Notes>
           )}
-        </Facts>
+        </ProfileMain>
 
         <Tabs
           className="panel"

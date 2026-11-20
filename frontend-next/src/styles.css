@@ -1087,6 +1087,37 @@ a {
   padding: var(--space-4) var(--space-5);
 }
 
+/* Facts, then the notes panel: one cell of the .profile grid. */
+.profile-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.record-notes {
+  padding: var(--space-4) var(--space-5);
+}
+
+.record-notes-title {
+  margin: 0 0 var(--space-3);
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+/* No inner scroll box: the notes are as tall as they are. */
+.record-notes-body {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+  max-width: 80ch;
+}
+
+.record-notes-body .markdown {
+  white-space: normal;
+}
+
 .facts dl {
   margin: 0;
   display: flex;
@@ -2554,6 +2585,19 @@ textarea.input {
   max-width: 100%;
   border: 1px solid var(--color-border);
   box-shadow: 0 2px 6px rgb(58 51 42 / 0.08);
+}
+
+/* Record pages use the width of a large monitor: facts and notes in a wide
+   main column, linked records beside it. The app bar follows the page. */
+@media (min-width: 1440px) {
+  .page.page-record,
+  .main:has(.page-record) .appbar {
+    max-width: 1600px;
+  }
+
+  .profile {
+    grid-template-columns: minmax(0, 3fr) minmax(360px, 2fr);
+  }
 }
 
 /* ---------- Deals ---------- */

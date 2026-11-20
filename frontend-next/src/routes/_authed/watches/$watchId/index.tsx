@@ -6,7 +6,7 @@ import { ApiError } from '../../../../api/client'
 import { ArchiveButton, ArchivedNotice } from '../../../../components/Archive'
 import { useArchive } from '../../../../useArchive'
 import { CheckDialog } from '../../../../components/CheckDialog'
-import { Fact, Facts } from '../../../../components/RecordPage'
+import { Fact, Facts, Notes, ProfileMain } from '../../../../components/RecordPage'
 import { Button } from '../../../../components/ui/Button'
 import { Pagination } from '../../../../components/ui/Pagination'
 import { PAGE_SIZE } from '../../../../contacts'
@@ -92,7 +92,7 @@ function WatchDetail() {
   const due = isDue(w, now)
 
   return (
-    <div className="page">
+    <div className="page page-record">
       {back}
 
       <ArchivedNotice record={w} noun="source" name={w.name} archiving={archiving}>
@@ -160,29 +160,31 @@ function WatchDetail() {
       </section>
 
       <div className="profile">
-        <Facts>
-          <Fact label="Web address">
-            <a href={url} target="_blank" rel="noreferrer">
-              {w.url}
-            </a>
-          </Fact>
-          {w.query_note && <Fact label="What to look for">{w.query_note}</Fact>}
-          <Fact label="Status">
-            {w.active ? (
-              'Active'
-            ) : w.archived_at ? (
-              'Paused'
-            ) : (
-              <>
-                Paused{' '}
-                <Button variant="quiet" className="link-button" onPress={() => pause.mutate(true)}>
-                  Resume
-                </Button>
-              </>
-            )}
-          </Fact>
-          {w.notes && <Fact label="Notes">{w.notes}</Fact>}
-        </Facts>
+        <ProfileMain>
+          <Facts>
+            <Fact label="Web address">
+              <a href={url} target="_blank" rel="noreferrer">
+                {w.url}
+              </a>
+            </Fact>
+            {w.query_note && <Fact label="What to look for">{w.query_note}</Fact>}
+            <Fact label="Status">
+              {w.active ? (
+                'Active'
+              ) : w.archived_at ? (
+                'Paused'
+              ) : (
+                <>
+                  Paused{' '}
+                  <Button variant="quiet" className="link-button" onPress={() => pause.mutate(true)}>
+                    Resume
+                  </Button>
+                </>
+              )}
+            </Fact>
+          </Facts>
+          {w.notes && <Notes>{w.notes}</Notes>}
+        </ProfileMain>
 
         <section className="panel" aria-labelledby="history-heading">
           <div className="panel-header">
