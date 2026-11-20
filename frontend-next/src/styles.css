@@ -1083,6 +1083,11 @@ a {
   align-items: start;
 }
 
+/* A record with nothing in the main column: the linked records take the row. */
+.profile.profile-solo {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .facts {
   padding: var(--space-4) var(--space-5);
 }
@@ -2597,6 +2602,10 @@ textarea.input {
 
   .profile {
     grid-template-columns: minmax(0, 3fr) minmax(360px, 2fr);
+  }
+
+  .profile.profile-solo {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

@@ -161,14 +161,14 @@ function ProjectDetail() {
         </p>
       )}
 
-      <div className="profile">
-        <ProfileMain>
-          {p.description && (
+      <div className={p.description ? 'profile' : 'profile profile-solo'}>
+        {p.description && (
+          <ProfileMain>
             <Notes label="Description">
               <Markdown>{p.description}</Markdown>
             </Notes>
-          )}
-        </ProfileMain>
+          </ProfileMain>
+        )}
 
         <Tabs
           className="panel"
