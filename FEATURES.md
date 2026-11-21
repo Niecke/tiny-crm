@@ -699,7 +699,8 @@ proposals they stage for approval, #321.
   - *Approvals* (`/approvals`, nav badge with the pending count): one card per
     proposal with the agent's reason and token name. A create previews every
     proposed field, an update shows Current | Proposed with the changed rows
-    marked, an archive names the record. **Approve** and **Reject** (with an
+    marked and the unchanged ones muted (on a phone each row stacks: field, then
+    Current, then Proposed), an archive names the record. **Approve** and **Reject** (with an
     optional note) act in one click and the card leaves the list at once; if the
     request fails it comes back with the error. **Edit** opens the entity's
     normal form prefilled, and saving it approves with the edited payload (kept
