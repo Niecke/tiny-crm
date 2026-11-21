@@ -10,7 +10,7 @@ import { useArchive } from '../../../../useArchive'
 import { DocumentRows } from '../../../../components/DocumentRows'
 import { InteractionList } from '../../../../components/InteractionList'
 import { LostReasonDialog } from '../../../../components/LostReasonDialog'
-import { Fact, Facts } from '../../../../components/RecordPage'
+import { Fact, Facts, Notes, ProfileMain } from '../../../../components/RecordPage'
 import { TaskList } from '../../../../components/TaskList'
 import { Checkbox } from '../../../../components/ui/Checkbox'
 import { Select } from '../../../../components/ui/Select'
@@ -100,7 +100,7 @@ function DealDetail() {
   }
 
   return (
-    <div className="page">
+    <div className="page page-record">
       {back}
 
       <ArchivedNotice record={d} noun="deal" name={d.title} archiving={archiving}>
@@ -141,7 +141,10 @@ function DealDetail() {
       )}
 
       <div className="profile">
-        <DealFacts deal={d} onMove={(stage) => mover.move(d, stage)} moving={mover.pendingId === d.id} />
+        <ProfileMain>
+          <DealFacts deal={d} onMove={(stage) => mover.move(d, stage)} moving={mover.pendingId === d.id} />
+          {d.notes && <Notes>{d.notes}</Notes>}
+        </ProfileMain>
 
         <Tabs
           className="panel"
@@ -276,7 +279,6 @@ function DealFacts({ deal: d, onMove, moving }: { deal: DealRead; onMove: (stage
       {d.closed_at && <Fact label="Decided">{formatDateTime(d.closed_at)}</Fact>}
       {d.probability != null && <Fact label="Probability">{d.probability}%</Fact>}
       {d.lost_reason && <Fact label="Lost because">{d.lost_reason}</Fact>}
-      {d.notes && <Fact label="Notes">{d.notes}</Fact>}
     </Facts>
   )
 }

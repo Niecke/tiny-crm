@@ -89,7 +89,7 @@ export function OrganizationForm({
       </div>
 
       <FormTextField control={control} name="address" label="Address" rows={2} />
-      <FormTextField control={control} name="notes" label="Notes" rows={4} />
+      <FormTextField control={control} name="notes" label="Notes" rows={10} />
 
       {error && (
         <p className="form-error" role="alert">

@@ -7,7 +7,7 @@ import { ApiError } from '../../../../api/client'
 import type { OrganizationRead } from '../../../../api/types'
 import { ArchiveButton, ArchivedNotice } from '../../../../components/Archive'
 import { useArchive } from '../../../../useArchive'
-import { Fact, Facts, Rows } from '../../../../components/RecordPage'
+import { Fact, Facts, Notes, ProfileMain, Rows } from '../../../../components/RecordPage'
 import { useSelectedTabInView } from '../../../../useSelectedTabInView'
 import {
   archiveOrganization,
@@ -90,7 +90,7 @@ function OrganizationDetail() {
   }
 
   return (
-    <div className="page">
+    <div className="page page-record">
       <Link to="/organizations" search={filters} className="back-link">
         ← Organizations
       </Link>
@@ -120,7 +120,10 @@ function OrganizationDetail() {
       </header>
 
       <div className="profile">
-        <OrgFacts org={o} />
+        <ProfileMain>
+          <OrgFacts org={o} />
+          {o.notes && <Notes>{o.notes}</Notes>}
+        </ProfileMain>
 
         {/* React Aria's Tabs: arrow keys move between tabs, and the tablist /
             tabpanel roles and their links are set up for screen readers. The
@@ -235,7 +238,7 @@ function OrganizationDetail() {
 
 // Only http(s) is passed through, so the field cannot become a javascript: link.
 function OrgFacts({ org }: { org: OrganizationRead }) {
-  const { domain, email, phone, address, notes } = org
+  const { domain, email, phone, address } = org
   // Stored as a bare domain, but an older record may hold a full URL.
   const website = domain && (/^https?:\/\//i.test(domain) ? domain : `https://${domain}`)
 
@@ -259,7 +262,6 @@ function OrgFacts({ org }: { org: OrganizationRead }) {
         </Fact>
       )}
       {address && <Fact label="Address">{address}</Fact>}
-      {notes && <Fact label="Notes">{notes}</Fact>}
     </Facts>
   )
 }

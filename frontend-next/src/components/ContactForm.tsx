@@ -288,7 +288,7 @@ export function ContactForm({
       <fieldset className="form-section">
         <legend>Filing</legend>
         <FormTagPicker control={control} name="tags" label="Tags" description="Separated by commas." />
-        <FormTextField control={control} name="notes" label="Notes" rows={4} />
+        <FormTextField control={control} name="notes" label="Notes" rows={10} />
       </fieldset>
 
       {error && (

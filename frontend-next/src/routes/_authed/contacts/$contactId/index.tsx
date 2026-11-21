@@ -7,7 +7,7 @@ import { ApiError } from '../../../../api/client'
 import type { ContactRead, InteractionRead, TaskRead, TimelineItemType } from '../../../../api/types'
 import { ArchiveButton, ArchivedNotice } from '../../../../components/Archive'
 import { useArchive } from '../../../../useArchive'
-import { Fact, Facts } from '../../../../components/RecordPage'
+import { Fact, Facts, Notes, ProfileMain } from '../../../../components/RecordPage'
 import { useSelectedTabInView } from '../../../../useSelectedTabInView'
 import {
   archiveContact,
@@ -119,7 +119,7 @@ function ContactDetail() {
   }
 
   return (
-    <div className="page">
+    <div className="page page-record">
       {back}
 
       <ArchivedNotice record={c} noun="contact" name={c.name} archiving={archiving}>
@@ -165,7 +165,10 @@ function ContactDetail() {
       {exportError && <p className="form-error">{exportError}</p>}
 
       <div className="profile">
-        <ContactFacts contact={c} />
+        <ProfileMain>
+          <ContactFacts contact={c} />
+          {c.notes && <Notes>{c.notes}</Notes>}
+        </ProfileMain>
 
         <Tabs
           className="panel"
@@ -458,7 +461,6 @@ function ContactFacts({ contact: c }: { contact: ContactRead }) {
           </span>
         </Fact>
       )}
-      {c.notes && <Fact label="Notes">{c.notes}</Fact>}
     </Facts>
   )
 }

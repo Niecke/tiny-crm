@@ -146,7 +146,7 @@ export function WatchForm({
         />
       </fieldset>
 
-      <FormTextField control={control} name="notes" label="Notes" rows={3} />
+      <FormTextField control={control} name="notes" label="Notes" rows={10} />
 
       {error && (
         <p className="form-error" role="alert">
