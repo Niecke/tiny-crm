@@ -3266,10 +3266,11 @@ textarea.input {
   table-layout: fixed;
 }
 
-/* Fixed layout: the field column gets an explicit width (wide enough for the
-   longest label, "Duration (minutes)"), Current and Proposed share the rest. */
+/* Fixed layout: the field column gets an explicit width (wide enough for long
+   labels such as "Works with freelancers"), Current and Proposed share the rest.
+   The row header carries a title with the full name as a fallback. */
 .proposal-diff-field {
-  width: 11rem;
+  width: 15rem;
 }
 
 .proposal-diff th,
