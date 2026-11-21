@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.5.0](https://github.com/Niecke/tiny-crm/compare/v0.4.0...v0.5.0) (2026-11-21)
+
+
+### Features
+
+* agent API tokens, read-only agent endpoints and MCP server ([#375](https://github.com/Niecke/tiny-crm/issues/375)) ([d069cb3](https://github.com/Niecke/tiny-crm/commit/d069cb3e9c9b38f27f5f9686556d3b319bc1e75a))
+* agent proposals with an approvals inbox and MCP propose tools ([#393](https://github.com/Niecke/tiny-crm/issues/393)) ([f2af191](https://github.com/Niecke/tiny-crm/commit/f2af191560f10bc78f70375d38bfe42e6a787891))
+* two-column record pages on wide screens with a dedicated notes panel ([#402](https://github.com/Niecke/tiny-crm/issues/402)) ([a8b41a1](https://github.com/Niecke/tiny-crm/commit/a8b41a1366745927396d40a065bfb36896fd9650))
+
+
+### Bug Fixes
+
+* **deps:** update caddy:alpine docker digest to 003a978 ([#388](https://github.com/Niecke/tiny-crm/issues/388)) ([a2b0752](https://github.com/Niecke/tiny-crm/commit/a2b0752be638489570917d258b43cac054a03722))
+* **deps:** update caddy:alpine docker digest to 78bd350 ([#374](https://github.com/Niecke/tiny-crm/issues/374)) ([caaf051](https://github.com/Niecke/tiny-crm/commit/caaf05181233c4fc3932ccd830596936c6d0f7c8))
+* **deps:** update docker.io/library/python:3.14-slim docker digest to 9aaa474 ([#373](https://github.com/Niecke/tiny-crm/issues/373)) ([42097a7](https://github.com/Niecke/tiny-crm/commit/42097a7c880dbf7619e65183f12e65278039264e))
+* **deps:** update ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie docker digest to 48a0038 ([#383](https://github.com/Niecke/tiny-crm/issues/383)) ([a6592be](https://github.com/Niecke/tiny-crm/commit/a6592be4d74cd46d4139ed502134b38e7c258ac9))
+* **deps:** update node.js to v24.22.3 ([#400](https://github.com/Niecke/tiny-crm/issues/400)) ([72bf1d8](https://github.com/Niecke/tiny-crm/commit/72bf1d8ecf1248397624627908e87d0a97cc975b))
+
 ## [0.4.0](https://github.com/Niecke/tiny-crm/compare/v0.3.0...v0.4.0) (2026-10-25)
 
 
