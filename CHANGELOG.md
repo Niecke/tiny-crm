@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/Niecke/tiny-crm/compare/v0.5.0...v0.5.1) (2026-11-22)
+
+
+### Bug Fixes
+
+* keep field names on one line in the approvals diff and widen the page ([#412](https://github.com/Niecke/tiny-crm/issues/412)) ([8b9cad6](https://github.com/Niecke/tiny-crm/commit/8b9cad645db26076814b786f0d75262e7a9cb0ab))
+
 ## [0.5.0](https://github.com/Niecke/tiny-crm/compare/v0.4.0...v0.5.0) (2026-11-21)
 
 
