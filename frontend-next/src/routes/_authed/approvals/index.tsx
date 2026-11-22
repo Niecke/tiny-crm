@@ -36,7 +36,7 @@ function Approvals() {
   const { approve, reject, errors } = useProposalDecision(api)
 
   return (
-    <div className="page">
+    <div className="page page-approvals">
       <header className="page-header">
         <h1>Approvals</h1>
         <p>Changes proposed by agents. Nothing is saved until you approve it.</p>

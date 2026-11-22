@@ -2596,7 +2596,9 @@ textarea.input {
    main column, linked records beside it. The app bar follows the page. */
 @media (min-width: 1440px) {
   .page.page-record,
-  .main:has(.page-record) .appbar {
+  .page.page-approvals,
+  .main:has(.page-record) .appbar,
+  .main:has(.page-approvals) .appbar {
     max-width: 1600px;
   }
 
@@ -2847,6 +2849,34 @@ textarea.input {
    a slide-in panel; the phone is where the inbox gets triaged, so it has to
    work there from the start. */
 @media (max-width: 767px) {
+  /* The update diff stacks: field name, then Current and Proposed, each
+     labelled, instead of three squeezed columns. */
+  .proposal-diff,
+  .proposal-diff tbody,
+  .proposal-diff tr,
+  .proposal-diff th,
+  .proposal-diff td {
+    display: block;
+  }
+
+  .proposal-diff colgroup,
+  .proposal-diff thead {
+    display: none;
+  }
+
+  .proposal-diff tr {
+    padding: var(--space-2) 0;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .proposal-diff td::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 400;
+    color: var(--color-text-muted);
+  }
+
 
   /* Two rows: the bar at its own height, the page taking the rest. Without
      the explicit rows the spare screen height is shared out, and the bar
@@ -3233,6 +3263,14 @@ textarea.input {
   width: 100%;
   margin: var(--space-3) 0;
   border-collapse: collapse;
+  table-layout: fixed;
+}
+
+/* Fixed layout: the field column gets an explicit width (wide enough for long
+   labels such as "Works with freelancers"), Current and Proposed share the rest.
+   The row header carries a title with the full name as a fallback. */
+.proposal-diff-field {
+  width: 15rem;
 }
 
 .proposal-diff th,
@@ -3240,7 +3278,23 @@ textarea.input {
   padding: var(--space-1) var(--space-2);
   text-align: left;
   vertical-align: top;
-  overflow-wrap: anywhere;
+}
+
+/* Field names stay on one line; the ellipsis is only a safety net. */
+.proposal-diff th {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Values wrap at word boundaries; a single long token (a URL) still breaks. */
+.proposal-diff td {
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.proposal-diff tbody tr:not([data-changed]) td {
+  color: var(--color-text-muted);
 }
 
 .proposal-diff tbody tr[data-changed] td:last-child {

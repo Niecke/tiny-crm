@@ -131,6 +131,11 @@ function ProposalBody({ proposal, labels }: { proposal: ProposalRead; labels: La
   }
   return (
     <table className="proposal-diff">
+      <colgroup>
+        <col className="proposal-diff-field" />
+        <col />
+        <col />
+      </colgroup>
       <thead>
         <tr>
           <th scope="col">Field</th>
@@ -141,9 +146,9 @@ function ProposalBody({ proposal, labels }: { proposal: ProposalRead; labels: La
       <tbody>
         {rows.map((row) => (
           <tr key={row.field} data-changed={row.changed || undefined}>
-            <th scope="row">{row.field}</th>
-            <td>{row.current}</td>
-            <td>{row.proposed}</td>
+            <th scope="row" title={row.field}>{row.field}</th>
+            <td data-label="Current">{row.current}</td>
+            <td data-label="Proposed">{row.proposed}</td>
           </tr>
         ))}
       </tbody>
